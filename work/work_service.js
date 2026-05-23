@@ -17,56 +17,46 @@ window.clearDirtyMap = function () {
 
 // ... 기존의 다른 함수들 (syncNow, startSync 등) ...
 window.startSync = async function () {
-    if (window.workSyncStartFromServiceDisabled) return;
+    try {
+        window.logs = window.logs || [];
+        window.trash = window.trash || [];
 
-    if (window.loadFromServer && window.getServerData && window.applyServerData) {
-        try {
-            window.logs = window.logs || [];
-            window.trash = window.trash || [];
+        const dirty = window.getDirtyMap ? window.getDirtyMap() : {};
+        const hasDirty = Object.keys(dirty).length > 0;
 
-            const dirty = window.getDirtyMap ? window.getDirtyMap() : {};
-            const hasDirty = Object.keys(dirty).length > 0;
+        if (hasDirty) {
+            console.log("시작 동기화 건너뜀: 로컬 변경사항이 있어 서버 저장을 우선합니다.", dirty);
 
-            if (hasDirty) {
-                console.log("시작 동기화 건너뜀: 로컬 변경사항이 있어 서버 저장을 우선합니다.", dirty);
+            if (window.scheduleSync) window.scheduleSync();
+            if (window.renderMain) window.renderMain();
 
-                if (window.scheduleSync) {
-                    window.scheduleSync();
-                }
-
-                if (window.renderMain) {
-                    window.renderMain();
-                }
-
-                return;
-            }
-
-            const result = await window.loadFromServer();
-            const serverData = window.getServerData(result);
-            const serverStamp = window.getServerStamp ? window.getServerStamp(result) : null;
-
-            if (serverData) {
-                window.applyServerData(serverData, false);
-
-                if (window.setSyncStamp) {
-                    window.setSyncStamp(serverStamp);
-                }
-
-                console.log("시작 동기화 완료: 서버 데이터 반영", serverStamp);
-            }
-        } catch (e) {
-            console.warn("시작 동기화 실패, 로컬 데이터로 실행:", e);
-            window.isInitialLoad = false;
-
-            if (window.renderMain) {
-                window.renderMain();
-            }
+            return;
         }
 
-        return;
-    }
+        if (!window.loadFromServer || !window.getServerData || !window.applyServerData) {
+            console.warn("시작 동기화 실패: work_sync.js 함수가 준비되지 않았습니다.");
+            return;
+        }
 
-    console.warn("시작 동기화 실패: work_sync.js 함수가 아직 준비되지 않았습니다.");
+        const result = await window.loadFromServer();
+        const serverData = window.getServerData(result);
+        const serverStamp = window.getServerStamp ? window.getServerStamp(result) : null;
+
+        if (serverData) {
+            window.applyServerData(serverData, false);
+
+            if (window.setSyncStamp) {
+                window.setSyncStamp(serverStamp);
+            }
+
+            console.log("시작 동기화 완료: 서버 데이터 반영", serverStamp);
+        }
+    } catch (e) {
+        console.warn("시작 동기화 실패, 로컬 데이터로 실행:", e);
+        window.isInitialLoad = false;
+
+        if (window.renderMain) window.renderMain();
+    }
 };
 
 window.exportBackupData = () => {
@@ -131,7 +121,7 @@ window.importData = (event) => {
 
     const reader = new FileReader();
 
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
         try {
             let text = e.target.result || "";
 
@@ -180,24 +170,20 @@ window.importData = (event) => {
                 window.markDirty("snapshot", "import", "replace");
             }
 
-            if (window.scheduleSync) {
-                window.scheduleSync();
-            }
-
-            if (window.recalculateTagCounts) {
-                window.recalculateTagCounts();
-            }
-
             if (window.refreshCurrentUI) {
                 window.refreshCurrentUI();
             } else if (window.renderMain) {
                 window.renderMain();
             }
 
-            alert(`복원 성공!\n작업/메모 기록: ${window.logs.length}개`);
+            if (window.syncNow) {
+                await window.syncNow(true);
+            }
+
+            alert(`복원 성공!\n작업/메모 기록: ${window.logs.length}개\n서버에도 즉시 반영했습니다.`);
         } catch (err) {
             console.error("복원 실패:", err);
-            alert("복원 실패: JSON 파일을 읽을 수 없습니다.");
+            alert("복원 실패: JSON 파일을 읽는 중 오류가 있었습니다.");
         } finally {
             if (window.hideLoading) {
                 window.hideLoading();

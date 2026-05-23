@@ -404,9 +404,7 @@ window.syncNow = async function (showError = false) {
     } catch (e) {
         console.warn("서버 저장 실패, 로컬 저장 유지:", e);
 
-        if (showError) {
-            throw e;
-        }
+        if (showError) throw e;
 
         return null;
     } finally {
