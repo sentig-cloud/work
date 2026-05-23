@@ -19,17 +19,184 @@ window.exportBackupData = () => {
     } catch(e) { alert("백업 파일 생성 중 오류가 발생했습니다."); }
 };
 
+// 🔥 백업 복원 버튼 실행
 window.triggerImport = () => {
+
     const input = document.getElementById('importFile');
 
     if (!input) {
-        alert("복원 파일 선택창이 없습니다.");
+        alert("❌ importFile 요소를 찾을 수 없습니다.");
         return;
     }
 
-    if (confirm("🚨 기존 데이터를 백업 파일로 덮어씁니다. 계속할까요?")) {
-        input.click();
+    const ok = confirm(
+        "🚨 기존 데이터가 백업 파일 내용으로 덮어쓰기 됩니다.\n\n계속하시겠습니까?"
+    );
+
+    if (!ok) return;
+
+    input.click();
+};
+
+
+// 🔥 JSON / TXT 복원
+window.importData = (event) => {
+
+    const file = event.target.files[0];
+
+    if (!file) return;
+
+    if (window.showLoading) {
+        window.showLoading("백업 파일 읽는 중...");
     }
+
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+
+        try {
+
+            let text = e.target.result;
+
+            // UTF BOM 제거
+            if (text.charCodeAt(0) === 0xFEFF) {
+                text = text.slice(1);
+            }
+
+            const importedData = JSON.parse(text);
+
+            // data 래핑 대응
+            const data = importedData.data
+                ? importedData.data
+                : importedData;
+
+            // logs 체크
+            if (!data || !Array.isArray(data.logs)) {
+
+                if (window.hideLoading) {
+                    window.hideLoading();
+                }
+
+                alert("❌ 지원하지 않는 백업 파일 형식입니다.");
+                return;
+            }
+
+            // 🔥 데이터 복원
+            window.logs = (data.logs || []).filter(Boolean);
+
+            window.trash =
+                (data.trash || []).filter(Boolean);
+
+            window.taskTypes =
+                (data.taskTypes || []).filter(Boolean);
+
+            window.coworkers =
+                (data.coworkers || []).filter(Boolean);
+
+            window.statuses =
+                (data.statuses || []).filter(Boolean);
+
+            window.equipments =
+                (data.equipments || []).filter(Boolean);
+
+            window.memoTags =
+                (data.memoTags || []).filter(Boolean);
+
+
+            // 🔥 로컬 저장
+            localStorage.setItem(
+                'wm_logs',
+                JSON.stringify(window.logs)
+            );
+
+            localStorage.setItem(
+                'wm_trash',
+                JSON.stringify(window.trash)
+            );
+
+            localStorage.setItem(
+                'wm_taskTypes',
+                JSON.stringify(window.taskTypes)
+            );
+
+            localStorage.setItem(
+                'wm_coworkers',
+                JSON.stringify(window.coworkers)
+            );
+
+            localStorage.setItem(
+                'wm_statuses',
+                JSON.stringify(window.statuses)
+            );
+
+            localStorage.setItem(
+                'wm_equipments',
+                JSON.stringify(window.equipments)
+            );
+
+            localStorage.setItem(
+                'wm_memoTags',
+                JSON.stringify(window.memoTags)
+            );
+
+
+            // 🔥 UI 새로고침
+            if (window.refreshCurrentUI) {
+
+                window.refreshCurrentUI();
+
+            } else {
+
+                if (window.renderMain) {
+                    window.renderMain();
+                }
+
+                if (window.updateUI) {
+                    window.updateUI();
+                }
+            }
+
+            if (window.hideLoading) {
+                window.hideLoading();
+            }
+
+            alert(
+                `✅ 복원 성공!\n\n총 ${window.logs.length}개의 기록이 복원되었습니다.`
+            );
+
+        } catch (err) {
+
+            console.error(err);
+
+            if (window.hideLoading) {
+                window.hideLoading();
+            }
+
+            alert(
+                "❌ JSON 파일 읽기 실패\n\n" +
+                "파일이 손상되었거나 형식이 올바르지 않습니다."
+            );
+        }
+
+        event.target.value = "";
+    };
+
+
+    // 🔥 읽기 실패
+    reader.onerror = () => {
+
+        if (window.hideLoading) {
+            window.hideLoading();
+        }
+
+        alert("❌ 파일 읽기 실패");
+
+        event.target.value = "";
+    };
+
+
+    // 🔥 UTF-8 읽기
+    reader.readAsText(file, "UTF-8");
 };
 
 window.importData = (event) => {
