@@ -73,6 +73,59 @@ window.restoreLocalDirtyItems = function (snapshot, dirty) {
     });
 };
 
+window.fetchWithTimeout = async function (url, options = {}, timeoutMs = 15000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        return await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+    } catch (e) {
+        if (e.name === "AbortError") {
+            throw new Error(`서버 응답 시간 초과: ${timeoutMs / 1000}초 동안 응답 없음`);
+        }
+
+        throw e;
+    } finally {
+        clearTimeout(timer);
+    }
+};
+
+window.loadFromServer = async function () {
+    let res;
+
+    try {
+        res = await window.fetchWithTimeout(`${WORK_API_BASE}/api/load`, {
+            method: "GET",
+            headers: {
+                "Accept": "application/json"
+            }
+        }, 15000);
+    } catch (e) {
+        console.error("동기화 서버 연결 실패:", e);
+        throw new Error(
+            "동기화 서버에 연결하지 못했습니다.\n" +
+            "인터넷, 인증서, VPN/보안 프로그램, Cloudflare Worker 주소를 확인하세요.\n\n" +
+            "원인: " + e.message
+        );
+    }
+
+    const text = await res.text();
+
+    if (!res.ok) {
+        throw new Error(`서버 불러오기 실패: ${res.status} / ${text}`);
+    }
+
+    try {
+        return text ? JSON.parse(text) : {};
+    } catch (e) {
+        console.error("서버 응답 JSON 파싱 실패:", text);
+        throw new Error("서버 응답을 JSON으로 읽을 수 없습니다.");
+    }
+};
+
 window.syncNow = async function (showError = false) {
     if (window.syncInProgress) {
         window.pendingSyncAfterCurrent = true;
