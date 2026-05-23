@@ -101,9 +101,14 @@ window.startSync = async function () {
             headers: { "Accept": "application/json" }
         });
 
-        if (!res.ok) throw new Error("서버 응답 오류: " + res.status);
+        const text = await res.text();
 
-        const result = await res.json();
+        if (!res.ok) {
+            console.error("❌ 서버 불러오기 응답:", res.status, text);
+            throw new Error(`서버 응답 오류: ${res.status} / ${text}`);
+        }
+
+        const result = text ? JSON.parse(text) : {};
 
         if (result?.saved?.data) {
             window.applyServerData(result.saved.data);
