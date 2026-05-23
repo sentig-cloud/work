@@ -145,7 +145,6 @@ window.saveLocal = function() {
     }
 };
 
-// 🛑 서버 업로드 원천 차단
 window.saveToServer = async function(showError = false) {
     try {
         const payload = {
@@ -162,7 +161,7 @@ window.saveToServer = async function(showError = false) {
             }
         };
 
-        const res = await fetch("/api/save", {
+        const res = await fetch("https://work.sentig335.workers.dev/api/save", {
             method: "POST",
             headers: { 
                 "Content-Type": "application/json",
