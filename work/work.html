@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Work Master Local Pro</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>   
+    
+    <link rel="stylesheet" href="work_style.css">
+</head>
+<body>
+
+<div id="app-container">
+    <div id="loadingLayer"><div class="spinner"></div><span id="loadingText">처리 중...</span></div>
+
+    <div class="header w95-out" id="mainHeader">
+        <div class="toolbar-group">
+            <button type="button" class="w95-btn icon-btn" onclick="if(window.WorkExportUI) window.WorkExportUI.open(); else alert('내보내기 모듈이 로드되지 않았습니다.');" title="엑셀 내보내기"><i class="fa-solid fa-file-excel" style="color:#10b981;"></i></button>
+        </div>
+        <div class="toolbar-group">
+            <button type="button" class="w95-btn icon-btn" onclick="window.openSearch()" title="검색"><i class="fa-solid fa-magnifying-glass"></i></button>
+            <button type="button" class="w95-btn icon-btn" onclick="window.openTrash()" title="휴지통"><i class="fa-solid fa-trash-can"></i></button>
+        </div>
+    </div>
+    
+    <div class="month-grid" id="mainGrid"></div>
+    
+    <div id="dashboardPanel" class="w95-out" style="background: var(--w-gray); padding:4px; display:flex; align-items:stretch;">
+        <div id="dashboardStats" class="w95-in" style="flex: 1; padding: 4px; overflow-y: auto; font-size: 0.8rem; line-height: 1.5; background: var(--w-white);"></div>
+    </div>
+
+    <div style="padding: 0 10px; margin-top: 6px; display:flex; gap: 4px; flex-shrink: 0;">
+        <button type="button" class="w95-btn icon-btn" id="quickMicBtn" onclick="window.toggleMicFor(event, 'quickInput', 'quickMicBtn')" title="음성 인식"><i class="fa-solid fa-microphone"></i></button>
+        <input type="text" id="quickInput" class="m-input w95-in" style="flex:1; margin:0; min-width:0;" placeholder="주소 / 전화번호 등 빠른 입력" autocomplete="nope" spellcheck="false" data-lpignore="true">
+        <button type="button" class="w95-btn" onclick="window.openQuickWorkModal()" style="font-weight:bold; color:var(--w-blue);">입력</button>
+    </div>
+
+    <div class="yearly-summary w95-out" style="margin-top: 8px;" id="yearlySummary"></div>
+
+    <div id="fabToday" style="position:fixed; bottom:110px; right:20px; width:45px; height:45px; background:#84cc16; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:2px 2px 8px rgba(0,0,0,0.5); z-index:4000; cursor:pointer; border:2px solid #fff;">
+        <i class="fa-solid fa-calendar-day" style="color:#fff; font-size:1.3rem;"></i>
+    </div>
+
+    <div id="popupLayer" class="layer">
+        <div class="pop-nav w95-out">
+            <div style="display:flex; align-items:center;">
+                <button type="button" class="w95-btn icon-btn" onclick="if(!window.isSyncLongPress) window.closePop()" onmousedown="window.startSyncPress(event)" onmouseup="window.endSyncPress(event)" onmouseleave="window.cancelSyncPress()" ontouchstart="window.startSyncPress(event)" ontouchend="window.endSyncPress(event)" ontouchcancel="window.cancelSyncPress()" oncontextmenu="return false;" style="margin-right: 8px; touch-action: manipulation; user-select: none;" title="길게 누르면 강제 동기화"><i class="fa-solid fa-chevron-left"></i></button>
+                <div class="pop-title" id="monthLabel" onclick="window.closePop()">0월</div>
+            </div>
+            <div class="pop-nav-stats">
+                <span>📋 <b id="popSumWork">0</b>건</span>
+                <button type="button" class="w95-btn icon-btn" onclick="window.openSearch()" style="margin-left: 8px;"><i class="fa-solid fa-magnifying-glass"></i></button>
+            </div>
+        </div>
+        <div id="popContentArea">
+            <table class="cal-table"><tbody id="calBody"></tbody></table>
+            <div id="logList" class="list-area"></div>
+        </div>
+        <div class="footer-nav w95-out">
+            <div id="previewArea" style="display:flex; gap:6px; margin-bottom:4px; overflow-x:auto;"></div>
+            <div class="single-input-row">
+                <button type="button" class="w95-btn icon-btn" id="micBtn" onclick="window.toggleMicFor(event, 'memoIn', 'micBtn')"><i class="fa-solid fa-microphone"></i></button>
+                <button type="button" class="w95-btn icon-btn" onclick="document.getElementById('fileIn').click()"><i class="fa-solid fa-image"></i></button>
+                <button type="button" class="w95-btn icon-btn" onclick="document.getElementById('fileCam').click()"><i class="fa-solid fa-camera"></i></button>
+                <input type="file" id="fileIn" hidden multiple accept="image/*, .heic, .HEIC" onchange="window.handleGeneralFiles(this)">
+                <input type="file" id="fileCam" hidden accept="image/*" capture="environment" onchange="window.handleGeneralFiles(this)">
+                
+                <input type="text" id="memoIn" class="m-input w95-in" style="flex:1; min-width:0; margin:0;" placeholder="메모 입력..." autocomplete="off" spellcheck="false" data-lpignore="true">
+                <button type="button" class="w95-btn icon-btn" onclick="window.saveGeneralEntry()"><i class="fa-solid fa-paper-plane" style="color:var(--w-blue)"></i></button>
+            </div>
+            
+            <div style="display:flex; margin-top: 4px; gap:6px; align-items: stretch; height: 38px;">
+                <button type="button" class="w95-btn" onclick="window.openCommuteModal('in')" style="flex:1;" title="출근"><i class="fa-solid fa-sign-in-alt" style="color:var(--w-blue); font-size:1.4rem;"></i></button>
+                <button type="button" class="w95-btn" onclick="window.openWorkModal()" style="flex:2;" title="작업 일지 작성"><i class="fa-solid fa-clipboard-list" style="color:var(--w-blue); font-size:1.4rem;"></i></button>
+                <button type="button" class="w95-btn" onclick="window.openCommuteModal('out')" style="flex:1;" title="퇴근"><i class="fa-solid fa-sign-out-alt" style="color:#ef4444; font-size:1.4rem;"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <div id="workModal" class="modal-overlay">
+        <div class="modal-box w95-window">
+            <div class="w95-titlebar">
+                <span>작업 일지 작성</span>
+                <button type="button" class="w95-btn" style="padding:0 6px;" onclick="window.closeWorkModal()">X</button>
+            </div>
+            
+            <div class="modal-content-scroll" style="padding:4px; display:flex; flex-direction:column;">
+                <div id="workDragContainer" style="display:flex; flex-direction:column; gap:2px;">
+
+                    <div class="drag-item w95-out" data-id="1" style="display:flex; flex-direction:column; gap:2px;">
+                        <div style="display:flex; gap:2px; align-items:center;">
+                            <div style="position:relative; flex:2; min-width:80px; max-width:95px; display:flex; align-items:center; justify-content:center; background:#fff; border: 2px solid; border-color: #808080 #fff #fff #808080; height:28px;">
+                                <span id="workDayLabel" style="font-weight:bold; font-size:0.8rem; color:var(--w-blue);"></span>
+                                <input type="date" id="workDateInput" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;" onchange="window.updateWorkDateLabel()">
+                            </div>
+                            <input type="text" id="workTime" inputmode="numeric" class="m-input w95-in" style="flex:1; max-width: 50px; text-align:center; height:28px;" placeholder="시간" onblur="window.formatTimeInput(this)">
+                            <button type="button" id="workDutyBtn" class="w95-btn" style="padding:0 4px; height:28px;" onclick="window.toggleDuty()">당직</button>
+                            <input type="text" id="workOT" inputmode="numeric" class="m-input w95-in" style="flex:1; max-width: 55px; text-align:center; height:28px;" placeholder="OT(00:00)" onblur="window.formatOTInput(this)">
+                        </div>
+                        <div style="display:flex; gap:2px;">
+                            <input type="text" id="taskNo" inputmode="numeric" class="m-input w95-in" style="flex:1; height:28px;" placeholder="Task 번호">
+                            <input type="text" id="customerName" class="m-input w95-in" style="flex:1; height:28px;" placeholder="고객명">
+                        </div>
+                        <div style="display:flex; gap:2px;">
+                            <input type="text" id="workAddress" class="m-input w95-in" style="flex:1; height:28px;" placeholder="주소 입력">
+                            <button type="button" class="w95-btn icon-btn" style="height:28px; padding:0 8px;" onmousedown="window.startMapPress(event)" onmouseup="window.endMapPress(event)" ontouchstart="window.startMapPress(event)" ontouchend="window.endMapPress(event)"><i class="fa-solid fa-map-location-dot"></i></button>
+                        </div>
+                        <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>
+                    </div>
+
+                    <div class="drag-item w95-out" data-id="2" style="display:flex; flex-direction:column; gap:2px;">
+                        <textarea id="workContent" class="m-input w95-in" rows="1" style="height:28px; padding-top:4px; resize:none;" placeholder="작업 내용"></textarea>
+                        <input type="text" id="workNote" class="m-input w95-in" style="height:28px;" placeholder="특이사항">
+                        <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>
+                    </div>
+
+                    <div class="drag-item w95-in" data-id="3">
+                        <div id="boxTitle_taskType" class="box-title" onmousedown="window.startTitlePress(event, 'taskType')" onmouseup="window.endTitlePress()" onmouseleave="window.endTitlePress()" ontouchstart="window.startTitlePress(event, 'taskType')" ontouchend="window.endTitlePress()" ontouchcancel="window.endTitlePress()">작업 유형</div>
+                        <div id="taskTypeArea" class="btn-tag-area"></div>
+                        <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>
+                    </div>
+
+                    <div class="drag-item w95-in" data-id="4">
+                        <div id="boxTitle_coworkers" class="box-title" onmousedown="window.startTitlePress(event, 'coworkers')" onmouseup="window.endTitlePress()" onmouseleave="window.endTitlePress()" ontouchstart="window.startTitlePress(event, 'coworkers')" ontouchend="window.endTitlePress()" ontouchcancel="window.endTitlePress()">매니저</div>
+                        <div id="coworkerArea" class="btn-tag-area"></div>
+                        <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>
+                    </div>
+
+                    <div class="drag-item w95-in" data-id="5">
+                        <div id="boxTitle_equips" class="box-title" onmousedown="window.startTitlePress(event, 'equips')" onmouseup="window.endTitlePress()" onmouseleave="window.endTitlePress()" ontouchstart="window.startTitlePress(event, 'equips')" ontouchend="window.endTitlePress()" ontouchcancel="window.endTitlePress()">사용 장비</div>
+                        <div id="equipArea" class="btn-tag-area"></div>
+                        <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>
+                    </div>
+
+                    <div class="drag-item w95-in" data-id="6">
+                        <div id="boxTitle_status" class="box-title" onmousedown="window.startTitlePress(event, 'status')" onmouseup="window.endTitlePress()" onmouseleave="window.endTitlePress()" ontouchstart="window.startTitlePress(event, 'status')" ontouchend="window.endTitlePress()" ontouchcancel="window.endTitlePress()">상태</div>
+                        <div id="statusArea" class="btn-tag-area"></div>
+                        <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>
+                    </div>
+
+                    <div class="drag-item w95-in" data-id="7">
+                        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:6px; padding: 4px;">
+                            <div id="workPhotoGrid" class="photo-edit-grid" style="flex:1; display:flex; gap:4px; overflow-x:auto;"></div>
+                            <div style="display:flex; flex-direction:column; gap:4px; flex-shrink:0;">
+                                <button type="button" class="w95-btn icon-btn" style="height:28px; padding:0 8px;" onclick="document.getElementById('workPhotoInput').click()"><i class="fa-solid fa-image"></i></button>
+                                <button type="button" class="w95-btn icon-btn" style="height:28px; padding:0 8px;" onclick="document.getElementById('workCamInput').click()"><i class="fa-solid fa-camera"></i></button>
+                            </div>
+                        </div>
+                        <input type="file" id="workPhotoInput" hidden multiple accept="image/*, .heic" onchange="window.handleWorkFiles(this)">
+                        <input type="file" id="workCamInput" hidden accept="image/*" capture="environment" onchange="window.handleWorkFiles(this)">
+                        <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>
+                    </div>
+
+                </div>
+            </div>
+            <div class="modal-footer" style="padding:4px; background:var(--w-gray); display:flex; gap:4px;">
+                <button type="button" class="w95-btn" style="flex:1; height:32px; font-weight:bold; color:var(--w-blue);" onclick="window.saveWorkLog()">저장</button>
+                <button type="button" class="w95-btn" style="flex:1; height:32px; font-weight:bold; color:red;" onclick="window.closeWorkModal()">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="commuteModal" class="modal-overlay" style="z-index: 2500;">
+        <div class="modal-box w95-window">
+            <div class="w95-titlebar">
+                <span id="commuteTitle">출/퇴근 기록</span>
+                <button type="button" class="w95-btn" style="padding:0 6px;" onclick="window.closeCommuteModal()">X</button>
+            </div>
+            <div class="modal-content-scroll" style="padding:8px; display:flex; flex-direction:column; gap:6px;">
+                
+                <div style="display:flex; gap:8px; align-items: stretch;">
+                    <div id="commuteThumbZone" style="width: 85px; height: auto; min-height: 105px; border:2px solid var(--w-dark-gray); background:var(--w-white); position:relative; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0; cursor:pointer;" onclick="window.handleCommuteThumbClick(event)">
+                        <span id="commuteNoPhotoText" style="font-size:0.75rem; color:#888; text-align:center; pointer-events:none;">사진 없음</span>
+                        <img id="commuteImgPreview" style="display:none; width:100%; height:100%; object-fit:cover; pointer-events:none;">
+                        <button type="button" id="commuteImgDelBtn" class="w95-btn" style="display:none; position:absolute; top:0; left:0; width:22px; height:22px; padding:0; font-size:10px; color:red; z-index:10;" onclick="window.removeCommuteImg(event)">X</button>
+                    </div>
+                    <input type="file" id="commuteImgInput" hidden accept="image/*, .heic" onchange="window.handleCommuteImg(this)">
+                    
+                    <div style="flex:1; display:flex; flex-direction:column; justify-content:space-between; gap:6px;">
+                        <div style="display:flex; gap:4px; align-items:center;">
+                            <input type="text" id="commuteTime" inputmode="numeric" class="m-input w95-in" style="flex:1;" placeholder="시간" onblur="window.formatTimeInput(this); if(window.updateOvertime) window.updateOvertime();">
+                            <input type="number" id="commuteKm" inputmode="numeric" class="m-input w95-in" style="flex:1;" placeholder="거리(km)">
+                        </div>
+                        <div style="display:flex; gap:4px; align-items:center;">
+                            <button type="button" id="editBaseTimeBtn" class="w95-btn icon-btn" style="width:28px; height:32px; flex-shrink:0; padding:0;" onclick="window.toggleEditBaseTime()"><i class="fa-solid fa-pen"></i></button>
+                            <input type="text" id="commuteBaseTime" class="m-input w95-in" style="width:55px; flex-shrink:0; text-align:center;" readonly onblur="window.formatTimeInput(this); if(window.updateOvertime) window.updateOvertime();">
+                            <input type="text" id="commuteOvertime" class="m-input w95-in" style="flex:1;" readonly placeholder="초과">
+                            <button type="button" id="commuteExceptionBtn" class="w95-btn" style="padding:0 6px; height:32px; flex-shrink:0;" onclick="window.toggleException()">예외</button>
+                        </div>
+                        <input type="text" id="commuteNote" class="m-input w95-in" placeholder="특이사항 (지각사유 등)">
+                    </div>
+                </div>
+
+            </div>
+            <div class="modal-footer" style="padding:6px; background:var(--w-gray);">
+                <button type="button" class="w95-btn" style="width:100%; height:32px; font-weight:bold; color:var(--w-blue);" onclick="window.saveCommute()">저장</button>
+            </div>
+        </div>
+    </div>
+        
+    <div id="mapAppModal" class="modal-overlay" style="z-index: 2600;">
+        <div class="modal-box w95-window" style="max-width: 250px;">
+            <div class="w95-titlebar"><span>지도 앱 선택</span><button type="button" class="w95-btn" onclick="window.closeMapAppModal()">X</button></div>
+            <div style="padding:10px; display:flex; flex-direction:column; gap:8px;">
+                <button type="button" class="w95-btn" style="height:40px; font-size:1.1rem; font-weight:bold;" onclick="window.openSpecificMap('tmap')">T맵</button>
+                <button type="button" class="w95-btn" style="height:40px; font-size:1.1rem; font-weight:bold;" onclick="window.openSpecificMap('naver')">네이버 지도</button>
+                <button type="button" class="w95-btn" style="height:40px; font-size:1.1rem; font-weight:bold;" onclick="window.openSpecificMap('kakaomap')">카카오맵</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="titleEditModal" class="modal-overlay" style="z-index: 2700;">
+        <div class="modal-box w95-window" style="max-width: 250px;">
+            <div class="w95-titlebar"><span>상자 이름 변경</span><button type="button" class="w95-btn" onclick="document.getElementById('titleEditModal').style.display='none'">X</button></div>
+            <div style="padding:10px; background:var(--w-gray);">
+                <input type="hidden" id="titleEditTargetId">
+                <input type="text" id="titleEditInput" class="m-input w95-in" style="width:100%; margin-bottom:8px;">
+                <button type="button" class="w95-btn" style="width:100%; color:var(--w-blue); font-weight:bold; height:32px;" onclick="window.saveBoxTitle()">저장 (내보내기 연동)</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="tagEditModal" class="modal-overlay" style="z-index: 2600;">
+        <div class="modal-box w95-window" style="max-width: 250px;">
+            <div class="w95-titlebar"><span>항목 편집</span><button type="button" class="w95-btn" onclick="window.closeTagEditModal()">X</button></div>
+            <div style="padding:10px; background:var(--w-gray);">
+                <input type="text" id="tagEditInput" class="m-input w95-in" style="width:100%; margin-bottom:8px;">
+                <div id="equipQtyContainer" style="display:none; align-items:center; justify-content:space-between; margin-bottom:8px; padding:4px; background:#fff; border:1px solid #888;">
+                    <span style="font-size:0.8rem; font-weight:bold;">장비 수량 조절</span>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <button type="button" class="w95-btn icon-btn" style="height:24px;" onclick="window.changeEquipQty(-1)">-</button>
+                        <b id="equipQtyDisplay" style="font-size:1.1rem; min-width:20px; text-align:center;">0</b>
+                        <button type="button" class="w95-btn icon-btn" style="height:24px;" onclick="window.changeEquipQty(1)">+</button>
+                    </div>
+                </div>
+                <div style="display:flex; gap:6px;">
+                    <button type="button" class="w95-btn" style="flex:1; color:var(--w-blue); font-weight:bold;" onclick="window.saveTagEdit()">저장</button>
+                    <button type="button" class="w95-btn" style="flex:1; color:red;" onclick="window.deleteTagEdit()">삭제</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="editModal" class="modal-overlay">
+        <div class="modal-box w95-window">
+            <div class="w95-titlebar"><span>메모/사진 편집</span><button type="button" class="w95-btn" onclick="window.closeEditModal()">X</button></div>
+            <div class="modal-content-scroll" style="padding:8px; display:flex; flex-direction:column; gap:6px;">
+                <textarea id="editMemo" class="m-input w95-in" rows="4"></textarea>
+                <div class="w95-in" style="background:#fff; padding:4px;">
+                    <div style="font-size:0.8rem; font-weight:bold; margin-bottom:4px; color:var(--w-blue);">태그</div>
+                    <div id="editTagArea" class="btn-tag-area"></div>
+                </div>
+                <div class="w95-in" style="background:#fff; padding:4px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <div style="font-size:0.8rem; font-weight:bold; color:var(--w-blue);">사진</div>
+                        <button type="button" class="w95-btn icon-btn" onclick="document.getElementById('editPhotoAdd').click()"><i class="fa-solid fa-plus"></i></button>
+                    </div>
+                    <input type="file" id="editPhotoAdd" hidden multiple accept="image/*, .heic" onchange="window.addFilesToEdit(this)">
+                    <div id="editPhotoGrid" class="photo-edit-grid"></div>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding:6px; background:var(--w-gray);">
+                <button type="button" class="w95-btn" style="width:100%; height:32px; font-weight:bold; color:var(--w-blue);" onclick="window.saveEditLog()">저장</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="searchLayer" class="layer">
+        <div class="w95-titlebar" style="padding: 10px;">
+            <span style="font-size:1.2rem; cursor:pointer;" onclick="window.closeSearch()"><i class="fa-solid fa-chevron-left" style="margin-right:8px;"></i> 검색 결과</span>
+            <button type="button" class="w95-btn icon-btn" onclick="window.resetSearchInput()"><i class="fa-solid fa-rotate-right"></i></button>
+        </div>
+        <div style="padding:8px; display:flex; flex-direction:column; gap:6px; background:var(--w-gray); border-bottom:2px solid var(--w-black);">
+            <div style="display:flex; gap:4px;">
+                <select id="searchMonth" class="m-input w95-in" style="flex:0.3; padding:0 2px;" onchange="window.handleSelectChange(this)"></select>
+                <input type="text" id="searchInput" class="m-input w95-in" style="flex:0.7;" placeholder="검색어 실시간 입력..." oninput="window.doSearch()">
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:4px;">
+                <select id="searchType" class="m-input w95-in" style="padding:0 2px; font-size:0.85rem !important;" onchange="window.handleSelectChange(this)"></select>
+                <select id="searchStatus" class="m-input w95-in" style="padding:0 2px; font-size:0.85rem !important;" onchange="window.handleSelectChange(this)"></select>
+                <select id="searchManager" class="m-input w95-in" style="padding:0 2px; font-size:0.85rem !important;" onchange="window.handleSelectChange(this)"></select>
+                <select id="searchEquip" class="m-input w95-in" style="padding:0 2px; font-size:0.85rem !important;" onchange="window.handleSelectChange(this)"></select>
+                <select id="searchMemoTag" class="m-input w95-in" style="padding:0 2px; font-size:0.85rem !important;" onchange="window.handleSelectChange(this)"></select>
+                <select id="searchOX" class="m-input w95-in" style="padding:0 2px; font-size:0.85rem !important;" onchange="window.handleSelectChange(this)"></select>
+            </div>
+            <div id="activeFiltersArea" style="display:flex; flex-wrap:wrap; gap:4px;"></div>
+            <div id="searchSummary" style="font-weight:bold; font-size:0.9rem; text-align:center; padding:4px; display:none; background:#fff; border:1px solid #888;"></div>
+        </div>
+        <div id="searchResultList" class="list-area" style="margin:0; border:none; padding-bottom:20px;"></div>
+    </div>
+    
+    <div id="imageViewer">
+        <div class="viewer-toolbar">
+            <button type="button" class="w95-btn" onclick="window.closeImageViewer()">닫기</button>
+            <button type="button" class="w95-btn" id="deleteImgBtn" style="color:red; display:none;" onclick="window.deleteViewerImage()">사진 삭제</button>
+        </div>
+        <div id="viewerImgArea">
+            <button type="button" onclick="window.changeViewerImage(-1)" style="position:absolute; left:0; top:50%; transform:translateY(-50%); height:100%; width:80px; background:transparent; border:none; color:white; font-size:2rem; z-index:3100; opacity:0.6;"><i class="fa-solid fa-chevron-left"></i></button>
+            <button type="button" onclick="window.changeViewerImage(1)" style="position:absolute; right:0; top:50%; transform:translateY(-50%); height:100%; width:80px; background:transparent; border:none; color:white; font-size:2rem; z-index:3100; opacity:0.6;"><i class="fa-solid fa-chevron-right"></i></button>
+            <img id="viewerImg" src="">
+        </div>
+    </div>
+
+    <div id="trashLayer" class="layer">
+        <div class="w95-titlebar" style="cursor: pointer;" onclick="window.closeTrash()">
+            <span><i class="fa-solid fa-chevron-left" style="margin-right:8px;"></i> 휴지통</span>
+            <button type="button" class="w95-btn" style="height: 22px; font-size: 0.8rem;" onclick="event.stopPropagation(); window.clearTrash()">모두 비우기</button>
+        </div>
+        <div id="trashList" class="list-area"></div>
+    </div>
+</div>
+
+<script src="work_data.js"></script>
+<script src="work_sync.js"></script>
+
+<script src="work_utils.js"></script>
+<script src="work_commute.js"></script>
+<script src="work_tag_manager.js"></script>
+
+<script src="work_render.js"></script>
+<script src="work_ui.js"></script>
+<script src="work_modal.js"></script>
+<script src="work_logic.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+<script src="work_export_html.js"></script>
+<script src="work_export_ui.js"></script>
+<script src="work_export.js"></script>
+
+</body>
+</html>
