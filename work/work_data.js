@@ -1,9 +1,4 @@
 // Firebase 설정
-window.firebaseConfig = {
-    apiKey: "AIzaSyCM-XlgUaZxIzuAVUJSb3LEVGwWM1GPlkw",
-    databaseURL: "https://my-dash-b9471-default-rtdb.asia-southeast1.firebasedatabase.app/",
-    projectId: "my-dash-b9471"
-};
 
 if (!firebase.apps.length) firebase.initializeApp(window.firebaseConfig);
 window.db = firebase.database();
