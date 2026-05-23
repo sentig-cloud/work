@@ -44,19 +44,65 @@ window.refreshCurrentUI = function() {
 };
 
 // 🛑 서버 다운로드 원천 차단 (120MB 통신 방지)
-window.startSync = function(uid) {
-    console.warn("서버 동기화가 강제 차단되었습니다. 요금 0원 유지 중.");
-    return;
+window.startSync = async function(uid) {
+    try {
+        const res = await fetch("/api/load", {
+            method: "GET",
+            headers: { "Accept": "application/json" }
+        });
+
+        if (!res.ok) {
+            console.warn("서버 복원 실패:", res.status);
+            window.isInitialLoad = false;
+            if (window.renderMain) window.renderMain();
+            return;
+        }
+
+        const result = await res.json();
+
+        if (result && result.saved && result.saved.data) {
+            window.applyServerData(result.saved.data);
+        } else if (result && result.data) {
+            window.applyServerData(result.data);
+        } else {
+            window.isInitialLoad = false;
+            if (window.renderMain) window.renderMain();
+        }
+    } catch (e) {
+        console.warn("서버 복원 실패, 로컬 데이터로 실행:", e);
+        window.isInitialLoad = false;
+        if (window.renderMain) window.renderMain();
+    }
 };
 
 // 🛑 수동 강제 동기화 버튼 클릭 시 차단 안내
-window.forceSync = function() {
-    alert("요금 보호를 위해 서버 동기화가 차단되었습니다.\n현재 작업 내용은 스마트폰 기기 내부에 안전하게 자동 저장되고 있습니다.");
+window.forceSync = async function() {
+    try {
+        if (window.showLoading) window.showLoading("서버 동기화 중...");
+
+        await window.saveToServer(true);
+
+        if (window.hideLoading) window.hideLoading();
+        alert("✅ 서버 동기화 완료!");
+    } catch (e) {
+        if (window.hideLoading) window.hideLoading();
+        alert("❌ 서버 동기화 실패: " + e.message);
+    }
 };
 
 // 화면 UI 강제 갱신용
-window.applyServerData = function(val) {
-    window.refreshCurrentUI();
+window.forceSync = async function() {
+    try {
+        if (window.showLoading) window.showLoading("서버 동기화 중...");
+
+        await window.saveToServer(true);
+
+        if (window.hideLoading) window.hideLoading();
+        alert("✅ 서버 동기화 완료!");
+    } catch (e) {
+        if (window.hideLoading) window.hideLoading();
+        alert("❌ 서버 동기화 실패: " + e.message);
+    }
 };
 
 window.recalculateTagCounts = function() {
@@ -79,6 +125,7 @@ window.recalculateTagCounts = function() {
 // 서버 전송 없이 로컬(기기 내부)에만 저장합니다.
 window.saveLocal = function() {
     window.recalculateTagCounts();
+
     try {
         localStorage.setItem('wm_logs', JSON.stringify(window.logs));
         localStorage.setItem('wm_trash', JSON.stringify(window.trash));
@@ -90,15 +137,50 @@ window.saveLocal = function() {
     } catch (e) {
         console.error("로컬 저장 오류:", e);
     }
-    
-    // window.saveToServer(); <-- 이 부분을 비활성화하여 업로드 통신도 차단합니다.
+
     window.refreshCurrentUI();
+
+    if (window.saveToServer) {
+        window.saveToServer(false);
+    }
 };
 
 // 🛑 서버 업로드 원천 차단
-window.saveToServer = function() {
-    console.warn("서버 업로드가 강제 차단되었습니다. 요금 0원 유지 중.");
-    return;
+window.saveToServer = async function(showError = false) {
+    try {
+        const payload = {
+            savedAt: new Date().toISOString(),
+            app: "work",
+            data: {
+                logs: window.logs || [],
+                trash: window.trash || [],
+                taskTypes: window.taskTypes || [],
+                coworkers: window.coworkers || [],
+                statuses: window.statuses || [],
+                equipments: window.equipments || [],
+                memoTags: window.memoTags || []
+            }
+        };
+
+        const res = await fetch("/api/save", {
+            method: "POST",
+            headers: { 
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            throw new Error("서버 응답 오류: " + res.status);
+        }
+
+        return await res.json();
+    } catch (e) {
+        console.warn("서버 저장 실패, 로컬 저장은 유지됨:", e);
+        if (showError) throw e;
+        return null;
+    }
 };
 
 window.saveToLocalStore = function(colName, data) {
