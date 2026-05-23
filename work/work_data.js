@@ -91,3 +91,47 @@ window.isCommuteException = false;
 window.calculatedOvertimeMin = 0;
 window.tempCommuteImg = null;
 window.isWorkDuty = false;
+
+// work_data.js 맨 아래에 추가
+window.saveToLocalStore = function(colName, data) {
+    if (!window.logs) window.logs = [];
+    if (!window.trash) window.trash = [];
+
+    // 날짜 업데이트
+    data.updatedAt = new Date().toISOString();
+
+    if (colName === 'logs') {
+        const idx = window.logs.findIndex(l => String(l.id) === String(data.id));
+        if (idx >= 0) window.logs[idx] = data;
+        else window.logs.push(data);
+        localStorage.setItem('wm_logs', JSON.stringify(window.logs));
+    } else if (colName === 'trash') {
+        const idx = window.trash.findIndex(l => String(l.id) === String(data.id));
+        if (idx >= 0) window.trash[idx] = data;
+        else window.trash.push(data);
+        localStorage.setItem('wm_trash', JSON.stringify(window.trash));
+    }
+
+    // 서버 동기화가 설정되어 있다면 dirty 처리
+    if (window.markDirty) {
+        window.markDirty(colName, data.id, 'upsert');
+    }
+    
+    // UI 업데이트가 정의되어 있다면 호출
+    if (window.updateUI) window.updateUI();
+};
+
+window.deleteFromLocalStore = function(colName, id) {
+    if (colName === 'logs') {
+        window.logs = window.logs.filter(l => String(l.id) !== String(id));
+        localStorage.setItem('wm_logs', JSON.stringify(window.logs));
+    } else if (colName === 'trash') {
+        window.trash = window.trash.filter(l => String(l.id) !== String(id));
+        localStorage.setItem('wm_trash', JSON.stringify(window.trash));
+    }
+
+    if (window.markDirty) {
+        window.markDirty(colName, id, 'delete');
+    }
+    if (window.updateUI) window.updateUI();
+};
