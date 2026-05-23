@@ -1,252 +1,76 @@
-// work_sync.js
-// Cloudflare Worker/KV 동기화 전용
-// 1초 디바운싱 + 변경 추적 + 병합 저장
-
-const WORK_API_BASE = "https://work.sentig335.workers.dev";
-
-window.syncTimer = null;
-window.syncInProgress = false;
-window.pendingSyncAfterCurrent = false;
-window.isApplyingServerData = false;
-
-window.getSyncStamp = function () {
-    return localStorage.getItem("wm_sync_updated_at") || "1970-01-01T00:00:00.000Z";
-};
-
-window.setSyncStamp = function (stamp = null) {
-    const nextStamp = stamp || new Date().toISOString();
-    localStorage.setItem("wm_sync_updated_at", nextStamp);
-    return nextStamp;
-};
-
-window.getDirtyMap = function () {
-    try {
-        return JSON.parse(localStorage.getItem("wm_dirty_map") || "{}");
-    } catch (e) {
-        return {};
-    }
-};
-
-window.setDirtyMap = function (map) {
-    localStorage.setItem("wm_dirty_map", JSON.stringify(map || {}));
-};
-
-window.clearDirtyMap = function () {
-    localStorage.removeItem("wm_dirty_map");
-};
-
-window.markDirty = function (colName, id = "_all", action = "upsert") {
-    if (window.isApplyingServerData) return;
-
-    const dirty = window.getDirtyMap();
-
-    if (!dirty[colName]) dirty[colName] = {};
-
-    dirty[colName][String(id)] = {
-        id: String(id),
-        action,
-        changedAt: new Date().toISOString()
+window.cloneSyncSnapshot = function () {
+    return {
+        logs: JSON.parse(JSON.stringify(window.logs || [])),
+        trash: JSON.parse(JSON.stringify(window.trash || [])),
+        taskTypes: JSON.parse(JSON.stringify(window.taskTypes || [])),
+        coworkers: JSON.parse(JSON.stringify(window.coworkers || [])),
+        statuses: JSON.parse(JSON.stringify(window.statuses || [])),
+        equipments: JSON.parse(JSON.stringify(window.equipments || [])),
+        memoTags: JSON.parse(JSON.stringify(window.memoTags || []))
     };
-
-    window.setDirtyMap(dirty);
 };
 
-window.saveArrayToLocal = function (key, arr) {
-    localStorage.setItem(`wm_${key}`, JSON.stringify((arr || []).filter(Boolean)));
-};
+window.touchAllDirtyItems = function (dirty, snapshot) {
+    const now = new Date().toISOString();
 
-window.saveAllLocalOnly = function () {
-    window.logs = (window.logs || []).filter(Boolean);
-    window.trash = (window.trash || []).filter(Boolean);
-    window.taskTypes = (window.taskTypes || []).filter(Boolean);
-    window.coworkers = (window.coworkers || []).filter(Boolean);
-    window.statuses = (window.statuses || []).filter(Boolean);
-    window.equipments = (window.equipments || []).filter(Boolean);
-    window.memoTags = (window.memoTags || []).filter(Boolean);
+    Object.keys(dirty || {}).forEach(colName => {
+        if (!Array.isArray(snapshot[colName])) return;
 
-    window.saveArrayToLocal("logs", window.logs);
-    window.saveArrayToLocal("trash", window.trash);
-    window.saveArrayToLocal("taskTypes", window.taskTypes);
-    window.saveArrayToLocal("coworkers", window.coworkers);
-    window.saveArrayToLocal("statuses", window.statuses);
-    window.saveArrayToLocal("equipments", window.equipments);
-    window.saveArrayToLocal("memoTags", window.memoTags);
-};
+        Object.keys(dirty[colName] || {}).forEach(id => {
+            const itemDirty = dirty[colName][id];
+            if (!itemDirty || itemDirty.action === "delete") return;
 
-window.refreshCurrentUI = function () {
-    if (window.renderMain) window.renderMain();
-
-    const popupLayer = document.getElementById("popupLayer");
-    const isPopupOpen = popupLayer && popupLayer.style.display === "flex";
-
-    if (isPopupOpen) {
-        if (window.renderCal) window.renderCal(window.currentYear, window.curMonth - 1);
-        if (window.updateUI) window.updateUI();
-    }
-
-    if (document.getElementById("searchLayer")?.style.display === "flex" && window.doSearch) {
-        window.doSearch();
-    }
-
-    if (document.getElementById("trashLayer")?.style.display === "flex" && window.renderTrash) {
-        window.renderTrash();
-    }
-};
-
-window.getServerData = function (serverResult) {
-    if (serverResult?.saved?.data) return serverResult.saved.data;
-    if (serverResult?.data) return serverResult.data;
-    return null;
-};
-
-window.getServerStamp = function (serverResult) {
-    return (
-        serverResult?.saved?.syncUpdatedAt ||
-        serverResult?.syncUpdatedAt ||
-        serverResult?.savedAt ||
-        "1970-01-01T00:00:00.000Z"
-    );
-};
-
-window.touchUpdatedAt = function (item) {
-    if (item && typeof item === "object") {
-        item.updatedAt = new Date().toISOString();
-    }
-    return item;
-};
-
-window.mergeById = function (localArr, serverArr) {
-    const map = new Map();
-
-    (serverArr || []).filter(Boolean).forEach(item => {
-        if (!item.id) item.id = `${Date.now()}_${Math.random()}`;
-        map.set(String(item.id), item);
+            const item = snapshot[colName].find(v => String(v.id) === String(id));
+            if (item && typeof item === "object") {
+                item.updatedAt = item.updatedAt || now;
+            }
+        });
     });
 
-    (localArr || []).filter(Boolean).forEach(item => {
-        if (!item.id) item.id = `${Date.now()}_${Math.random()}`;
+    return snapshot;
+};
 
-        const id = String(item.id);
-        const old = map.get(id);
+window.applyDirtyDeletesToServerData = function (serverData, dirty) {
+    if (!serverData || !dirty) return serverData;
 
-        if (!old) {
-            map.set(id, item);
-            return;
-        }
+    const nextData = JSON.parse(JSON.stringify(serverData));
 
-        const localTime = item.updatedAt || item.savedAt || "";
-        const serverTime = old.updatedAt || old.savedAt || "";
+    Object.keys(dirty).forEach(colName => {
+        if (!Array.isArray(nextData[colName])) return;
 
-        map.set(id, localTime >= serverTime ? item : old);
+        Object.keys(dirty[colName] || {}).forEach(id => {
+            const itemDirty = dirty[colName][id];
+
+            if (itemDirty && itemDirty.action === "delete") {
+                nextData[colName] = nextData[colName].filter(item => String(item.id) !== String(id));
+            }
+        });
     });
 
-    return Array.from(map.values()).filter(Boolean);
+    return nextData;
 };
 
-window.mergeMasterByName = function (localArr, serverArr) {
-    const map = new Map();
+window.restoreLocalDirtyItems = function (snapshot, dirty) {
+    Object.keys(dirty || {}).forEach(colName => {
+        if (!Array.isArray(window[colName]) || !Array.isArray(snapshot[colName])) return;
 
-    (serverArr || []).filter(Boolean).forEach(item => {
-        if (item.name) map.set(item.name, item);
+        Object.keys(dirty[colName] || {}).forEach(id => {
+            const itemDirty = dirty[colName][id];
+
+            if (itemDirty && itemDirty.action === "delete") {
+                window[colName] = window[colName].filter(item => String(item.id) !== String(id));
+                return;
+            }
+
+            const localItem = snapshot[colName].find(item => String(item.id) === String(id));
+            if (!localItem) return;
+
+            const idx = window[colName].findIndex(item => String(item.id) === String(id));
+
+            if (idx >= 0) window[colName][idx] = localItem;
+            else window[colName].push(localItem);
+        });
     });
-
-    (localArr || []).filter(Boolean).forEach(item => {
-        if (item.name) map.set(item.name, item);
-    });
-
-    return Array.from(map.values()).filter(Boolean);
-};
-
-window.applyServerData = function (data, merge = false) {
-    if (!data || !Array.isArray(data.logs)) return false;
-
-    window.isApplyingServerData = true;
-
-    if (merge) {
-        window.logs = window.mergeById(window.logs || [], data.logs || []);
-        window.trash = window.mergeById(window.trash || [], data.trash || []);
-        window.taskTypes = window.mergeMasterByName(window.taskTypes || [], data.taskTypes || []);
-        window.coworkers = window.mergeMasterByName(window.coworkers || [], data.coworkers || []);
-        window.statuses = window.mergeMasterByName(window.statuses || [], data.statuses || []);
-        window.equipments = window.mergeMasterByName(window.equipments || [], data.equipments || []);
-        window.memoTags = window.mergeMasterByName(window.memoTags || [], data.memoTags || []);
-    } else {
-        window.logs = (data.logs || []).filter(Boolean);
-        window.trash = (data.trash || []).filter(Boolean);
-        window.taskTypes = (data.taskTypes || []).filter(Boolean);
-        window.coworkers = (data.coworkers || []).filter(Boolean);
-        window.statuses = (data.statuses || []).filter(Boolean);
-        window.equipments = (data.equipments || []).filter(Boolean);
-        window.memoTags = (data.memoTags || []).filter(Boolean);
-    }
-
-    window.saveAllLocalOnly();
-
-    window.isApplyingServerData = false;
-    window.isInitialLoad = false;
-
-    if (window.refreshCurrentUI) window.refreshCurrentUI();
-
-    return true;
-};
-
-window.loadFromServer = async function () {
-    const res = await fetch(`${WORK_API_BASE}/api/load`, {
-        method: "GET",
-        headers: { "Accept": "application/json" }
-    });
-
-    const text = await res.text();
-
-    if (!res.ok) {
-        throw new Error(`서버 불러오기 실패: ${res.status} / ${text}`);
-    }
-
-    return text ? JSON.parse(text) : {};
-};
-
-window.startSync = async function () {
-    try {
-        window.logs = window.logs || [];
-        window.trash = window.trash || [];
-
-        const result = await window.loadFromServer();
-        const serverData = window.getServerData(result);
-        const serverStamp = window.getServerStamp(result);
-
-        const hasLocalData =
-            (window.logs && window.logs.length > 0) ||
-            (window.trash && window.trash.length > 0);
-
-        if (serverData) {
-            window.applyServerData(serverData, hasLocalData);
-            window.setSyncStamp(serverStamp);
-        } else {
-            window.isInitialLoad = false;
-            window.saveAllLocalOnly();
-            if (window.renderMain) window.renderMain();
-        }
-
-        if (hasLocalData) {
-            window.scheduleSync();
-        }
-
-        console.log("✅ 시작 동기화 완료", result);
-    } catch (e) {
-        console.warn("서버 불러오기 실패, 로컬로 실행:", e);
-        window.isInitialLoad = false;
-        if (window.renderMain) window.renderMain();
-    }
-};
-
-window.scheduleSync = function () {
-    if (window.isApplyingServerData) return;
-
-    clearTimeout(window.syncTimer);
-
-    window.syncTimer = setTimeout(() => {
-        window.syncNow(false);
-    }, 1000);
 };
 
 window.syncNow = async function (showError = false) {
@@ -266,15 +90,20 @@ window.syncNow = async function (showError = false) {
         let serverResult = null;
         let serverData = null;
 
+        const localSnapshot = window.touchAllDirtyItems(dirty, window.cloneSyncSnapshot());
+
         try {
             serverResult = await window.loadFromServer();
             serverData = window.getServerData(serverResult);
         } catch (e) {
-            console.warn("서버 병합용 불러오기 실패, 현재 로컬 기준 저장:", e);
+            console.warn("서버 병합용 데이터 불러오기 실패, 현재 로컬 기준 저장:", e);
         }
 
         if (serverData) {
-            window.applyServerData(serverData, true);
+            const cleanedServerData = window.applyDirtyDeletesToServerData(serverData, dirty);
+            window.applyServerData(cleanedServerData, true);
+            window.restoreLocalDirtyItems(localSnapshot, dirty);
+            window.saveAllLocalOnly();
         }
 
         const stamp = window.setSyncStamp();
@@ -313,7 +142,7 @@ window.syncNow = async function (showError = false) {
         const result = text ? JSON.parse(text) : {};
 
         window.clearDirtyMap();
-        console.log("✅ 자동 동기화 완료", result);
+        console.log("자동 동기화 완료", result);
 
         return result;
     } catch (e) {
@@ -329,72 +158,3 @@ window.syncNow = async function (showError = false) {
         }
     }
 };
-
-window.saveToServer = async function (showError = false) {
-    return await window.syncNow(showError);
-};
-
-window.saveLocal = function (dirtyKey = "_all") {
-    if (!window.logs) window.logs = [];
-    if (!window.trash) window.trash = [];
-
-    window.saveAllLocalOnly();
-
-    if (!window.isApplyingServerData) {
-        window.markDirty("snapshot", dirtyKey, "save");
-        window.scheduleSync();
-    }
-
-    if (window.refreshCurrentUI) window.refreshCurrentUI();
-};
-
-window.saveToLocalStore = function (colName, data) {
-    if (!window.logs) window.logs = [];
-    if (!window.trash) window.trash = [];
-
-    data = window.touchUpdatedAt(data);
-
-    if (colName === "logs") {
-        const idx = window.logs.findIndex(l => String(l.id) === String(data.id));
-        if (idx >= 0) window.logs[idx] = data;
-        else window.logs.push(data);
-    }
-
-    if (colName === "trash") {
-        const idx = window.trash.findIndex(l => String(l.id) === String(data.id));
-        if (idx >= 0) window.trash[idx] = data;
-        else window.trash.push(data);
-    }
-
-    window.markDirty(colName, data.id, "upsert");
-    window.saveLocal(`${colName}:${data.id}`);
-};
-
-window.deleteFromLocalStore = function (colName, id) {
-    if (colName === "logs") {
-        window.logs = (window.logs || []).filter(l => String(l.id) !== String(id));
-    }
-
-    if (colName === "trash") {
-        window.trash = (window.trash || []).filter(l => String(l.id) !== String(id));
-    }
-
-    window.markDirty(colName, id, "delete");
-    window.saveLocal(`${colName}:${id}:delete`);
-};
-
-window.forceSync = async function () {
-    try {
-        if (window.showLoading) window.showLoading("서버 동기화 중...");
-        await window.syncNow(true);
-        if (window.hideLoading) window.hideLoading();
-        alert("✅ 서버 동기화 완료!");
-    } catch (e) {
-        if (window.hideLoading) window.hideLoading();
-        alert("❌ 서버 동기화 실패: " + e.message);
-    }
-};
-
-setTimeout(() => {
-    if (window.startSync) window.startSync();
-}, 500);
