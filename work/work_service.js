@@ -18,29 +18,54 @@ window.clearDirtyMap = function () {
 // ... 기존의 다른 함수들 (syncNow, startSync 등) ...
 window.startSync = async function () {
     try {
-        console.log("서버 데이터 강제 동기화 시작...");
-        const res = await fetch(`${WORK_API_BASE}/api/load`, {
-            method: "GET",
-            headers: { "Accept": "application/json" }
-        });
-        
-        if (!res.ok) throw new Error("서버 응답 오류");
-        
-        const json = await res.json();
-        // 서버 데이터 구조에 맞게 파싱
-        const serverData = json.saved ? json.saved.data : json.data;
-        
+        window.logs = window.logs || [];
+        window.trash = window.trash || [];
+
+        const dirty = window.getDirtyMap ? window.getDirtyMap() : {};
+        const hasDirty = Object.keys(dirty).length > 0;
+
+        if (hasDirty) {
+            console.log("시작 동기화: 로컬 변경사항이 있어 서버 저장을 우선합니다.", dirty);
+
+            if (window.scheduleSync) {
+                window.scheduleSync();
+            }
+
+            if (window.renderMain) {
+                window.renderMain();
+            }
+
+            return;
+        }
+
+        const result = await window.loadFromServer();
+        const serverData = window.getServerData(result);
+        const serverStamp = window.getServerStamp(result);
+
         if (serverData) {
-            window.applyServerData(serverData, false); // false를 주면 서버 데이터로 로컬을 완전 덮어씁니다.
-            console.log("동기화 성공! 서버 데이터가 로컬에 반영되었습니다.");
+            window.applyServerData(serverData, false);
+            window.setSyncStamp(serverStamp);
+            console.log("시작 동기화 완료: 서버 데이터 반영", serverStamp);
+        } else {
+            window.isInitialLoad = false;
+
+            if (window.saveAllLocalOnly) {
+                window.saveAllLocalOnly();
+            }
+
+            if (window.renderMain) {
+                window.renderMain();
+            }
         }
     } catch (e) {
-        console.error("동기화 실패:", e);
-        // 서버 통신이 안 될 때만 로컬 데이터를 유지
-        window.saveAllLocalOnly(); 
+        console.warn("시작 동기화 실패, 로컬 데이터로 실행:", e);
+        window.isInitialLoad = false;
+
+        if (window.renderMain) {
+            window.renderMain();
+        }
     }
-    if (window.renderMain) window.renderMain();
-}
+};
 
 window.exportBackupData = () => {
     if (!window.logs || window.logs.length === 0) {

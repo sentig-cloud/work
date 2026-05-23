@@ -40,40 +40,105 @@ window.setupSwipeGesture = () => {
 // 🚨 이동식 연두색 버튼 (오늘 날짜 이동) 복원 로직
 window.setupFAB = () => {
     const fab = document.getElementById('fabToday');
-    if(!fab) return;
-    let isDragging = false, isTouch = false;
-    let startX, startY, initialX, initialY;
+    if (!fab) return;
 
-    const startDrag = (clientX, clientY) => {
-        isDragging = false; isTouch = true;
-        startX = clientX; startY = clientY;
-        initialX = fab.offsetLeft; initialY = fab.offsetTop;
-        fab.style.transition = 'none'; 
+    let isDragging = false;
+    let isTouching = false;
+    let isTodayLongPress = false;
+    let todayPressTimer = null;
+
+    let startX = 0;
+    let startY = 0;
+    let initialX = 0;
+    let initialY = 0;
+
+    const clearTodayPressTimer = () => {
+        clearTimeout(todayPressTimer);
+        todayPressTimer = null;
     };
 
-    const moveDrag = (clientX, clientY, e) => {
-        if(!isTouch) return;
-        let dx = clientX - startX; let dy = clientY - startY;
-        if(Math.abs(dx) > 5 || Math.abs(dy) > 5) isDragging = true;
-        if(isDragging) {
-            if(e.cancelable) e.preventDefault();
+    const startPress = (clientX, clientY) => {
+        isDragging = false;
+        isTouching = true;
+        isTodayLongPress = false;
+
+        startX = clientX;
+        startY = clientY;
+        initialX = fab.offsetLeft;
+        initialY = fab.offsetTop;
+
+        fab.style.transition = 'none';
+
+        clearTodayPressTimer();
+
+        todayPressTimer = setTimeout(() => {
+            isTodayLongPress = true;
+
+            if (navigator.vibrate) navigator.vibrate(50);
+            if (window.forceSync) window.forceSync();
+        }, 1500);
+    };
+
+    const movePress = (clientX, clientY, e) => {
+        if (!isTouching) return;
+
+        let dx = clientX - startX;
+        let dy = clientY - startY;
+
+        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+            isDragging = true;
+            clearTodayPressTimer();
+        }
+
+        if (isDragging) {
+            if (e && e.cancelable) e.preventDefault();
+
             fab.style.left = `${initialX + dx}px`;
             fab.style.top = `${initialY + dy}px`;
-            fab.style.right = 'auto'; fab.style.bottom = 'auto';
+            fab.style.right = 'auto';
+            fab.style.bottom = 'auto';
         }
     };
 
-    const endDrag = (e) => {
-        isTouch = false;
-        fab.style.transition = '0.2s'; 
-        if(!isDragging && e.type !== 'touchcancel') window.goToToday();
-        setTimeout(() => { isDragging = false; }, 100);
+    const endPress = (e) => {
+        clearTodayPressTimer();
+
+        isTouching = false;
+        fab.style.transition = '0.2s';
+
+        if (!isDragging && !isTodayLongPress && (!e || e.type !== 'touchcancel')) {
+            window.goToToday();
+        }
+
+        setTimeout(() => {
+            isDragging = false;
+            isTodayLongPress = false;
+        }, 100);
     };
 
-    fab.addEventListener('touchstart', e => startDrag(e.touches[0].clientX, e.touches[0].clientY), {passive: true});
-    fab.addEventListener('touchmove', e => moveDrag(e.touches[0].clientX, e.touches[0].clientY, e), {passive: false});
-    fab.addEventListener('touchend', endDrag);
-    fab.addEventListener('touchcancel', endDrag);
+    fab.addEventListener('touchstart', e => {
+        startPress(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
+
+    fab.addEventListener('touchmove', e => {
+        movePress(e.touches[0].clientX, e.touches[0].clientY, e);
+    }, { passive: false });
+
+    fab.addEventListener('touchend', endPress);
+    fab.addEventListener('touchcancel', endPress);
+
+    fab.addEventListener('mousedown', e => {
+        e.preventDefault();
+        startPress(e.clientX, e.clientY);
+    });
+
+    document.addEventListener('mousemove', e => {
+        movePress(e.clientX, e.clientY, e);
+    });
+
+    document.addEventListener('mouseup', e => {
+        if (isTouching) endPress(e);
+    });
 };
 
 window.startPress = (e, type, index) => {

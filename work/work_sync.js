@@ -362,25 +362,6 @@ window.syncNow = async function (showError = false) {
     window.syncInProgress = true;
 
     try {
-        let serverResult = null;
-        let serverData = null;
-
-        const localSnapshot = window.touchAllDirtyItems(dirty, window.cloneSyncSnapshot());
-
-        try {
-            serverResult = await window.loadFromServer();
-            serverData = window.getServerData(serverResult);
-        } catch (e) {
-            console.warn("서버 병합 데이터 불러오기 실패, 현재 로컬 기준 저장:", e);
-        }
-
-        if (serverData) {
-            const cleanedServerData = window.applyDirtyDeletesToServerData(serverData, dirty);
-            window.applyServerData(cleanedServerData, true);
-            window.restoreLocalDirtyItems(localSnapshot, dirty);
-            window.saveAllLocalOnly();
-        }
-
         const stamp = window.setSyncStamp();
 
         const payload = {
@@ -422,7 +403,11 @@ window.syncNow = async function (showError = false) {
         return result;
     } catch (e) {
         console.warn("서버 저장 실패, 로컬 저장 유지:", e);
-        if (showError) throw e;
+
+        if (showError) {
+            throw e;
+        }
+
         return null;
     } finally {
         window.syncInProgress = false;
@@ -486,6 +471,69 @@ window.deleteFromLocalStore = function (colName, id) {
     window.markDirty(colName, id, "delete");
     window.saveLocal(`${colName}:${id}:delete`);
 };
+
+window.isSyncApplyBlocked = function () {
+    const blockingLayerIds = [
+        "workModal",
+        "editModal",
+        "commuteModal",
+        "titleEditModal",
+        "tagEditModal"
+    ];
+
+    const hasOpenModal = blockingLayerIds.some(id => {
+        const el = document.getElementById(id);
+        return el && el.style.display === "flex";
+    });
+
+    if (hasOpenModal) return true;
+
+    const active = document.activeElement;
+    if (active && ["INPUT", "TEXTAREA", "SELECT"].includes(active.tagName)) {
+        return true;
+    }
+
+    return false;
+};
+
+window.syncFromServerIfSafe = async function (reason = "manual") {
+    if (window.syncInProgress || window.isApplyingServerData) return false;
+
+    const dirty = window.getDirtyMap ? window.getDirtyMap() : {};
+    if (Object.keys(dirty).length > 0) {
+        console.log("서버 불러오기 건너뜀: 로컬 변경사항 있음", reason);
+        return false;
+    }
+
+    if (window.isSyncApplyBlocked && window.isSyncApplyBlocked()) {
+        console.log("서버 불러오기 건너뜀: 편집 중", reason);
+        return false;
+    }
+
+    try {
+        const result = await window.loadFromServer();
+        const serverData = window.getServerData(result);
+        const serverStamp = window.getServerStamp(result);
+        const localStamp = window.getSyncStamp();
+
+        if (!serverData) return false;
+
+        if (serverStamp && serverStamp <= localStamp) {
+            console.log("서버 불러오기 건너뜀: 최신 상태", reason);
+            return false;
+        }
+
+        window.applyServerData(serverData, false);
+        window.setSyncStamp(serverStamp);
+
+        console.log("서버 최신 데이터 적용 완료", reason, serverStamp);
+        return true;
+    } catch (e) {
+        console.warn("서버 최신 데이터 확인 실패:", reason, e);
+        return false;
+    }
+};
+
 
 window.forceSync = async function () {
     try {

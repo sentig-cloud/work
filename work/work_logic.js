@@ -33,10 +33,22 @@ window.startSyncPress = (e) => {
 window.endSyncPress = (e) => { clearTimeout(window.syncPressTimer); };
 window.cancelSyncPress = () => { clearTimeout(window.syncPressTimer); };
 
-window.goToToday = () => {
+window.goToToday = async () => {
+    if (window.syncFromServerIfSafe) {
+        if (window.showLoading) window.showLoading("최신 데이터 확인 중...");
+        await window.syncFromServerIfSafe("today");
+        if (window.hideLoading) window.hideLoading();
+    }
+
     let now = new Date();
-    window.currentYear = now.getFullYear(); let m = now.getMonth() + 1; let d = now.getDate();
-    window.openPop(m); window.setCurDay(d);
+
+    window.currentYear = now.getFullYear();
+
+    let m = now.getMonth() + 1;
+    let d = now.getDate();
+
+    window.openPop(m);
+    window.setCurDay(d);
 };
 
 window.toggleLogOx = (id) => {
