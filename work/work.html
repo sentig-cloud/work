@@ -36,6 +36,19 @@
         <div id="dashboardStats" class="w95-in" style="flex: 1; padding: 4px; overflow-y: auto; font-size: 0.8rem; line-height: 1.5; background: var(--w-white);"></div>
     </div>
 
+<!-- 🔥 백업 복원 버튼 -->
+<button type="button" class="w95-btn icon-btn" onclick="window.triggerImport()" title="백업 복원">
+    <i class="fa-solid fa-file-import" style="color:#dc2626;"></i>
+</button>
+
+<!-- 🔥 파일 선택 -->
+<input 
+    type="file"
+    id="importFile"
+    hidden
+    accept=".json,.txt,application/json,text/plain"
+    onchange="window.importData(event)">
+
     <div style="padding: 0 10px; margin-top: 6px; display:flex; gap: 4px; flex-shrink: 0;">
         <button type="button" class="w95-btn icon-btn" id="quickMicBtn" onclick="window.toggleMicFor(event, 'quickInput', 'quickMicBtn')" title="음성 인식"><i class="fa-solid fa-microphone"></i></button>
         <input type="text" id="quickInput" class="m-input w95-in" style="flex:1; margin:0; min-width:0;" placeholder="주소 / 전화번호 등 빠른 입력" autocomplete="nope" spellcheck="false" data-lpignore="true">
