@@ -13,6 +13,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>   
     
     <link rel="stylesheet" href="work_style.css">
+    
 </head>
 <body>
 
@@ -40,6 +41,11 @@
         <input type="text" id="quickInput" class="m-input w95-in" style="flex:1; margin:0; min-width:0;" placeholder="주소 / 전화번호 등 빠른 입력" autocomplete="nope" spellcheck="false" data-lpignore="true">
         <button type="button" class="w95-btn" onclick="window.openQuickWorkModal()" style="font-weight:bold; color:var(--w-blue);">입력</button>
     </div>
+    <button type="button" class="w95-btn icon-btn" onclick="window.triggerImport()" title="백업 복원">
+  <i class="fa-solid fa-file-import" style="color:#dc2626;"></i>
+</button>
+
+<input type="file" id="importFile" hidden accept=".json,.txt,application/json,text/plain" onchange="window.importData(event)">
 
     <div class="yearly-summary w95-out" style="margin-top: 8px;" id="yearlySummary"></div>
 

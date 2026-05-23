@@ -19,6 +19,151 @@ window.exportBackupData = () => {
     } catch(e) { alert("백업 파일 생성 중 오류가 발생했습니다."); }
 };
 
+window.triggerImport = () => {
+    const input = document.getElementById('importFile');
+
+    if (!input) {
+        alert("복원 파일 선택창이 없습니다.");
+        return;
+    }
+
+    if (confirm("🚨 기존 데이터를 백업 파일로 덮어씁니다. 계속할까요?")) {
+        input.click();
+    }
+};
+
+window.importData = (event) => {
+    const file = event.target.files[0];
+
+    if (!file) return;
+
+    if (window.showLoading) {
+        window.showLoading("백업 파일 읽는 중...");
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+        try {
+            const importedData = JSON.parse(e.target.result);
+
+            const data = importedData.data
+                ? importedData.data
+                : importedData;
+
+            if (!data || !Array.isArray(data.logs)) {
+                alert("❌ 지원하지 않는 백업 파일입니다.");
+                return;
+            }
+
+            window.logs = (data.logs || []).filter(Boolean);
+            window.trash = (data.trash || []).filter(Boolean);
+            window.taskTypes = (data.taskTypes || []).filter(Boolean);
+            window.coworkers = (data.coworkers || []).filter(Boolean);
+            window.statuses = (data.statuses || []).filter(Boolean);
+            window.equipments = (data.equipments || []).filter(Boolean);
+            window.memoTags = (data.memoTags || []).filter(Boolean);
+
+            localStorage.setItem('wm_logs', JSON.stringify(window.logs));
+            localStorage.setItem('wm_trash', JSON.stringify(window.trash));
+            localStorage.setItem('wm_taskTypes', JSON.stringify(window.taskTypes));
+            localStorage.setItem('wm_coworkers', JSON.stringify(window.coworkers));
+            localStorage.setItem('wm_statuses', JSON.stringify(window.statuses));
+            localStorage.setItem('wm_equipments', JSON.stringify(window.equipments));
+            localStorage.setItem('wm_memoTags', JSON.stringify(window.memoTags));
+
+            if (window.refreshCurrentUI) {
+                window.refreshCurrentUI();
+            } else if (window.renderMain) {
+                window.renderMain();
+            }
+
+            alert(`✅ 복원 성공!\n기록 수: ${window.logs.length}개`);
+
+        } catch (err) {
+            console.error(err);
+            alert("❌ JSON 파일 읽기 실패");
+        } finally {
+            if (window.hideLoading) {
+                window.hideLoading();
+            }
+
+            event.target.value = "";
+        }
+    };
+
+    reader.onerror = () => {
+        if (window.hideLoading) {
+            window.hideLoading();
+        }
+
+        alert("❌ 파일 읽기 실패");
+        event.target.value = "";
+    };
+
+    reader.readAsText(file, "UTF-8");
+};
+
+window.importData = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (window.showLoading) window.showLoading("백업 파일 읽는 중...");
+
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+        try {
+            const importedData = JSON.parse(e.target.result);
+
+            const data = importedData.data ? importedData.data : importedData;
+
+            if (!data || !Array.isArray(data.logs)) {
+                alert("❌ 지원하지 않는 백업 파일입니다.");
+                return;
+            }
+
+            window.logs = (data.logs || []).filter(Boolean);
+            window.trash = (data.trash || []).filter(Boolean);
+            window.taskTypes = (data.taskTypes || window.taskTypes || []).filter(Boolean);
+            window.coworkers = (data.coworkers || window.coworkers || []).filter(Boolean);
+            window.statuses = (data.statuses || window.statuses || []).filter(Boolean);
+            window.equipments = (data.equipments || window.equipments || []).filter(Boolean);
+            window.memoTags = (data.memoTags || window.memoTags || []).filter(Boolean);
+
+            if (window.saveLocal) window.saveLocal();
+            else {
+                localStorage.setItem('wm_logs', JSON.stringify(window.logs));
+                localStorage.setItem('wm_trash', JSON.stringify(window.trash));
+                localStorage.setItem('wm_taskTypes', JSON.stringify(window.taskTypes));
+                localStorage.setItem('wm_coworkers', JSON.stringify(window.coworkers));
+                localStorage.setItem('wm_statuses', JSON.stringify(window.statuses));
+                localStorage.setItem('wm_equipments', JSON.stringify(window.equipments));
+                localStorage.setItem('wm_memoTags', JSON.stringify(window.memoTags));
+            }
+
+            if (window.recalculateTagCounts) window.recalculateTagCounts();
+            if (window.refreshCurrentUI) window.refreshCurrentUI();
+            else if (window.renderMain) window.renderMain();
+
+            alert(`✅ 복원 성공!\n작업/메모 기록: ${window.logs.length}개`);
+        } catch (err) {
+            console.error(err);
+            alert("❌ 복원 실패: JSON 파일을 읽을 수 없습니다.");
+        } finally {
+            if (window.hideLoading) window.hideLoading();
+            event.target.value = "";
+        }
+    };
+
+    reader.onerror = () => {
+        if (window.hideLoading) window.hideLoading();
+        alert("❌ 파일 읽기 실패");
+        event.target.value = "";
+    };
+
+    reader.readAsText(file, "UTF-8");
+};
 window.triggerImport = () => { if(confirm("🚨 [주의] 기존 데이터가 삭제되고 덮어쓰기 복원이 진행됩니다. 계속하시겠습니까?")) document.getElementById('importFile').click(); };
 
 window.importData = (event) => {
