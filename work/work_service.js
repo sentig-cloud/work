@@ -1,7 +1,21 @@
-// work_service.js
-// Firebase Storage 제거 버전
-// JSON 백업/복원 + 이미지 압축 로컬 저장
+// === 기초 필수 함수 정의 (맨 위에 위치) ===
+window.getDirtyMap = function () {
+    try {
+        return JSON.parse(localStorage.getItem("wm_dirty_map") || "{}");
+    } catch (e) {
+        return {};
+    }
+};
 
+window.setDirtyMap = function (map) {
+    localStorage.setItem("wm_dirty_map", JSON.stringify(map || {}));
+};
+
+window.clearDirtyMap = function () {
+    localStorage.removeItem("wm_dirty_map");
+};
+
+// ... 기존의 다른 함수들 (syncNow, startSync 등) ...
 window.startSync = async function () {
     try {
         console.log("서버 데이터 강제 동기화 시작...");
