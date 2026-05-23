@@ -1,4 +1,6 @@
 // work_sync.js
+// Cloudflare Worker/KV 동기화 전용
+// 1초 디바운싱 + 변경 추적 + 병합 저장
 
 const WORK_API_BASE = "https://work.sentig335.workers.dev";
 
@@ -6,16 +8,6 @@ window.syncTimer = null;
 window.syncInProgress = false;
 window.pendingSyncAfterCurrent = false;
 window.isApplyingServerData = false;
-
-window.SYNC_KEYS = [
-    "logs",
-    "trash",
-    "taskTypes",
-    "coworkers",
-    "statuses",
-    "equipments",
-    "memoTags"
-];
 
 window.getSyncStamp = function () {
     return localStorage.getItem("wm_sync_updated_at") || "1970-01-01T00:00:00.000Z";
@@ -47,10 +39,11 @@ window.markDirty = function (colName, id = "_all", action = "upsert") {
     if (window.isApplyingServerData) return;
 
     const dirty = window.getDirtyMap();
+
     if (!dirty[colName]) dirty[colName] = {};
 
-    dirty[colName][id] = {
-        id,
+    dirty[colName][String(id)] = {
+        id: String(id),
         action,
         changedAt: new Date().toISOString()
     };
@@ -63,13 +56,21 @@ window.saveArrayToLocal = function (key, arr) {
 };
 
 window.saveAllLocalOnly = function () {
-    window.saveArrayToLocal("logs", window.logs || []);
-    window.saveArrayToLocal("trash", window.trash || []);
-    window.saveArrayToLocal("taskTypes", window.taskTypes || []);
-    window.saveArrayToLocal("coworkers", window.coworkers || []);
-    window.saveArrayToLocal("statuses", window.statuses || []);
-    window.saveArrayToLocal("equipments", window.equipments || []);
-    window.saveArrayToLocal("memoTags", window.memoTags || []);
+    window.logs = (window.logs || []).filter(Boolean);
+    window.trash = (window.trash || []).filter(Boolean);
+    window.taskTypes = (window.taskTypes || []).filter(Boolean);
+    window.coworkers = (window.coworkers || []).filter(Boolean);
+    window.statuses = (window.statuses || []).filter(Boolean);
+    window.equipments = (window.equipments || []).filter(Boolean);
+    window.memoTags = (window.memoTags || []).filter(Boolean);
+
+    window.saveArrayToLocal("logs", window.logs);
+    window.saveArrayToLocal("trash", window.trash);
+    window.saveArrayToLocal("taskTypes", window.taskTypes);
+    window.saveArrayToLocal("coworkers", window.coworkers);
+    window.saveArrayToLocal("statuses", window.statuses);
+    window.saveArrayToLocal("equipments", window.equipments);
+    window.saveArrayToLocal("memoTags", window.memoTags);
 };
 
 window.refreshCurrentUI = function () {
@@ -92,23 +93,6 @@ window.refreshCurrentUI = function () {
     }
 };
 
-window.makeSnapshot = function () {
-    return {
-        savedAt: new Date().toISOString(),
-        syncUpdatedAt: window.getSyncStamp(),
-        app: "work",
-        data: {
-            logs: window.logs || [],
-            trash: window.trash || [],
-            taskTypes: window.taskTypes || [],
-            coworkers: window.coworkers || [],
-            statuses: window.statuses || [],
-            equipments: window.equipments || [],
-            memoTags: window.memoTags || []
-        }
-    };
-};
-
 window.getServerData = function (serverResult) {
     if (serverResult?.saved?.data) return serverResult.saved.data;
     if (serverResult?.data) return serverResult.data;
@@ -124,6 +108,13 @@ window.getServerStamp = function (serverResult) {
     );
 };
 
+window.touchUpdatedAt = function (item) {
+    if (item && typeof item === "object") {
+        item.updatedAt = new Date().toISOString();
+    }
+    return item;
+};
+
 window.mergeById = function (localArr, serverArr) {
     const map = new Map();
 
@@ -134,6 +125,7 @@ window.mergeById = function (localArr, serverArr) {
 
     (localArr || []).filter(Boolean).forEach(item => {
         if (!item.id) item.id = `${Date.now()}_${Math.random()}`;
+
         const id = String(item.id);
         const old = map.get(id);
 
@@ -142,8 +134,8 @@ window.mergeById = function (localArr, serverArr) {
             return;
         }
 
-        const localTime = item.updatedAt || item.savedAt || item.time || "";
-        const serverTime = old.updatedAt || old.savedAt || old.time || "";
+        const localTime = item.updatedAt || item.savedAt || "";
+        const serverTime = old.updatedAt || old.savedAt || "";
 
         map.set(id, localTime >= serverTime ? item : old);
     });
@@ -189,6 +181,7 @@ window.applyServerData = function (data, merge = false) {
     }
 
     window.saveAllLocalOnly();
+
     window.isApplyingServerData = false;
     window.isInitialLoad = false;
 
@@ -214,6 +207,9 @@ window.loadFromServer = async function () {
 
 window.startSync = async function () {
     try {
+        window.logs = window.logs || [];
+        window.trash = window.trash || [];
+
         const result = await window.loadFromServer();
         const serverData = window.getServerData(result);
         const serverStamp = window.getServerStamp(result);
@@ -251,10 +247,6 @@ window.scheduleSync = function () {
     window.syncTimer = setTimeout(() => {
         window.syncNow(false);
     }, 1000);
-};
-
-window.saveToServer = async function (showError = false) {
-    return await window.syncNow(showError);
 };
 
 window.syncNow = async function (showError = false) {
@@ -338,11 +330,8 @@ window.syncNow = async function (showError = false) {
     }
 };
 
-window.touchUpdatedAt = function (item) {
-    if (item && typeof item === "object") {
-        item.updatedAt = new Date().toISOString();
-    }
-    return item;
+window.saveToServer = async function (showError = false) {
+    return await window.syncNow(showError);
 };
 
 window.saveLocal = function (dirtyKey = "_all") {

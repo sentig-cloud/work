@@ -7,6 +7,8 @@ window.renderMain = () => {
     let yWork = 0, yOt = 0, yDuty = 0;
     let yStatuses = {}; 
 
+    if (!window.logs) window.logs = [];
+
     for(let i=1; i<=12; i++) {
         let mLogs = window.logs.filter(l => l && l.m === i);
         let mWork = mLogs.filter(l => l.cat === 'work').length;
