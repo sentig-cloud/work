@@ -2,6 +2,49 @@
 
 const WORK_API_BASE = "https://work.sentig335.workers.dev";
 
+window.getSyncStamp = function () {
+    return localStorage.getItem("wm_sync_updated_at") || "1970-01-01T00:00:00.000Z";
+};
+
+window.setSyncStamp = function (stamp = null) {
+    const nextStamp = stamp || new Date().toISOString();
+    localStorage.setItem("wm_sync_updated_at", nextStamp);
+    return nextStamp;
+};
+
+window.buildSyncPayload = function () {
+    return {
+        savedAt: new Date().toISOString(),
+        syncUpdatedAt: window.getSyncStamp(),
+        app: "work",
+        data: {
+            logs: window.logs || [],
+            trash: window.trash || [],
+            taskTypes: window.taskTypes || [],
+            coworkers: window.coworkers || [],
+            statuses: window.statuses || [],
+            equipments: window.equipments || [],
+            memoTags: window.memoTags || []
+        }
+    };
+};
+
+window.getServerSyncStamp = function (serverResult) {
+    return (
+        serverResult?.saved?.syncUpdatedAt ||
+        serverResult?.syncUpdatedAt ||
+        serverResult?.savedAt ||
+        "1970-01-01T00:00:00.000Z"
+    );
+};
+
+window.getServerData = function (serverResult) {
+    if (serverResult?.saved?.data) return serverResult.saved.data;
+    if (serverResult?.data) return serverResult.data;
+    return null;
+};
+
+
 window.refreshCurrentUI = function () {
     if (window.renderMain) window.renderMain();
 

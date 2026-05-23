@@ -1,5 +1,19 @@
 {
   "name": "work",
   "main": "worker.js",
-  "compatibility_date": "2026-05-23"
+  "compatibility_date": "2026-05-23",
+
+  "kv_namespaces": [
+    {
+      "binding": "WORK_KV",
+      "id": "여기에_KV_ID"
+    }
+  ],
+
+  "r2_buckets": [
+    {
+      "binding": "WORK_R2",
+      "bucket_name": "여기에_R2버킷이름"
+    }
+  ]
 }
