@@ -2,6 +2,32 @@
 // Firebase Storage 제거 버전
 // JSON 백업/복원 + 이미지 압축 로컬 저장
 
+window.startSync = async function () {
+    try {
+        console.log("서버 데이터 강제 동기화 시작...");
+        const res = await fetch(`${WORK_API_BASE}/api/load`, {
+            method: "GET",
+            headers: { "Accept": "application/json" }
+        });
+        
+        if (!res.ok) throw new Error("서버 응답 오류");
+        
+        const json = await res.json();
+        // 서버 데이터 구조에 맞게 파싱
+        const serverData = json.saved ? json.saved.data : json.data;
+        
+        if (serverData) {
+            window.applyServerData(serverData, false); // false를 주면 서버 데이터로 로컬을 완전 덮어씁니다.
+            console.log("동기화 성공! 서버 데이터가 로컬에 반영되었습니다.");
+        }
+    } catch (e) {
+        console.error("동기화 실패:", e);
+        // 서버 통신이 안 될 때만 로컬 데이터를 유지
+        window.saveAllLocalOnly(); 
+    }
+    if (window.renderMain) window.renderMain();
+}
+
 window.exportBackupData = () => {
     if (!window.logs || window.logs.length === 0) {
         return alert("백업할 데이터가 없습니다.");
