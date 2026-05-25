@@ -122,6 +122,8 @@ window.importData = (event) => {
     const reader = new FileReader();
 
     reader.onload = async (e) => {
+        let data;
+
         try {
             let text = e.target.result || "";
 
@@ -129,11 +131,9 @@ window.importData = (event) => {
                 text = text.slice(1);
             }
 
-            text = text.trim();
+            const importedData = JSON.parse(text.trim());
 
-            const importedData = JSON.parse(text);
-
-            const data =
+            data =
                 importedData?.data ||
                 importedData?.saved?.data ||
                 importedData?.saved?.saved?.data ||
@@ -141,11 +141,16 @@ window.importData = (event) => {
                 importedData;
 
             if (!data || !Array.isArray(data.logs)) {
-                console.log("읽은 JSON:", importedData);
-                alert("지원하지 않는 백업 파일입니다. logs 배열을 찾을 수 없습니다.");
+                alert("지원하지 않는 백업 파일입니다. logs 데이터를 찾을 수 없습니다.");
                 return;
             }
+        } catch (e) {
+            console.error("백업 JSON 해석 실패:", e);
+            alert("복원 실패: JSON 파일 형식을 읽을 수 없습니다.");
+            return;
+        }
 
+        try {
             window.logs = (data.logs || []).filter(Boolean);
             window.trash = (data.trash || []).filter(Boolean);
             window.taskTypes = (data.taskTypes || window.taskTypes || []).filter(Boolean);
@@ -154,36 +159,28 @@ window.importData = (event) => {
             window.equipments = (data.equipments || window.equipments || []).filter(Boolean);
             window.memoTags = (data.memoTags || window.memoTags || []).filter(Boolean);
 
-            if (window.saveAllLocalOnly) {
-                window.saveAllLocalOnly();
-            } else {
-                localStorage.setItem("wm_logs", JSON.stringify(window.logs));
-                localStorage.setItem("wm_trash", JSON.stringify(window.trash));
-                localStorage.setItem("wm_taskTypes", JSON.stringify(window.taskTypes));
-                localStorage.setItem("wm_coworkers", JSON.stringify(window.coworkers));
-                localStorage.setItem("wm_statuses", JSON.stringify(window.statuses));
-                localStorage.setItem("wm_equipments", JSON.stringify(window.equipments));
-                localStorage.setItem("wm_memoTags", JSON.stringify(window.memoTags));
-            }
-
-            if (window.markDirty) {
-                window.markDirty("snapshot", "import", "replace");
-            }
+            window.saveAllLocalOnly();
+            window.markDirty("snapshot", "import", "replace");
 
             if (window.refreshCurrentUI) {
                 window.refreshCurrentUI();
-            } else if (window.renderMain) {
-                window.renderMain();
             }
 
-            if (window.syncNow) {
-                await window.syncNow(true);
-            }
+            await window.syncNow(true);
 
-            alert(`복원 성공!\n작업/메모 기록: ${window.logs.length}개\n서버에도 즉시 반영했습니다.`);
-        } catch (err) {
-            console.error("복원 실패:", err);
-            alert("복원 실패: JSON 파일을 읽는 중 오류가 있었습니다.");
+            alert(
+                `복원 성공!\n` +
+                `작업/메모 기록: ${window.logs.length}개\n` +
+                `서버에도 반영되었습니다.`
+            );
+        } catch (e) {
+            console.error("복원 데이터 서버 반영 실패:", e);
+
+            alert(
+                "파일은 이 기기에 복원되었습니다.\n" +
+                "하지만 서버 동기화에는 실패했습니다.\n\n" +
+                e.message
+            );
         } finally {
             if (window.hideLoading) {
                 window.hideLoading();

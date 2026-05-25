@@ -309,32 +309,51 @@ window.startSync = async function () {
         window.logs = window.logs || [];
         window.trash = window.trash || [];
 
+        const dirty = window.getDirtyMap ? window.getDirtyMap() : {};
+        const hasDirty = Object.keys(dirty).length > 0;
+
+        if (hasDirty) {
+            window.isInitialLoad = false;
+
+            console.warn("미전송 로컬 변경사항이 있습니다. 서버 데이터를 덮어쓰지 않고 로컬을 유지합니다.", dirty);
+
+            if (window.renderMain) {
+                window.renderMain();
+            }
+
+            try {
+                await window.syncNow(true);
+            } catch (e) {
+                console.warn("미전송 로컬 데이터 서버 반영 실패:", e);
+            }
+
+            return;
+        }
+
         const result = await window.loadFromServer();
         const serverData = window.getServerData(result);
         const serverStamp = window.getServerStamp(result);
 
-        const hasLocalData =
-            (window.logs && window.logs.length > 0) ||
-            (window.trash && window.trash.length > 0);
-
         if (serverData) {
-            window.applyServerData(serverData, hasLocalData);
+            window.applyServerData(serverData, false);
             window.setSyncStamp(serverStamp);
+
+            console.log("시작 동기화 완료: 서버 데이터 적용", serverStamp);
         } else {
             window.isInitialLoad = false;
             window.saveAllLocalOnly();
-            if (window.renderMain) window.renderMain();
-        }
 
-        if (hasLocalData && Object.keys(window.getDirtyMap()).length > 0) {
-            window.scheduleSync();
+            if (window.renderMain) {
+                window.renderMain();
+            }
         }
-
-        console.log("시작 동기화 완료", result);
     } catch (e) {
-        console.warn("서버 불러오기 실패, 로컬로 실행:", e);
+        console.warn("서버 불러오기 실패, 로컬 데이터로 실행:", e);
         window.isInitialLoad = false;
-        if (window.renderMain) window.renderMain();
+
+        if (window.renderMain) {
+            window.renderMain();
+        }
     }
 };
 
@@ -362,7 +381,7 @@ window.syncNow = async function (showError = false) {
     window.syncInProgress = true;
 
     try {
-        const stamp = window.setSyncStamp();
+        const stamp = new Date().toISOString();
 
         const payload = {
             savedAt: stamp,
@@ -380,13 +399,26 @@ window.syncNow = async function (showError = false) {
             }
         };
 
+        const body = JSON.stringify(payload);
+        const bodyBytes = new Blob([body]).size;
+        const bodyMb = bodyBytes / 1024 / 1024;
+        const safeLimitBytes = 24 * 1024 * 1024;
+
+        if (bodyBytes > safeLimitBytes) {
+            throw new Error(
+                `동기화 데이터가 ${bodyMb.toFixed(2)}MB입니다. ` +
+                "Cloudflare KV 저장 한도에 가까워 서버 저장할 수 없습니다. " +
+                "사진 데이터는 R2 분리가 필요합니다."
+            );
+        }
+
         const res = await window.fetchWithTimeout(`${WORK_API_BASE}/api/save`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 "Accept": "application/json"
             },
-            body: JSON.stringify(payload)
+            body
         }, 15000);
 
         const text = await res.text();
@@ -397,14 +429,21 @@ window.syncNow = async function (showError = false) {
 
         const result = text ? JSON.parse(text) : {};
 
+        window.setSyncStamp(stamp);
         window.clearDirtyMap();
-        console.log("자동 동기화 완료", result);
+
+        console.log("자동 동기화 완료", {
+            result,
+            sizeMb: bodyMb.toFixed(2)
+        });
 
         return result;
     } catch (e) {
-        console.warn("서버 저장 실패, 로컬 저장 유지:", e);
+        console.warn("서버 저장 실패, 로컬 변경사항 유지:", e);
 
-        if (showError) throw e;
+        if (showError) {
+            throw e;
+        }
 
         return null;
     } finally {
