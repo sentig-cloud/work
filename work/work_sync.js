@@ -1,5 +1,5 @@
 // work_sync.js
-// Work Master - Cloudflare Worker/KV sync
+// Work Master - Cloudflare Worker / KV / R2 sync
 
 const WORK_API_BASE = "https://work.sentig335.workers.dev";
 
@@ -21,6 +21,7 @@ window.fetchWithTimeout = async function (url, options = {}, timeoutMs = 15000) 
         if (e.name === "AbortError") {
             throw new Error(`서버 응답 시간 초과: ${timeoutMs / 1000}초`);
         }
+
         throw e;
     } finally {
         clearTimeout(timer);
@@ -32,9 +33,9 @@ window.getSyncStamp = function () {
 };
 
 window.setSyncStamp = function (stamp = null) {
-    const nextStamp = stamp || new Date().toISOString();
-    localStorage.setItem("wm_sync_updated_at", nextStamp);
-    return nextStamp;
+    const value = stamp || new Date().toISOString();
+    localStorage.setItem("wm_sync_updated_at", value);
+    return value;
 };
 
 window.getDirtyMap = function () {
@@ -58,7 +59,9 @@ window.markDirty = function (colName, id = "_all", action = "upsert") {
 
     const dirty = window.getDirtyMap();
 
-    if (!dirty[colName]) dirty[colName] = {};
+    if (!dirty[colName]) {
+        dirty[colName] = {};
+    }
 
     dirty[colName][String(id)] = {
         id: String(id),
@@ -70,7 +73,10 @@ window.markDirty = function (colName, id = "_all", action = "upsert") {
 };
 
 window.saveArrayToLocal = function (key, arr) {
-    localStorage.setItem(`wm_${key}`, JSON.stringify((arr || []).filter(Boolean)));
+    localStorage.setItem(
+        `wm_${key}`,
+        JSON.stringify((arr || []).filter(Boolean))
+    );
 };
 
 window.saveAllLocalOnly = function () {
@@ -92,187 +98,85 @@ window.saveAllLocalOnly = function () {
 };
 
 window.refreshCurrentUI = function () {
-    if (window.renderMain) window.renderMain();
+    if (window.renderMain) {
+        window.renderMain();
+    }
 
     const popupLayer = document.getElementById("popupLayer");
     const isPopupOpen = popupLayer && popupLayer.style.display === "flex";
 
     if (isPopupOpen) {
-        if (window.renderCal) window.renderCal(window.currentYear, window.curMonth - 1);
-        if (window.updateUI) window.updateUI();
+        if (window.renderCal) {
+            window.renderCal(window.currentYear, window.curMonth - 1);
+        }
+
+        if (window.updateUI) {
+            window.updateUI();
+        }
     }
 
-    if (document.getElementById("searchLayer")?.style.display === "flex" && window.doSearch) {
+    const searchLayer = document.getElementById("searchLayer");
+    if (searchLayer && searchLayer.style.display === "flex" && window.doSearch) {
         window.doSearch();
     }
 
-    if (document.getElementById("trashLayer")?.style.display === "flex" && window.renderTrash) {
+    const trashLayer = document.getElementById("trashLayer");
+    if (trashLayer && trashLayer.style.display === "flex" && window.renderTrash) {
         window.renderTrash();
     }
 };
 
 window.getServerData = function (serverResult) {
-    if (serverResult?.saved?.data) return serverResult.saved.data;
-    if (serverResult?.data) return serverResult.data;
+    if (serverResult && serverResult.saved && serverResult.saved.data) {
+        return serverResult.saved.data;
+    }
+
+    if (serverResult && serverResult.data) {
+        return serverResult.data;
+    }
+
     return null;
 };
 
 window.getServerStamp = function (serverResult) {
-    return (
-        serverResult?.saved?.syncUpdatedAt ||
-        serverResult?.syncUpdatedAt ||
-        serverResult?.savedAt ||
-        "1970-01-01T00:00:00.000Z"
-    );
+    if (serverResult && serverResult.saved && serverResult.saved.syncUpdatedAt) {
+        return serverResult.saved.syncUpdatedAt;
+    }
+
+    if (serverResult && serverResult.syncUpdatedAt) {
+        return serverResult.syncUpdatedAt;
+    }
+
+    if (serverResult && serverResult.savedAt) {
+        return serverResult.savedAt;
+    }
+
+    return "1970-01-01T00:00:00.000Z";
 };
 
 window.touchUpdatedAt = function (item) {
     if (item && typeof item === "object") {
         item.updatedAt = new Date().toISOString();
     }
+
     return item;
 };
 
-window.mergeById = function (localArr, serverArr) {
-    const map = new Map();
-
-    (serverArr || []).filter(Boolean).forEach(item => {
-        if (!item.id) item.id = `${Date.now()}_${Math.random()}`;
-        map.set(String(item.id), item);
-    });
-
-    (localArr || []).filter(Boolean).forEach(item => {
-        if (!item.id) item.id = `${Date.now()}_${Math.random()}`;
-
-        const id = String(item.id);
-        const old = map.get(id);
-
-        if (!old) {
-            map.set(id, item);
-            return;
-        }
-
-        const localTime = item.updatedAt || item.savedAt || "";
-        const serverTime = old.updatedAt || old.savedAt || "";
-
-        map.set(id, localTime >= serverTime ? item : old);
-    });
-
-    return Array.from(map.values()).filter(Boolean);
-};
-
-window.mergeMasterByName = function (localArr, serverArr) {
-    const map = new Map();
-
-    (serverArr || []).filter(Boolean).forEach(item => {
-        if (item.name) map.set(item.name, item);
-    });
-
-    (localArr || []).filter(Boolean).forEach(item => {
-        if (item.name) map.set(item.name, item);
-    });
-
-    return Array.from(map.values()).filter(Boolean);
-};
-
-window.cloneSyncSnapshot = function () {
-    return {
-        logs: JSON.parse(JSON.stringify(window.logs || [])),
-        trash: JSON.parse(JSON.stringify(window.trash || [])),
-        taskTypes: JSON.parse(JSON.stringify(window.taskTypes || [])),
-        coworkers: JSON.parse(JSON.stringify(window.coworkers || [])),
-        statuses: JSON.parse(JSON.stringify(window.statuses || [])),
-        equipments: JSON.parse(JSON.stringify(window.equipments || [])),
-        memoTags: JSON.parse(JSON.stringify(window.memoTags || []))
-    };
-};
-
-window.touchAllDirtyItems = function (dirty, snapshot) {
-    const now = new Date().toISOString();
-
-    Object.keys(dirty || {}).forEach(colName => {
-        if (!Array.isArray(snapshot[colName])) return;
-
-        Object.keys(dirty[colName] || {}).forEach(id => {
-            const itemDirty = dirty[colName][id];
-            if (!itemDirty || itemDirty.action === "delete") return;
-
-            const item = snapshot[colName].find(v => String(v.id) === String(id));
-            if (item && typeof item === "object") {
-                item.updatedAt = item.updatedAt || now;
-            }
-        });
-    });
-
-    return snapshot;
-};
-
-window.applyDirtyDeletesToServerData = function (serverData, dirty) {
-    if (!serverData || !dirty) return serverData;
-
-    const nextData = JSON.parse(JSON.stringify(serverData));
-
-    Object.keys(dirty).forEach(colName => {
-        if (!Array.isArray(nextData[colName])) return;
-
-        Object.keys(dirty[colName] || {}).forEach(id => {
-            const itemDirty = dirty[colName][id];
-
-            if (itemDirty && itemDirty.action === "delete") {
-                nextData[colName] = nextData[colName].filter(item => String(item.id) !== String(id));
-            }
-        });
-    });
-
-    return nextData;
-};
-
-window.restoreLocalDirtyItems = function (snapshot, dirty) {
-    Object.keys(dirty || {}).forEach(colName => {
-        if (!Array.isArray(window[colName]) || !Array.isArray(snapshot[colName])) return;
-
-        Object.keys(dirty[colName] || {}).forEach(id => {
-            const itemDirty = dirty[colName][id];
-
-            if (itemDirty && itemDirty.action === "delete") {
-                window[colName] = window[colName].filter(item => String(item.id) !== String(id));
-                return;
-            }
-
-            const localItem = snapshot[colName].find(item => String(item.id) === String(id));
-            if (!localItem) return;
-
-            const idx = window[colName].findIndex(item => String(item.id) === String(id));
-
-            if (idx >= 0) window[colName][idx] = localItem;
-            else window[colName].push(localItem);
-        });
-    });
-};
-
-window.applyServerData = function (data, merge = false) {
-    if (!data || !Array.isArray(data.logs)) return false;
+window.applyServerData = function (data) {
+    if (!data || !Array.isArray(data.logs)) {
+        return false;
+    }
 
     window.isApplyingServerData = true;
 
     try {
-        if (merge) {
-            window.logs = window.mergeById(window.logs || [], data.logs || []);
-            window.trash = window.mergeById(window.trash || [], data.trash || []);
-            window.taskTypes = window.mergeMasterByName(window.taskTypes || [], data.taskTypes || []);
-            window.coworkers = window.mergeMasterByName(window.coworkers || [], data.coworkers || []);
-            window.statuses = window.mergeMasterByName(window.statuses || [], data.statuses || []);
-            window.equipments = window.mergeMasterByName(window.equipments || [], data.equipments || []);
-            window.memoTags = window.mergeMasterByName(window.memoTags || [], data.memoTags || []);
-        } else {
-            window.logs = (data.logs || []).filter(Boolean);
-            window.trash = (data.trash || []).filter(Boolean);
-            window.taskTypes = (data.taskTypes || []).filter(Boolean);
-            window.coworkers = (data.coworkers || []).filter(Boolean);
-            window.statuses = (data.statuses || []).filter(Boolean);
-            window.equipments = (data.equipments || []).filter(Boolean);
-            window.memoTags = (data.memoTags || []).filter(Boolean);
-        }
+        window.logs = (data.logs || []).filter(Boolean);
+        window.trash = (data.trash || []).filter(Boolean);
+        window.taskTypes = (data.taskTypes || []).filter(Boolean);
+        window.coworkers = (data.coworkers || []).filter(Boolean);
+        window.statuses = (data.statuses || []).filter(Boolean);
+        window.equipments = (data.equipments || []).filter(Boolean);
+        window.memoTags = (data.memoTags || []).filter(Boolean);
 
         window.saveAllLocalOnly();
     } finally {
@@ -280,88 +184,241 @@ window.applyServerData = function (data, merge = false) {
         window.isInitialLoad = false;
     }
 
-    if (window.refreshCurrentUI) window.refreshCurrentUI();
-
+    window.refreshCurrentUI();
     return true;
 };
 
 window.loadFromServer = async function () {
-    const res = await window.fetchWithTimeout(`${WORK_API_BASE}/api/load`, {
-        method: "GET",
-        headers: {
-            "Accept": "application/json"
-        }
-    }, 15000);
+    const response = await window.fetchWithTimeout(
+        `${WORK_API_BASE}/api/load`,
+        {
+            method: "GET",
+            headers: {
+                "Accept": "application/json"
+            }
+        },
+        15000
+    );
 
-    const text = await res.text();
+    const text = await response.text();
 
-    if (!res.ok) {
-        throw new Error(`서버 불러오기 실패: ${res.status} / ${text}`);
+    if (!response.ok) {
+        throw new Error(`서버 불러오기 실패: ${response.status} / ${text}`);
     }
 
     return text ? JSON.parse(text) : {};
 };
 
-// 🚨 [핵심 수정] 새로고침 시 데이터가 무조건 덮어씌워져 증발하는 현상 방지
-// 🚨 [수정 1] 새로고침 시 데이터 덮어쓰기(증발) 원천 차단
+window.isInlineImageSrc = function (src) {
+    return typeof src === "string" && src.startsWith("data:image/");
+};
+
+window.dataUrlToBlob = function (dataUrl) {
+    const parts = String(dataUrl || "").split(",");
+    const header = parts[0] || "";
+    const base64 = parts[1] || "";
+    const match = header.match(/^data:(image\/[^;]+);base64$/i);
+
+    if (!match || !base64) {
+        throw new Error("지원하지 않는 이미지 데이터입니다.");
+    }
+
+    const mimeType = match[1];
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+
+    return new Blob([bytes], {
+        type: mimeType
+    });
+};
+
+window.uploadToStorage = async function (dataUrl) {
+    if (!window.isInlineImageSrc(dataUrl)) {
+        return dataUrl;
+    }
+
+    const blob = window.dataUrlToBlob(dataUrl);
+
+    const response = await window.fetchWithTimeout(
+        `${WORK_API_BASE}/api/upload`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": blob.type || "application/octet-stream"
+            },
+            body: blob
+        },
+        60000
+    );
+
+    const text = await response.text();
+
+    if (!response.ok) {
+        throw new Error(`사진 R2 업로드 실패: ${response.status} / ${text}`);
+    }
+
+    const result = text ? JSON.parse(text) : {};
+
+    if (!result.ok || !result.url) {
+        throw new Error("사진 업로드 결과에 URL이 없습니다.");
+    }
+
+    return result.url;
+};
+
+window.migrateInlineImagesToR2 = async function () {
+    const uploadedBySource = new Map();
+    const collections = [
+        window.logs || [],
+        window.trash || []
+    ];
+
+    let changed = false;
+    let uploadedCount = 0;
+
+    for (const collection of collections) {
+        for (const log of collection) {
+            if (!log || !Array.isArray(log.imgs)) {
+                continue;
+            }
+
+            for (const image of log.imgs) {
+                if (!image || !window.isInlineImageSrc(image.src)) {
+                    continue;
+                }
+
+                const originalSrc = image.src;
+                let uploadedUrl = uploadedBySource.get(originalSrc);
+
+                if (!uploadedUrl) {
+                    uploadedUrl = await window.uploadToStorage(originalSrc);
+                    uploadedBySource.set(originalSrc, uploadedUrl);
+                    uploadedCount++;
+                }
+
+                image.src = uploadedUrl;
+                image.updatedAt = new Date().toISOString();
+                log.updatedAt = new Date().toISOString();
+                changed = true;
+            }
+        }
+    }
+
+    if (changed) {
+        window.saveAllLocalOnly();
+    }
+
+    return {
+        changed,
+        uploadedCount
+    };
+};
+
 window.startSync = async function () {
     try {
         window.logs = window.logs || [];
         window.trash = window.trash || [];
 
-        const dirty = window.getDirtyMap ? window.getDirtyMap() : {};
+        const dirty = window.getDirtyMap();
         const hasDirty = Object.keys(dirty).length > 0;
 
-        // 미전송 로컬 데이터가 있다면, 덮어쓰지 않고 최우선으로 보호
         if (hasDirty) {
             window.isInitialLoad = false;
-            console.warn("미전송 로컬 변경사항(Dirty)이 있어 서버 데이터 덮어쓰기를 차단합니다.");
-            if (window.renderMain) window.renderMain();
-            
-            try { await window.syncNow(true); } catch (e) { console.warn("자동 동기화 재시도 실패:", e); }
+
+            if (window.renderMain) {
+                window.renderMain();
+            }
+
+            console.log("로컬 변경사항이 있어 서버 저장을 먼저 시도합니다.");
+
+            try {
+                await window.syncNow(true);
+            } catch (e) {
+                console.warn("초기 로컬 변경사항 저장 실패:", e);
+            }
+
             return;
         }
 
         const result = await window.loadFromServer();
         const serverData = window.getServerData(result);
         const serverStamp = window.getServerStamp(result);
-        const localStamp = window.getSyncStamp();
 
         if (serverData) {
-            // 서버 스탬프가 로컬보다 최신일 때만 병합. 또한 무조건 merge=true를 사용하여 로컬 데이터 증발 원천 차단.
-            if (!localStamp || serverStamp > localStamp) {
-                console.log("서버에서 최신 데이터를 가져와 병합합니다.", serverStamp);
-                window.applyServerData(serverData, true); // true: ID별로 안전하게 병합
-                window.setSyncStamp(serverStamp);
-            } else {
-                console.log("로컬 데이터가 서버와 같거나 더 최신입니다. 서버 데이터를 무시합니다.");
-                window.isInitialLoad = false;
-                if (window.renderMain) window.renderMain();
-            }
+            window.applyServerData(serverData);
+            window.setSyncStamp(serverStamp);
+            console.log("서버 데이터 불러오기 완료", serverStamp);
         } else {
             window.isInitialLoad = false;
-            window.saveAllLocalOnly();
-            if (window.renderMain) window.renderMain();
+
+            try {
+                window.saveAllLocalOnly();
+            } catch (e) {
+                console.warn("초기 로컬 저장 실패:", e);
+            }
+
+            if (window.renderMain) {
+                window.renderMain();
+            }
         }
     } catch (e) {
-        console.warn("서버 불러오기 실패, 로컬 데이터만으로 실행:", e);
+        console.warn("서버 불러오기 실패, 로컬 데이터로 실행합니다.", e);
         window.isInitialLoad = false;
-        if (window.renderMain) window.renderMain();
+
+        if (window.renderMain) {
+            window.renderMain();
+        }
     }
 };
 
-// 🚨 [수정 2] 수동 동기화 시에도 안전하게 병합(merge=true)하도록 강제
-window.syncFromServerIfSafe = async function (reason = "manual") {
-    if (window.syncInProgress || window.isApplyingServerData) return false;
+window.isSyncApplyBlocked = function () {
+    const blockingLayerIds = [
+        "workModal",
+        "editModal",
+        "commuteModal",
+        "titleEditModal",
+        "tagEditModal"
+    ];
 
-    const dirty = window.getDirtyMap ? window.getDirtyMap() : {};
-    if (Object.keys(dirty).length > 0) {
-        console.log("서버 불러오기 건너뜀: 로컬 변경사항 있음", reason);
+    const hasOpenModal = blockingLayerIds.some((id) => {
+        const element = document.getElementById(id);
+        return element && element.style.display === "flex";
+    });
+
+    if (hasOpenModal) {
+        return true;
+    }
+
+    const active = document.activeElement;
+
+    if (
+        active &&
+        ["INPUT", "TEXTAREA", "SELECT"].includes(active.tagName)
+    ) {
+        return true;
+    }
+
+    return false;
+};
+
+window.syncFromServerIfSafe = async function (reason = "manual") {
+    if (window.syncInProgress || window.isApplyingServerData) {
         return false;
     }
 
-    if (window.isSyncApplyBlocked && window.isSyncApplyBlocked()) {
-        console.log("서버 불러오기 건너뜀: 편집 중", reason);
+    const dirty = window.getDirtyMap();
+
+    if (Object.keys(dirty).length > 0) {
+        console.log("서버 불러오기 건너뜀: 저장하지 않은 로컬 변경사항 있음", reason);
+        return false;
+    }
+
+    if (window.isSyncApplyBlocked()) {
+        console.log("서버 불러오기 건너뜀: 현재 편집 중", reason);
         return false;
     }
 
@@ -371,15 +428,16 @@ window.syncFromServerIfSafe = async function (reason = "manual") {
         const serverStamp = window.getServerStamp(result);
         const localStamp = window.getSyncStamp();
 
-        if (!serverData) return false;
-
-        if (serverStamp && serverStamp <= localStamp) {
-            console.log("서버 불러오기 건너뜀: 최신 상태", reason);
+        if (!serverData) {
             return false;
         }
 
-        // 데이터를 불러올 때 무조건 병합(true) 처리하여 렌더링 증발 막음
-        window.applyServerData(serverData, true);
+        if (serverStamp && serverStamp <= localStamp) {
+            console.log("서버 데이터가 이미 반영된 상태입니다.", reason);
+            return false;
+        }
+
+        window.applyServerData(serverData);
         window.setSyncStamp(serverStamp);
 
         console.log("서버 최신 데이터 적용 완료", reason, serverStamp);
@@ -390,7 +448,6 @@ window.syncFromServerIfSafe = async function (reason = "manual") {
     }
 };
 
-// 🚨 [수정 3] 동기화 교착 상태(Deadlock)를 방지하는 업로드 로직
 window.syncNow = async function (showError = false) {
     if (window.syncInProgress) {
         window.pendingSyncAfterCurrent = true;
@@ -400,103 +457,14 @@ window.syncNow = async function (showError = false) {
     const dirty = window.getDirtyMap();
     const hasDirty = Object.keys(dirty).length > 0;
 
-    if (!hasDirty && !showError) return null;
+    if (!hasDirty && !showError) {
+        return null;
+    }
 
     window.syncInProgress = true;
 
     try {
-        const stamp = new Date().toISOString();
-
-        const payload = {
-            savedAt: stamp,
-            syncUpdatedAt: stamp,
-            app: "work",
-            dirty,
-            data: {
-                logs: window.logs || [],
-                trash: window.trash || [],
-                taskTypes: window.taskTypes || [],
-                coworkers: window.coworkers || [],
-                statuses: window.statuses || [],
-                equipments: window.equipments || [],
-                memoTags: window.memoTags || []
-            }
-        };
-
-        const body = JSON.stringify(payload);
-        const bodyBytes = new Blob([body]).size;
-        const bodyMb = bodyBytes / 1024 / 1024;
-        const safeLimitBytes = 24 * 1024 * 1024; // 24MB 제한
-
-        if (bodyBytes > safeLimitBytes) {
-            throw new Error(
-                `동기화 데이터가 ${bodyMb.toFixed(2)}MB입니다. ` +
-                "Cloudflare KV 저장 한도에 가까워 서버 저장할 수 없습니다. " +
-                "사진 데이터를 지우거나 분리해야 합니다."
-            );
-        }
-
-        const res = await window.fetchWithTimeout("https://work.sentig335.workers.dev/api/save", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            },
-            body
-        }, 15000);
-
-        const text = await res.text();
-
-        if (!res.ok) {
-            throw new Error(`서버 저장 실패: ${res.status} / ${text}`);
-        }
-
-        const result = text ? JSON.parse(text) : {};
-
-        window.setSyncStamp(stamp);
-        window.clearDirtyMap(); // 성공 시에만 더티맵 초기화
-
-        console.log("자동 동기화 완료", { result, sizeMb: bodyMb.toFixed(2) });
-
-        return result;
-    } catch (e) {
-        console.warn("서버 저장 실패, 로컬 변경사항 유지:", e);
-        if (showError) throw e;
-        return null;
-    } finally {
-        window.syncInProgress = false;
-
-        if (window.pendingSyncAfterCurrent) {
-            window.pendingSyncAfterCurrent = false;
-            window.scheduleSync();
-        }
-    }
-};
-
-window.scheduleSync = function () {
-    if (window.isApplyingServerData) return;
-
-    clearTimeout(window.syncTimer);
-
-    window.syncTimer = setTimeout(() => {
-        window.syncNow(false);
-    }, 1000);
-};
-
-window.syncNow = async function (showError = false) {
-    if (window.syncInProgress) {
-        window.pendingSyncAfterCurrent = true;
-        return null;
-    }
-
-    const dirty = window.getDirtyMap();
-    const hasDirty = Object.keys(dirty).length > 0;
-
-    if (!hasDirty && !showError) return null;
-
-    window.syncInProgress = true;
-
-    try {
+        const migration = await window.migrateInlineImagesToR2();
         const stamp = new Date().toISOString();
 
         const payload = {
@@ -522,25 +490,28 @@ window.syncNow = async function (showError = false) {
 
         if (bodyBytes > safeLimitBytes) {
             throw new Error(
-                `동기화 데이터가 ${bodyMb.toFixed(2)}MB입니다. ` +
-                "Cloudflare KV 저장 한도에 가까워 서버 저장할 수 없습니다. " +
-                "사진 데이터는 분리가 필요합니다."
+                `사진 분리 후에도 저장 데이터가 ${bodyMb.toFixed(2)}MB입니다. ` +
+                "기록 데이터 자체를 추가로 나누어야 합니다."
             );
         }
 
-        const res = await window.fetchWithTimeout(`${WORK_API_BASE}/api/save`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
+        const response = await window.fetchWithTimeout(
+            `${WORK_API_BASE}/api/save`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                },
+                body
             },
-            body
-        }, 15000);
+            30000
+        );
 
-        const text = await res.text();
+        const text = await response.text();
 
-        if (!res.ok) {
-            throw new Error(`서버 저장 실패: ${res.status} / ${text}`);
+        if (!response.ok) {
+            throw new Error(`서버 저장 실패: ${response.status} / ${text}`);
         }
 
         const result = text ? JSON.parse(text) : {};
@@ -550,13 +521,18 @@ window.syncNow = async function (showError = false) {
 
         console.log("자동 동기화 완료", {
             result,
-            sizeMb: bodyMb.toFixed(2)
+            sizeMb: bodyMb.toFixed(2),
+            uploadedImages: migration.uploadedCount
         });
 
         return result;
     } catch (e) {
         console.warn("서버 저장 실패, 로컬 변경사항 유지:", e);
-        if (showError) throw e;
+
+        if (showError) {
+            throw e;
+        }
+
         return null;
     } finally {
         window.syncInProgress = false;
@@ -568,40 +544,78 @@ window.syncNow = async function (showError = false) {
     }
 };
 
+window.scheduleSync = function () {
+    if (window.isApplyingServerData) {
+        return;
+    }
+
+    clearTimeout(window.syncTimer);
+
+    window.syncTimer = setTimeout(() => {
+        window.syncNow(false);
+    }, 1000);
+};
+
 window.saveToServer = async function (showError = false) {
     return await window.syncNow(showError);
 };
 
 window.saveLocal = function (dirtyKey = "_all") {
-    if (!window.logs) window.logs = [];
-    if (!window.trash) window.trash = [];
+    if (!window.logs) {
+        window.logs = [];
+    }
 
-    window.saveAllLocalOnly();
+    if (!window.trash) {
+        window.trash = [];
+    }
+
+    try {
+        window.saveAllLocalOnly();
+    } catch (e) {
+        console.warn("사진 이전 전 로컬 저장 용량 부족 가능성:", e);
+    }
 
     if (!window.isApplyingServerData) {
         window.markDirty("snapshot", dirtyKey, "save");
         window.scheduleSync();
     }
 
-    if (window.refreshCurrentUI) window.refreshCurrentUI();
+    window.refreshCurrentUI();
 };
 
 window.saveToLocalStore = function (colName, data) {
-    if (!window.logs) window.logs = [];
-    if (!window.trash) window.trash = [];
+    if (!window.logs) {
+        window.logs = [];
+    }
+
+    if (!window.trash) {
+        window.trash = [];
+    }
 
     data = window.touchUpdatedAt(data);
 
     if (colName === "logs") {
-        const idx = window.logs.findIndex(l => String(l.id) === String(data.id));
-        if (idx >= 0) window.logs[idx] = data;
-        else window.logs.push(data);
+        const index = window.logs.findIndex(
+            (item) => String(item.id) === String(data.id)
+        );
+
+        if (index >= 0) {
+            window.logs[index] = data;
+        } else {
+            window.logs.push(data);
+        }
     }
 
     if (colName === "trash") {
-        const idx = window.trash.findIndex(l => String(l.id) === String(data.id));
-        if (idx >= 0) window.trash[idx] = data;
-        else window.trash.push(data);
+        const index = window.trash.findIndex(
+            (item) => String(item.id) === String(data.id)
+        );
+
+        if (index >= 0) {
+            window.trash[index] = data;
+        } else {
+            window.trash.push(data);
+        }
     }
 
     window.markDirty(colName, data.id, "upsert");
@@ -610,92 +624,53 @@ window.saveToLocalStore = function (colName, data) {
 
 window.deleteFromLocalStore = function (colName, id) {
     if (colName === "logs") {
-        window.logs = (window.logs || []).filter(l => String(l.id) !== String(id));
+        window.logs = (window.logs || []).filter(
+            (item) => String(item.id) !== String(id)
+        );
     }
 
     if (colName === "trash") {
-        window.trash = (window.trash || []).filter(l => String(l.id) !== String(id));
+        window.trash = (window.trash || []).filter(
+            (item) => String(item.id) !== String(id)
+        );
     }
 
     window.markDirty(colName, id, "delete");
     window.saveLocal(`${colName}:${id}:delete`);
 };
 
-window.isSyncApplyBlocked = function () {
-    const blockingLayerIds = [
-        "workModal",
-        "editModal",
-        "commuteModal",
-        "titleEditModal",
-        "tagEditModal"
-    ];
-
-    const hasOpenModal = blockingLayerIds.some(id => {
-        const el = document.getElementById(id);
-        return el && el.style.display === "flex";
-    });
-
-    if (hasOpenModal) return true;
-
-    const active = document.activeElement;
-    if (active && ["INPUT", "TEXTAREA", "SELECT"].includes(active.tagName)) {
-        return true;
-    }
-
-    return false;
-};
-
-window.syncFromServerIfSafe = async function (reason = "manual") {
-    if (window.syncInProgress || window.isApplyingServerData) return false;
-
-    const dirty = window.getDirtyMap ? window.getDirtyMap() : {};
-    if (Object.keys(dirty).length > 0) {
-        console.log("서버 불러오기 건너뜀: 로컬 변경사항 있음", reason);
-        return false;
-    }
-
-    if (window.isSyncApplyBlocked && window.isSyncApplyBlocked()) {
-        console.log("서버 불러오기 건너뜀: 편집 중", reason);
-        return false;
-    }
-
-    try {
-        const result = await window.loadFromServer();
-        const serverData = window.getServerData(result);
-        const serverStamp = window.getServerStamp(result);
-        const localStamp = window.getSyncStamp();
-
-        if (!serverData) return false;
-
-        if (serverStamp && serverStamp <= localStamp) {
-            console.log("서버 불러오기 건너뜀: 최신 상태", reason);
-            return false;
-        }
-
-        // 🚨 [핵심 수정] 데이터를 불러올 때 무조건 병합(true) 처리하여 렌더링 증발 막음
-        window.applyServerData(serverData, true);
-        window.setSyncStamp(serverStamp);
-
-        console.log("서버 최신 데이터 적용 완료", reason, serverStamp);
-        return true;
-    } catch (e) {
-        console.warn("서버 최신 데이터 확인 실패:", reason, e);
-        return false;
-    }
-};
-
 window.forceSync = async function () {
     try {
-        if (window.showLoading) window.showLoading("서버 동기화 중...");
-        await window.syncNow(true);
-        if (window.hideLoading) window.hideLoading();
-        alert("서버 동기화 완료!");
+        if (window.showLoading) {
+            window.showLoading("서버 동기화 중...");
+        }
+
+        const dirty = window.getDirtyMap();
+        const hasDirty = Object.keys(dirty).length > 0;
+
+        if (hasDirty) {
+            await window.syncNow(true);
+            alert("변경사항을 서버에 저장했습니다.");
+        } else {
+            const loaded = await window.syncFromServerIfSafe("force");
+
+            if (loaded) {
+                alert("서버 최신 데이터를 불러왔습니다.");
+            } else {
+                alert("이미 최신 상태입니다.");
+            }
+        }
     } catch (e) {
-        if (window.hideLoading) window.hideLoading();
         alert("서버 동기화 실패: " + e.message);
+    } finally {
+        if (window.hideLoading) {
+            window.hideLoading();
+        }
     }
 };
 
 setTimeout(() => {
-    if (window.startSync) window.startSync();
+    if (window.startSync) {
+        window.startSync();
+    }
 }, 500);
