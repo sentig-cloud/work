@@ -1,249 +1,401 @@
+// work_commute.js
+
 window.handleCommuteFile = async (input) => {
-    if(input.files.length === 0) return;
-    window.showLoading("사진 처리 중...");
-    window.processFileExt(input.files[0], (dataUrl) => {
-        if(dataUrl) {
-            window.tempCommuteImg = dataUrl;
-            document.getElementById('commuteNoPhotoText').style.display = 'none';
-            const preview = document.getElementById('commuteImgPreview');
-            preview.style.display = 'block';
-            preview.src = dataUrl;
-            document.getElementById('commuteImgDelBtn').style.display = 'block';
+    if (!input.files || input.files.length === 0) {
+        return;
+    }
+
+    if (window.showLoading) {
+        window.showLoading("사진 처리 중...");
+    }
+
+    const file = input.files[0];
+
+    if (!window.safeProcessImage) {
+        if (window.hideLoading) {
+            window.hideLoading();
         }
-        window.hideLoading();
+
+        alert("사진 처리 기능을 불러오지 못했습니다.");
+        input.value = "";
+        return;
+    }
+
+    window.safeProcessImage(file, (dataUrl) => {
+        if (dataUrl) {
+            window.tempCommuteImg = dataUrl;
+
+            document.getElementById("commuteNoPhotoText").style.display = "none";
+
+            const preview = document.getElementById("commuteImgPreview");
+            preview.style.display = "block";
+            preview.src = dataUrl;
+
+            document.getElementById("commuteImgDelBtn").style.display = "block";
+        }
+
+        if (window.hideLoading) {
+            window.hideLoading();
+        }
     });
+
     input.value = "";
 };
 
 window.handleCommuteImg = window.handleCommuteFile;
 
 window.handleCommuteThumbClick = (event) => {
-    if (event && event.target && event.target.id === 'commuteImgDelBtn') return;
-
-    if (window.tempCommuteImg) {
-        if (window.openImageViewer) window.openImageViewer(0, 'tempCommute');
+    if (event && event.target && event.target.id === "commuteImgDelBtn") {
         return;
     }
 
-    const input = document.getElementById('commuteImgInput');
-    if (input) input.click();
+    if (window.tempCommuteImg) {
+        if (window.openImageViewer) {
+            window.openImageViewer(0, "tempCommute");
+        }
+
+        return;
+    }
+
+    const input = document.getElementById("commuteImgInput");
+
+    if (input) {
+        input.click();
+    }
 };
 
 window.removeCommuteImg = (event) => {
-    if (event && event.stopPropagation) event.stopPropagation();
+    if (event && event.stopPropagation) {
+        event.stopPropagation();
+    }
+
     window.tempCommuteImg = null;
-    document.getElementById('commuteNoPhotoText').style.display = 'block';
-    document.getElementById('commuteImgPreview').style.display = 'none';
-    document.getElementById('commuteImgPreview').src = '';
-    document.getElementById('commuteImgDelBtn').style.display = 'none';
+
+    document.getElementById("commuteNoPhotoText").style.display = "block";
+    document.getElementById("commuteImgPreview").style.display = "none";
+    document.getElementById("commuteImgPreview").src = "";
+    document.getElementById("commuteImgDelBtn").style.display = "none";
 };
 
 window.updateOvertime = () => {
-    const timeVal = document.getElementById('commuteTime').value;
-    const baseVal = document.getElementById('commuteBaseTime').value;
-    const otInput = document.getElementById('commuteOvertime');
+    const timeValue = document.getElementById("commuteTime").value;
+    const baseValue = document.getElementById("commuteBaseTime").value;
+    const overtimeInput = document.getElementById("commuteOvertime");
 
-    if(timeVal.length < 4 || baseVal.length < 4 || !timeVal.includes(':') || !baseVal.includes(':')) {
-        otInput.value = `00:00`;
+    if (
+        timeValue.length < 4 ||
+        baseValue.length < 4 ||
+        !timeValue.includes(":") ||
+        !baseValue.includes(":")
+    ) {
+        overtimeInput.value = "00:00";
         window.calculatedOvertimeMin = 0;
         return;
     }
 
-    const parseMins = (tStr) => {
-        const [h, m] = tStr.split(':').map(Number);
-        return h * 60 + m;
+    const parseMinutes = (value) => {
+        const parts = value.split(":").map(Number);
+        return parts[0] * 60 + parts[1];
     };
 
-    const tMins = parseMins(timeVal);
-    const bMins = parseMins(baseVal);
+    const currentMinutes = parseMinutes(timeValue);
+    const baseMinutes = parseMinutes(baseValue);
 
-    let diff = 0;
-    if (window.currentCommuteType === 'in') diff = bMins - tMins;
-    else diff = tMins - bMins;
+    let difference = 0;
 
-    if (diff < 0) diff = 0; 
-    if (window.isCommuteException) diff = 0; 
+    if (window.currentCommuteType === "in") {
+        difference = baseMinutes - currentMinutes;
+    } else {
+        difference = currentMinutes - baseMinutes;
+    }
 
-    window.calculatedOvertimeMin = diff;
+    if (difference < 0 || window.isCommuteException) {
+        difference = 0;
+    }
 
-    const hh = String(Math.floor(diff / 60)).padStart(2, '0');
-    const mm = String(diff % 60).padStart(2, '0');
-    otInput.value = `${hh}:${mm}`;
+    window.calculatedOvertimeMin = difference;
+
+    const hours = String(Math.floor(difference / 60)).padStart(2, "0");
+    const minutes = String(difference % 60).padStart(2, "0");
+
+    overtimeInput.value = `${hours}:${minutes}`;
 };
 
-window.updateCommuteDetailByDate = (y, m, d) => {
-    const todayLogs = window.logs.filter(l => l.y === y && l.m === m && l.d === d);
-    const inLog = todayLogs.find(l => l.cat === 'commute_in');
-    const outLog = todayLogs.find(l => l.cat === 'commute_out');
-    let calcId = `calc_commute_${y}_${m}_${d}`;
-    
-    if (inLog && outLog) {
-        let diffKm = (parseInt(outLog.km) || 0) - (parseInt(inLog.km) || 0);
-        if (diffKm < 0) diffKm = 0;
+window.updateCommuteDetailByDate = (year, month, day) => {
+    const dayLogs = window.logs.filter(
+        (log) =>
+            log.y === year &&
+            log.m === month &&
+            log.d === day
+    );
 
-        const monthLogs = window.logs.filter(l => String(l.y) === String(y) && String(l.m) === String(m));
-        let monthlyKm = 0;
-        
-        for(let day = 1; day <= d; day++) {
-            let dIn = monthLogs.find(l => String(l.d) === String(day) && l.cat === 'commute_in');
-            let dOut = monthLogs.find(l => String(l.d) === String(day) && l.cat === 'commute_out');
-            
-            if(dIn && dOut) {
-                let dKm = (parseInt(dOut.km) || 0) - (parseInt(dIn.km) || 0); 
-                if (dKm > 0) monthlyKm += dKm;
+    const inLog = dayLogs.find((log) => log.cat === "commute_in");
+    const outLog = dayLogs.find((log) => log.cat === "commute_out");
+    const detailId = `calc_commute_${year}_${month}_${day}`;
+    const previousDetail = window.logs.find((log) => log.id === detailId);
+
+    if (!inLog || !outLog) {
+        if (previousDetail) {
+            window.logs = window.logs.filter((log) => log.id !== detailId);
+
+            if (window.markDirty) {
+                window.markDirty("logs", detailId, "delete");
             }
         }
 
-        const formatOt = (min) => {
-            if(!min) return "";
-            let hStr = String(Math.floor(min / 60)).padStart(2, '0');
-            let mStr = String(min % 60).padStart(2, '0');
-            // 🌟 [수정 완료] 편집창 오류 방지를 위해 HTML 태그를 없애고 순수 텍스트로만 저장
-            return ` (+${hStr}:${mStr})`;
-        };
+        return;
+    }
 
-        // 🌟 [수정 완료] 편집창 오류 방지를 위해 [예외] 텍스트도 순수하게 저장
-        let inOtStr = inLog.inException ? ` [예외]` : formatOt(inLog.overtimeMin);
-        let outOtStr = outLog.outException ? ` [예외]` : formatOt(outLog.overtimeMin);
+    let distance = (parseInt(outLog.km, 10) || 0) - (parseInt(inLog.km, 10) || 0);
 
-        let inTimeStr = inLog.time || "-";
-        let outTimeStr = outLog.time || "-";
+    if (distance < 0) {
+        distance = 0;
+    }
 
-        const days = ['일','월','화','수','목','금','토'];
-        const dayStr = days[new Date(y, m - 1, d).getDay()];
-        const isDutyToday = todayLogs.some(l => l.cat === 'work' && l.isDuty);
-        
-        // 🌟 [수정 완료] 당직 역시 순수 텍스트로 저장
-        let dutyStr = isDutyToday ? ` - 당직` : "";
+    const monthLogs = window.logs.filter(
+        (log) =>
+            String(log.y) === String(year) &&
+            String(log.m) === String(month)
+    );
 
-        let diffKmStr = Number(diffKm).toLocaleString();
-        let monthlyKmStr = Number(monthlyKm).toLocaleString();
+    let monthlyDistance = 0;
 
-        let newMemoStr = `[출/퇴 상세내역]\n📅 ${y}년 ${m}월 ${d}일(${dayStr})${dutyStr}\n🟢 출근 : ${inTimeStr}${inOtStr}\n🔴 퇴근 : ${outTimeStr}${outOtStr}\n🚗 주행: ${diffKmStr}km (누적 ${monthlyKmStr}km)`;
+    for (let currentDay = 1; currentDay <= day; currentDay++) {
+        const dailyIn = monthLogs.find(
+            (log) =>
+                String(log.d) === String(currentDay) &&
+                log.cat === "commute_in"
+        );
 
-        // 🌟 [수정 완료] 기준 시간을 '출근'에서 '퇴근'으로 변경하여 퇴근 카드 밑에 생성되도록 고정
-        let sortTime = outLog.time ? outLog.time + ":01" : "23:59:59";
+        const dailyOut = monthLogs.find(
+            (log) =>
+                String(log.d) === String(currentDay) &&
+                log.cat === "commute_out"
+        );
 
-        if (!window.memoTags) window.memoTags = [];
-        if (!window.memoTags.find(t => t.name === '상세내역')) {
-            window.memoTags.push({ name: '상세내역', count: 1 });
+        if (dailyIn && dailyOut) {
+            const dailyDistance =
+                (parseInt(dailyOut.km, 10) || 0) -
+                (parseInt(dailyIn.km, 10) || 0);
+
+            if (dailyDistance > 0) {
+                monthlyDistance += dailyDistance;
+            }
+        }
+    }
+
+    const formatOvertime = (minutes) => {
+        if (!minutes) return "";
+
+        const hoursText = String(Math.floor(minutes / 60)).padStart(2, "0");
+        const minutesText = String(minutes % 60).padStart(2, "0");
+
+        return ` (+${hoursText}:${minutesText})`;
+    };
+
+    const inOvertimeText = inLog.inException
+        ? " [예외]"
+        : formatOvertime(inLog.overtimeMin);
+
+    const outOvertimeText = outLog.outException
+        ? " [예외]"
+        : formatOvertime(outLog.overtimeMin);
+
+    const weekdayNames = ["일", "월", "화", "수", "목", "금", "토"];
+    const weekday = weekdayNames[new Date(year, month - 1, day).getDay()];
+    const hasDuty = dayLogs.some((log) => log.cat === "work" && log.isDuty);
+    const dutyText = hasDuty ? " - 당직" : "";
+
+    const memo =
+        `[출/퇴 상세내역]\n` +
+        `📅 ${year}년 ${month}월 ${day}일(${weekday})${dutyText}\n` +
+        `🟢 출근 : ${inLog.time || "-"}${inOvertimeText}\n` +
+        `🔴 퇴근 : ${outLog.time || "-"}${outOvertimeText}\n` +
+        `🚗 주행: ${Number(distance).toLocaleString()}km ` +
+        `(누적 ${Number(monthlyDistance).toLocaleString()}km)`;
+
+    const sortTime = outLog.time ? `${outLog.time}:01` : "23:59:59";
+    const now = new Date().toISOString();
+
+    if (!window.memoTags) {
+        window.memoTags = [];
+    }
+
+    if (!window.memoTags.find((tag) => tag.name === "상세내역")) {
+        window.memoTags.push({
+            name: "상세내역",
+            count: 1
+        });
+
+        if (window.markDirty) {
+            window.markDirty("master", "memoTags", "replace");
+        }
+    }
+
+    if (previousDetail) {
+        const customLines = String(previousDetail.memo || "")
+            .split("\n")
+            .filter((line) => {
+                const value = line.trim();
+
+                return !(
+                    value.startsWith("[출/퇴 상세내역]") ||
+                    value.startsWith("📅") ||
+                    value.startsWith("🟢") ||
+                    value.startsWith("🔴") ||
+                    value.startsWith("🚗 주행:") ||
+                    value.startsWith("오늘 주행:")
+                );
+            })
+            .filter(Boolean);
+
+        previousDetail.memo =
+            memo + (customLines.length > 0 ? `\n${customLines.join("\n")}` : "");
+
+        previousDetail.time = sortTime;
+        previousDetail.updatedAt = now;
+
+        if (!previousDetail.tags) {
+            previousDetail.tags = [];
         }
 
-        let detailLog = window.logs.find(l => l.id === calcId);
-        
-        if (detailLog) {
-            let oldMemo = detailLog.memo || "";
-            let customText = "";
-            
-            let lines = oldMemo.split('\n');
-            let customLines = [];
-            lines.forEach(line => {
-                let l = line.trim();
-                if (l.startsWith('[출/퇴 상세내역]') || l.startsWith('📅') || l.startsWith('🟢') || l.startsWith('🔴')) return;
-                if (l.startsWith('🚗 주행:') || l.startsWith('오늘 주행:')) {
-                    let idx = line.indexOf('km)');
-                    if (idx !== -1 && idx + 3 < line.length) {
-                        let extra = line.substring(idx + 3).trim();
-                        if (extra) customLines.push(extra);
-                    }
-                    return;
-                }
-                if (line.length > 0) customLines.push(line);
-            });
-            
-            if (customLines.length > 0) customText = "\n" + customLines.join('\n');
-            
-            detailLog.memo = newMemoStr + customText;
-            detailLog.time = sortTime; 
-            
-            if(!detailLog.tags) detailLog.tags = [];
-            if(!detailLog.tags.includes('상세내역')) detailLog.tags.push('상세내역');
-        } else {
-            window.logs.push({
-                id: calcId, y: y, m: m, d: d, cat: 'memo', tags: ['상세내역'], memo: newMemoStr, time: sortTime
-            });
+        if (!previousDetail.tags.includes("상세내역")) {
+            previousDetail.tags.push("상세내역");
+        }
+
+        if (window.markDirty) {
+            window.markDirty("logs", previousDetail.id, "upsert");
         }
     } else {
-        window.logs = window.logs.filter(l => l.id !== calcId);
+        const detailLog = {
+            id: detailId,
+            y: year,
+            m: month,
+            d: day,
+            cat: "memo",
+            tags: ["상세내역"],
+            memo,
+            time: sortTime,
+            updatedAt: now
+        };
+
+        window.logs.push(detailLog);
+
+        if (window.markDirty) {
+            window.markDirty("logs", detailLog.id, "upsert");
+        }
     }
 };
 
 window.saveCommute = () => {
-    const timeInput = document.getElementById('commuteTime');
+    const timeInput = document.getElementById("commuteTime");
+
     window.formatTimeInput(timeInput);
-    let cTime = timeInput.value || window.getCurrentTimeString();
-    
-    let kmInput = document.getElementById('commuteKm').value.replace(/[^0-9]/g, '');
-    let km = parseInt(kmInput) || 0;
-    
+
+    const commuteTime = timeInput.value || window.getCurrentTimeString();
+    const kilometerText = document
+        .getElementById("commuteKm")
+        .value
+        .replace(/[^0-9]/g, "");
+
+    const kilometers = parseInt(kilometerText, 10) || 0;
+    const overtimeMinutes = window.calculatedOvertimeMin || 0;
+    const note = document.getElementById("commuteNote").value.trim();
+
     let exceptionText = "";
     let exceptionStatus = null;
-    let diffMins = window.calculatedOvertimeMin || 0;
-    let note = document.getElementById('commuteNote').value.trim();
-    
+
     if (window.isCommuteException) {
         exceptionText = " [예외 적용됨]";
         exceptionStatus = "예외";
-    } else if (diffMins > 0) {
-        exceptionStatus = window.currentCommuteType === 'in' ? '조출' : '지연';
+    } else if (overtimeMinutes > 0) {
+        exceptionStatus =
+            window.currentCommuteType === "in" ? "조출" : "지연";
+
         exceptionText = ` [${exceptionStatus} 적용]`;
     }
 
-    const catType = window.currentCommuteType === 'in' ? 'commute_in' : 'commute_out';
+    const category =
+        window.currentCommuteType === "in" ? "commute_in" : "commute_out";
 
-    let existingIdx = window.logs.findIndex(l => l.y === window.currentYear && l.m === window.curMonth && l.d === window.curDay && l.cat === catType);
-    const existingLog = existingIdx > -1 ? window.logs[existingIdx] : null;
-    let newId = existingLog ? existingLog.id : Date.now().toString();
-    const nowIso = new Date().toISOString();
-    let imgsArr = [];
+    const existingIndex = window.logs.findIndex(
+        (log) =>
+            log.y === window.currentYear &&
+            log.m === window.curMonth &&
+            log.d === window.curDay &&
+            log.cat === category
+    );
+
+    const existingLog =
+        existingIndex >= 0 ? window.logs[existingIndex] : null;
+
+    const id = existingLog ? existingLog.id : Date.now().toString();
+    const now = new Date().toISOString();
+
+    let images = [];
+
     if (window.tempCommuteImg) {
-        const prevImg = existingLog && existingLog.imgs && existingLog.imgs[0] ? existingLog.imgs[0] : null;
-        imgsArr = [{
-            id: prevImg && prevImg.src === window.tempCommuteImg ? prevImg.id : 'c_' + Date.now(),
-            src: window.tempCommuteImg,
-            updatedAt: nowIso
-        }];
+        const previousImage =
+            existingLog &&
+            existingLog.imgs &&
+            existingLog.imgs[0]
+                ? existingLog.imgs[0]
+                : null;
+
+        images = [
+            {
+                id:
+                    previousImage &&
+                    previousImage.src === window.tempCommuteImg
+                        ? previousImage.id
+                        : `c_${Date.now()}`,
+                src: window.tempCommuteImg,
+                updatedAt: now
+            }
+        ];
     }
 
-    const newLog = { 
-        id: newId, 
-        y: window.currentYear, 
-        m: window.curMonth, 
-        d: window.curDay, 
-        cat: catType, 
-        time: cTime,
-        inTime: window.currentCommuteType === 'in' ? cTime : null,
-        outTime: window.currentCommuteType === 'out' ? cTime : null,
-        inResult: window.currentCommuteType === 'in' ? exceptionStatus : null,
-        outResult: window.currentCommuteType === 'out' ? exceptionStatus : null,
-        inException: window.currentCommuteType === 'in' ? window.isCommuteException : null,
-        outException: window.currentCommuteType === 'out' ? window.isCommuteException : null,
-        overtimeMin: diffMins,
+    const newLog = {
+        id,
+        y: window.currentYear,
+        m: window.curMonth,
+        d: window.curDay,
+        cat: category,
+        time: commuteTime,
+        inTime: window.currentCommuteType === "in" ? commuteTime : null,
+        outTime: window.currentCommuteType === "out" ? commuteTime : null,
+        inResult: window.currentCommuteType === "in" ? exceptionStatus : null,
+        outResult: window.currentCommuteType === "out" ? exceptionStatus : null,
+        inException:
+            window.currentCommuteType === "in"
+                ? window.isCommuteException
+                : null,
+        outException:
+            window.currentCommuteType === "out"
+                ? window.isCommuteException
+                : null,
+        overtimeMin: overtimeMinutes,
         commuteNote: note,
-        km: km,
-        imgs: imgsArr,
-        memo: `${window.currentCommuteType === 'in' ? '출근' : '퇴근'} 기록: ${cTime} / ${Number(km).toLocaleString()}km${exceptionText}`,
-        personalCheck: existingLog ? (existingLog.personalCheck || null) : null,
-        updatedAt: nowIso
+        km: kilometers,
+        imgs: images,
+        memo:
+            `${window.currentCommuteType === "in" ? "출근" : "퇴근"} 기록: ` +
+            `${commuteTime} / ${Number(kilometers).toLocaleString()}km${exceptionText}`,
+        personalCheck: existingLog ? existingLog.personalCheck || null : null,
+        updatedAt: now
     };
 
-    if (window.saveToLocalStore) {
-        window.saveToLocalStore('logs', newLog);
-    } else {
-        if (existingIdx !== -1) window.logs[existingIdx] = newLog;
-        else window.logs.push(newLog);
-    }
+    window.saveToLocalStore("logs", newLog);
 
-    const beforeDetail = window.logs.find(l => l.id === `calc_commute_${window.currentYear}_${window.curMonth}_${window.curDay}`);
-    window.updateCommuteDetailByDate(window.currentYear, window.curMonth, window.curDay);
-    const afterDetail = window.logs.find(l => l.id === `calc_commute_${window.currentYear}_${window.curMonth}_${window.curDay}`);
-    if (afterDetail) {
-        afterDetail.updatedAt = nowIso;
-        if (window.markDirty) window.markDirty('logs', afterDetail.id, beforeDetail ? 'upsert' : 'upsert');
-    } else if (beforeDetail && window.markDirty) {
-        window.markDirty('logs', beforeDetail.id, 'delete');
-    }
+    window.updateCommuteDetailByDate(
+        window.currentYear,
+        window.curMonth,
+        window.curDay
+    );
 
-    if (window.saveLocal) window.saveLocal(`logs:${newId}:commute`);
+    window.saveLocal(`logs:${id}:commute`, {
+        skipSnapshotDirty: true
+    });
+
     window.closeCommuteModal();
 };

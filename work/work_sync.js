@@ -1,12 +1,17 @@
 // work_sync.js
-// Work Master - Cloudflare Worker / KV / R2 sync
+// Work Master - partial automatic sync with Cloudflare KV / R2
 
 const WORK_API_BASE = "https://work.sentig335.workers.dev";
+const WORK_SYNC_PUSH_DELAY = 1500;
+const WORK_SYNC_PULL_COOLDOWN = 15000;
+const WORK_CALENDAR_PULL_INTERVAL = 60000;
 
 window.syncTimer = null;
 window.syncInProgress = false;
 window.pendingSyncAfterCurrent = false;
 window.isApplyingServerData = false;
+window.autoPullSyncTimer = null;
+window.lastRemoteCheckAt = 0;
 
 window.fetchWithTimeout = async function (url, options = {}, timeoutMs = 15000) {
     const controller = new AbortController();
@@ -54,16 +59,20 @@ window.clearDirtyMap = function () {
     localStorage.removeItem("wm_dirty_map");
 };
 
-window.markDirty = function (colName, id = "_all", action = "upsert") {
+window.hasDirtyChanges = function () {
+    return Object.keys(window.getDirtyMap()).length > 0;
+};
+
+window.markDirty = function (collection, id = "_all", action = "upsert") {
     if (window.isApplyingServerData) return;
 
     const dirty = window.getDirtyMap();
 
-    if (!dirty[colName]) {
-        dirty[colName] = {};
+    if (!dirty[collection]) {
+        dirty[collection] = {};
     }
 
-    dirty[colName][String(id)] = {
+    dirty[collection][String(id)] = {
         id: String(id),
         action,
         changedAt: new Date().toISOString()
@@ -72,10 +81,10 @@ window.markDirty = function (colName, id = "_all", action = "upsert") {
     window.setDirtyMap(dirty);
 };
 
-window.saveArrayToLocal = function (key, arr) {
+window.saveArrayToLocal = function (key, array) {
     localStorage.setItem(
         `wm_${key}`,
-        JSON.stringify((arr || []).filter(Boolean))
+        JSON.stringify((array || []).filter(Boolean))
     );
 };
 
@@ -103,9 +112,8 @@ window.refreshCurrentUI = function () {
     }
 
     const popupLayer = document.getElementById("popupLayer");
-    const isPopupOpen = popupLayer && popupLayer.style.display === "flex";
 
-    if (isPopupOpen) {
+    if (popupLayer && popupLayer.style.display === "flex") {
         if (window.renderCal) {
             window.renderCal(window.currentYear, window.curMonth - 1);
         }
@@ -116,42 +124,45 @@ window.refreshCurrentUI = function () {
     }
 
     const searchLayer = document.getElementById("searchLayer");
-    if (searchLayer && searchLayer.style.display === "flex" && window.doSearch) {
+
+    if (
+        searchLayer &&
+        searchLayer.style.display === "flex" &&
+        window.doSearch
+    ) {
         window.doSearch();
     }
 
     const trashLayer = document.getElementById("trashLayer");
-    if (trashLayer && trashLayer.style.display === "flex" && window.renderTrash) {
+
+    if (
+        trashLayer &&
+        trashLayer.style.display === "flex" &&
+        window.renderTrash
+    ) {
         window.renderTrash();
     }
 };
 
-window.getServerData = function (serverResult) {
-    if (serverResult && serverResult.saved && serverResult.saved.data) {
-        return serverResult.saved.data;
+window.getServerData = function (result) {
+    if (result && result.saved && result.saved.data) {
+        return result.saved.data;
     }
 
-    if (serverResult && serverResult.data) {
-        return serverResult.data;
+    if (result && result.data) {
+        return result.data;
     }
 
     return null;
 };
 
-window.getServerStamp = function (serverResult) {
-    if (serverResult && serverResult.saved && serverResult.saved.syncUpdatedAt) {
-        return serverResult.saved.syncUpdatedAt;
-    }
-
-    if (serverResult && serverResult.syncUpdatedAt) {
-        return serverResult.syncUpdatedAt;
-    }
-
-    if (serverResult && serverResult.savedAt) {
-        return serverResult.savedAt;
-    }
-
-    return "1970-01-01T00:00:00.000Z";
+window.getServerStamp = function (result) {
+    return (
+        result?.saved?.syncUpdatedAt ||
+        result?.savedAt ||
+        result?.syncUpdatedAt ||
+        "1970-01-01T00:00:00.000Z"
+    );
 };
 
 window.touchUpdatedAt = function (item) {
@@ -160,53 +171,6 @@ window.touchUpdatedAt = function (item) {
     }
 
     return item;
-};
-
-window.applyServerData = function (data) {
-    if (!data || !Array.isArray(data.logs)) {
-        return false;
-    }
-
-    window.isApplyingServerData = true;
-
-    try {
-        window.logs = (data.logs || []).filter(Boolean);
-        window.trash = (data.trash || []).filter(Boolean);
-        window.taskTypes = (data.taskTypes || []).filter(Boolean);
-        window.coworkers = (data.coworkers || []).filter(Boolean);
-        window.statuses = (data.statuses || []).filter(Boolean);
-        window.equipments = (data.equipments || []).filter(Boolean);
-        window.memoTags = (data.memoTags || []).filter(Boolean);
-
-        window.saveAllLocalOnly();
-    } finally {
-        window.isApplyingServerData = false;
-        window.isInitialLoad = false;
-    }
-
-    window.refreshCurrentUI();
-    return true;
-};
-
-window.loadFromServer = async function () {
-    const response = await window.fetchWithTimeout(
-        `${WORK_API_BASE}/api/load`,
-        {
-            method: "GET",
-            headers: {
-                "Accept": "application/json"
-            }
-        },
-        15000
-    );
-
-    const text = await response.text();
-
-    if (!response.ok) {
-        throw new Error(`서버 불러오기 실패: ${response.status} / ${text}`);
-    }
-
-    return text ? JSON.parse(text) : {};
 };
 
 window.isInlineImageSrc = function (src) {
@@ -236,12 +200,12 @@ window.dataUrlToBlob = function (dataUrl) {
     });
 };
 
-window.uploadToStorage = async function (dataUrl) {
-    if (!window.isInlineImageSrc(dataUrl)) {
-        return dataUrl;
+window.uploadToStorage = async function (src) {
+    if (!window.isInlineImageSrc(src)) {
+        return src;
     }
 
-    const blob = window.dataUrlToBlob(dataUrl);
+    const blob = window.dataUrlToBlob(src);
 
     const response = await window.fetchWithTimeout(
         `${WORK_API_BASE}/api/upload`,
@@ -270,182 +234,399 @@ window.uploadToStorage = async function (dataUrl) {
     return result.url;
 };
 
-window.migrateInlineImagesToR2 = async function () {
-    const uploadedBySource = new Map();
-    const collections = [
-        window.logs || [],
-        window.trash || []
-    ];
+window.migrateImagesInItem = async function (item, uploadedBySource) {
+    if (!item || !Array.isArray(item.imgs)) {
+        return 0;
+    }
 
-    let changed = false;
     let uploadedCount = 0;
 
-    for (const collection of collections) {
-        for (const log of collection) {
-            if (!log || !Array.isArray(log.imgs)) {
+    for (const image of item.imgs) {
+        if (!image || !window.isInlineImageSrc(image.src)) {
+            continue;
+        }
+
+        const originalSrc = image.src;
+        let url = uploadedBySource.get(originalSrc);
+
+        if (!url) {
+            url = await window.uploadToStorage(originalSrc);
+            uploadedBySource.set(originalSrc, url);
+            uploadedCount++;
+        }
+
+        image.src = url;
+        image.updatedAt = new Date().toISOString();
+        item.updatedAt = new Date().toISOString();
+    }
+
+    return uploadedCount;
+};
+
+window.migrateDirtyImagesToR2 = async function (dirty) {
+    const uploadedBySource = new Map();
+    let uploadedCount = 0;
+
+    for (const collection of ["logs", "trash"]) {
+        const changes = dirty[collection] || {};
+
+        for (const id of Object.keys(changes)) {
+            const change = changes[id];
+
+            if (!change || change.action === "delete") {
                 continue;
             }
 
-            for (const image of log.imgs) {
-                if (!image || !window.isInlineImageSrc(image.src)) {
-                    continue;
-                }
+            const item = (window[collection] || []).find(
+                (value) => String(value.id) === String(id)
+            );
 
-                const originalSrc = image.src;
-                let uploadedUrl = uploadedBySource.get(originalSrc);
-
-                if (!uploadedUrl) {
-                    uploadedUrl = await window.uploadToStorage(originalSrc);
-                    uploadedBySource.set(originalSrc, uploadedUrl);
-                    uploadedCount++;
-                }
-
-                image.src = uploadedUrl;
-                image.updatedAt = new Date().toISOString();
-                log.updatedAt = new Date().toISOString();
-                changed = true;
-            }
+            uploadedCount += await window.migrateImagesInItem(
+                item,
+                uploadedBySource
+            );
         }
     }
 
-    if (changed) {
+    if (uploadedCount > 0) {
         window.saveAllLocalOnly();
     }
 
+    return uploadedCount;
+};
+
+window.migrateAllImagesToR2 = async function () {
+    const uploadedBySource = new Map();
+    let uploadedCount = 0;
+
+    for (const collection of ["logs", "trash"]) {
+        for (const item of window[collection] || []) {
+            uploadedCount += await window.migrateImagesInItem(
+                item,
+                uploadedBySource
+            );
+        }
+    }
+
+    if (uploadedCount > 0) {
+        window.saveAllLocalOnly();
+    }
+
+    return uploadedCount;
+};
+
+window.getMasterPayload = function () {
     return {
-        changed,
-        uploadedCount
+        taskTypes: window.taskTypes || [],
+        coworkers: window.coworkers || [],
+        statuses: window.statuses || [],
+        equipments: window.equipments || [],
+        memoTags: window.memoTags || []
     };
 };
 
-window.startSync = async function () {
+window.getFullPayload = function () {
+    const stamp = new Date().toISOString();
+
+    return {
+        app: "work",
+        savedAt: stamp,
+        syncUpdatedAt: stamp,
+        data: {
+            logs: window.logs || [],
+            trash: window.trash || [],
+            ...window.getMasterPayload()
+        }
+    };
+};
+
+window.applyServerData = function (data) {
+    if (!data || !Array.isArray(data.logs)) {
+        return false;
+    }
+
+    window.isApplyingServerData = true;
+
     try {
-        window.logs = window.logs || [];
-        window.trash = window.trash || [];
+        window.logs = (data.logs || []).filter(Boolean);
+        window.trash = (data.trash || []).filter(Boolean);
+        window.taskTypes = (data.taskTypes || []).filter(Boolean);
+        window.coworkers = (data.coworkers || []).filter(Boolean);
+        window.statuses = (data.statuses || []).filter(Boolean);
+        window.equipments = (data.equipments || []).filter(Boolean);
+        window.memoTags = (data.memoTags || []).filter(Boolean);
 
-        const dirty = window.getDirtyMap();
-        const hasDirty = Object.keys(dirty).length > 0;
-
-        if (hasDirty) {
-            window.isInitialLoad = false;
-
-            if (window.renderMain) {
-                window.renderMain();
-            }
-
-            console.log("로컬 변경사항이 있어 서버 저장을 먼저 시도합니다.");
-
-            try {
-                await window.syncNow(true);
-            } catch (e) {
-                console.warn("초기 로컬 변경사항 저장 실패:", e);
-            }
-
-            return;
-        }
-
-        const result = await window.loadFromServer();
-        const serverData = window.getServerData(result);
-        const serverStamp = window.getServerStamp(result);
-
-        if (serverData) {
-            window.applyServerData(serverData);
-            window.setSyncStamp(serverStamp);
-            console.log("서버 데이터 불러오기 완료", serverStamp);
-        } else {
-            window.isInitialLoad = false;
-
-            try {
-                window.saveAllLocalOnly();
-            } catch (e) {
-                console.warn("초기 로컬 저장 실패:", e);
-            }
-
-            if (window.renderMain) {
-                window.renderMain();
-            }
-        }
-    } catch (e) {
-        console.warn("서버 불러오기 실패, 로컬 데이터로 실행합니다.", e);
+        window.saveAllLocalOnly();
+    } finally {
+        window.isApplyingServerData = false;
         window.isInitialLoad = false;
+    }
 
-        if (window.renderMain) {
-            window.renderMain();
+    window.refreshCurrentUI();
+    return true;
+};
+
+window.applyRemoteOperations = function (operations, master) {
+    window.isApplyingServerData = true;
+
+    try {
+        (operations || []).forEach((operation) => {
+            if (!operation) return;
+
+            const collection = operation.collection;
+
+            if (collection !== "logs" && collection !== "trash") {
+                return;
+            }
+
+            if (operation.action === "delete") {
+                window[collection] = (window[collection] || []).filter(
+                    (item) => String(item.id) !== String(operation.id)
+                );
+                return;
+            }
+
+            if (operation.action === "upsert" && operation.item) {
+                const index = (window[collection] || []).findIndex(
+                    (item) => String(item.id) === String(operation.item.id)
+                );
+
+                if (index >= 0) {
+                    window[collection][index] = operation.item;
+                } else {
+                    window[collection].push(operation.item);
+                }
+            }
+        });
+
+        if (master) {
+            for (const key of [
+                "taskTypes",
+                "coworkers",
+                "statuses",
+                "equipments",
+                "memoTags"
+            ]) {
+                if (Array.isArray(master[key])) {
+                    window[key] = master[key];
+                }
+            }
         }
+
+        window.saveAllLocalOnly();
+    } finally {
+        window.isApplyingServerData = false;
+        window.isInitialLoad = false;
     }
+
+    window.refreshCurrentUI();
 };
 
-window.isSyncApplyBlocked = function () {
-    const blockingLayerIds = [
-        "workModal",
-        "editModal",
-        "commuteModal",
-        "titleEditModal",
-        "tagEditModal"
-    ];
+window.loadFromServer = async function () {
+    const response = await window.fetchWithTimeout(
+        `${WORK_API_BASE}/api/load`,
+        {
+            method: "GET",
+            headers: {
+                "Accept": "application/json"
+            }
+        },
+        15000
+    );
 
-    const hasOpenModal = blockingLayerIds.some((id) => {
-        const element = document.getElementById(id);
-        return element && element.style.display === "flex";
-    });
+    const text = await response.text();
 
-    if (hasOpenModal) {
-        return true;
+    if (!response.ok) {
+        throw new Error(`서버 불러오기 실패: ${response.status} / ${text}`);
     }
 
-    const active = document.activeElement;
-
-    if (
-        active &&
-        ["INPUT", "TEXTAREA", "SELECT"].includes(active.tagName)
-    ) {
-        return true;
-    }
-
-    return false;
+    return text ? JSON.parse(text) : {};
 };
 
-window.syncFromServerIfSafe = async function (reason = "manual") {
+window.pullRemoteChanges = async function (reason = "auto", force = false) {
     if (window.syncInProgress || window.isApplyingServerData) {
         return false;
     }
 
-    const dirty = window.getDirtyMap();
-
-    if (Object.keys(dirty).length > 0) {
-        console.log("서버 불러오기 건너뜀: 저장하지 않은 로컬 변경사항 있음", reason);
+    if (window.hasDirtyChanges()) {
         return false;
     }
 
-    if (window.isSyncApplyBlocked()) {
-        console.log("서버 불러오기 건너뜀: 현재 편집 중", reason);
+    const now = Date.now();
+
+    if (!force && now - window.lastRemoteCheckAt < WORK_SYNC_PULL_COOLDOWN) {
         return false;
     }
+
+    window.lastRemoteCheckAt = now;
+
+    const since = encodeURIComponent(window.getSyncStamp());
 
     try {
-        const result = await window.loadFromServer();
-        const serverData = window.getServerData(result);
-        const serverStamp = window.getServerStamp(result);
-        const localStamp = window.getSyncStamp();
+        const response = await window.fetchWithTimeout(
+            `${WORK_API_BASE}/api/changes?since=${since}`,
+            {
+                method: "GET",
+                headers: {
+                    "Accept": "application/json"
+                }
+            },
+            15000
+        );
 
-        if (!serverData) {
+        const text = await response.text();
+
+        if (!response.ok) {
+            throw new Error(`변경 확인 실패: ${response.status} / ${text}`);
+        }
+
+        const result = text ? JSON.parse(text) : {};
+
+        if (!result.changed) {
             return false;
         }
 
-        if (serverStamp && serverStamp <= localStamp) {
-            console.log("서버 데이터가 이미 반영된 상태입니다.", reason);
-            return false;
+        if (result.full) {
+            window.applyServerData(result.data);
+        } else {
+            window.applyRemoteOperations(result.operations, result.master);
         }
 
-        window.applyServerData(serverData);
-        window.setSyncStamp(serverStamp);
+        window.setSyncStamp(result.savedAt);
 
-        console.log("서버 최신 데이터 적용 완료", reason, serverStamp);
+        console.log("서버 변경사항 자동 반영 완료", reason, result.savedAt);
         return true;
     } catch (e) {
-        console.warn("서버 최신 데이터 확인 실패:", reason, e);
+        console.warn("서버 변경사항 확인 실패:", reason, e);
         return false;
     }
+};
+
+window.buildPatchOperations = function (dirty) {
+    const operations = [];
+
+    for (const collection of ["logs", "trash"]) {
+        const changes = dirty[collection] || {};
+
+        Object.keys(changes).forEach((id) => {
+            const change = changes[id];
+
+            if (!change) return;
+
+            if (change.action === "delete") {
+                operations.push({
+                    collection,
+                    id,
+                    action: "delete"
+                });
+
+                return;
+            }
+
+            const item = (window[collection] || []).find(
+                (value) => String(value.id) === String(id)
+            );
+
+            if (item) {
+                operations.push({
+                    collection,
+                    id,
+                    action: "upsert",
+                    item
+                });
+            }
+        });
+    }
+
+    return operations;
+};
+
+window.saveFullSnapshot = async function () {
+    const uploadedImages = await window.migrateAllImagesToR2();
+    const payload = window.getFullPayload();
+    const body = JSON.stringify(payload);
+    const bodyMb = new Blob([body]).size / 1024 / 1024;
+
+    if (bodyMb > 24) {
+        throw new Error(
+            `사진 분리 후에도 전체 저장 데이터가 ${bodyMb.toFixed(2)}MB입니다.`
+        );
+    }
+
+    const response = await window.fetchWithTimeout(
+        `${WORK_API_BASE}/api/save`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
+            body
+        },
+        30000
+    );
+
+    const text = await response.text();
+
+    if (!response.ok) {
+        throw new Error(`전체 저장 실패: ${response.status} / ${text}`);
+    }
+
+    const result = text ? JSON.parse(text) : {};
+
+    console.log("전체 동기화 완료", {
+        sizeMb: bodyMb.toFixed(2),
+        uploadedImages
+    });
+
+    return result;
+};
+
+window.saveDirtyPatch = async function (dirty) {
+    const uploadedImages = await window.migrateDirtyImagesToR2(dirty);
+    const operations = window.buildPatchOperations(dirty);
+    const hasMasterChange = !!dirty.master;
+
+    if (operations.length === 0 && !hasMasterChange) {
+        return {
+            ok: true,
+            message: "nothing changed",
+            savedAt: window.getSyncStamp()
+        };
+    }
+
+    const payload = {
+        operations,
+        master: hasMasterChange ? window.getMasterPayload() : null
+    };
+
+    const response = await window.fetchWithTimeout(
+        `${WORK_API_BASE}/api/patch`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
+            body: JSON.stringify(payload)
+        },
+        30000
+    );
+
+    const text = await response.text();
+
+    if (!response.ok) {
+        throw new Error(`부분 저장 실패: ${response.status} / ${text}`);
+    }
+
+    const result = text ? JSON.parse(text) : {};
+
+    console.log("부분 동기화 완료", {
+        changedCards: operations.length,
+        uploadedImages
+    });
+
+    return result;
 };
 
 window.syncNow = async function (showError = false) {
@@ -457,74 +638,30 @@ window.syncNow = async function (showError = false) {
     const dirty = window.getDirtyMap();
     const hasDirty = Object.keys(dirty).length > 0;
 
-    if (!hasDirty && !showError) {
+    if (!hasDirty) {
+        if (showError) {
+            return await window.pullRemoteChanges("manual", true);
+        }
+
         return null;
     }
 
     window.syncInProgress = true;
 
     try {
-        const migration = await window.migrateInlineImagesToR2();
-        const stamp = new Date().toISOString();
+        let result;
 
-        const payload = {
-            savedAt: stamp,
-            syncUpdatedAt: stamp,
-            app: "work",
-            dirty,
-            data: {
-                logs: window.logs || [],
-                trash: window.trash || [],
-                taskTypes: window.taskTypes || [],
-                coworkers: window.coworkers || [],
-                statuses: window.statuses || [],
-                equipments: window.equipments || [],
-                memoTags: window.memoTags || []
-            }
-        };
-
-        const body = JSON.stringify(payload);
-        const bodyBytes = new Blob([body]).size;
-        const bodyMb = bodyBytes / 1024 / 1024;
-        const safeLimitBytes = 24 * 1024 * 1024;
-
-        if (bodyBytes > safeLimitBytes) {
-            throw new Error(
-                `사진 분리 후에도 저장 데이터가 ${bodyMb.toFixed(2)}MB입니다. ` +
-                "기록 데이터 자체를 추가로 나누어야 합니다."
-            );
+        if (dirty.snapshot) {
+            result = await window.saveFullSnapshot();
+        } else {
+            result = await window.saveDirtyPatch(dirty);
         }
 
-        const response = await window.fetchWithTimeout(
-            `${WORK_API_BASE}/api/save`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Accept": "application/json"
-                },
-                body
-            },
-            30000
-        );
-
-        const text = await response.text();
-
-        if (!response.ok) {
-            throw new Error(`서버 저장 실패: ${response.status} / ${text}`);
+        if (result && result.savedAt) {
+            window.setSyncStamp(result.savedAt);
         }
 
-        const result = text ? JSON.parse(text) : {};
-
-        window.setSyncStamp(stamp);
         window.clearDirtyMap();
-
-        console.log("자동 동기화 완료", {
-            result,
-            sizeMb: bodyMb.toFixed(2),
-            uploadedImages: migration.uploadedCount
-        });
-
         return result;
     } catch (e) {
         console.warn("서버 저장 실패, 로컬 변경사항 유지:", e);
@@ -553,7 +690,7 @@ window.scheduleSync = function () {
 
     window.syncTimer = setTimeout(() => {
         window.syncNow(false);
-    }, 1000);
+    }, WORK_SYNC_PUSH_DELAY);
 };
 
 window.saveToServer = async function (showError = false) {
@@ -561,49 +698,55 @@ window.saveToServer = async function (showError = false) {
 };
 
 window.saveLocal = function (dirtyKey = "_all", options = {}) {
-    if (!window.logs) {
-        window.logs = [];
-    }
-
-    if (!window.trash) {
-        window.trash = [];
-    }
-
     try {
         window.saveAllLocalOnly();
     } catch (e) {
-        console.warn("사진 이전 전 로컬 저장 용량 부족 가능성:", e);
+        console.warn("로컬 저장 실패:", e);
     }
 
-    if (!window.isApplyingServerData) {
-        const keyText = String(dirtyKey || "_all");
-        const alreadyTracked = keyText.includes(":") || options.skipSnapshotDirty;
+    if (window.isApplyingServerData) {
+        window.refreshCurrentUI();
+        return;
+    }
 
-        // 개별 카드(logs:id) 변경은 이미 markDirty('logs', id)로 추적한다.
-        // 전체 마스터 배열/설정 변경처럼 대상이 애매할 때만 snapshot dirty를 남긴다.
-        if (!alreadyTracked) {
-            window.markDirty("snapshot", keyText, "save");
+    const key = String(dirtyKey || "_all");
+
+    if (key.startsWith("work:")) {
+        const id = key.split(":")[1];
+        const changedWork = (window.logs || []).find(
+            (item) => String(item.id) === String(id)
+        );
+
+        if (changedWork) {
+            window.markDirty("logs", changedWork.id, "upsert");
+
+            (window.logs || [])
+                .filter(
+                    (item) =>
+                        item.cat === "work" &&
+                        item.y === changedWork.y &&
+                        item.m === changedWork.m &&
+                        item.d === changedWork.d
+                )
+                .forEach((item) => {
+                    window.markDirty("logs", item.id, "upsert");
+                });
         }
-
-        window.scheduleSync();
+    } else if (key.startsWith("commute-delete:")) {
+        window.markDirty("snapshot", key, "replace");
+    } else if (!options.skipSnapshotDirty && !key.includes(":")) {
+        window.markDirty("snapshot", key, "replace");
     }
 
+    window.scheduleSync();
     window.refreshCurrentUI();
 };
 
-window.saveToLocalStore = function (colName, data) {
-    if (!window.logs) {
-        window.logs = [];
-    }
-
-    if (!window.trash) {
-        window.trash = [];
-    }
-
+window.saveToLocalStore = function (collection, data) {
     data = window.touchUpdatedAt(data);
 
-    if (colName === "logs") {
-        const index = window.logs.findIndex(
+    if (collection === "logs") {
+        const index = (window.logs || []).findIndex(
             (item) => String(item.id) === String(data.id)
         );
 
@@ -614,8 +757,8 @@ window.saveToLocalStore = function (colName, data) {
         }
     }
 
-    if (colName === "trash") {
-        const index = window.trash.findIndex(
+    if (collection === "trash") {
+        const index = (window.trash || []).findIndex(
             (item) => String(item.id) === String(data.id)
         );
 
@@ -626,25 +769,54 @@ window.saveToLocalStore = function (colName, data) {
         }
     }
 
-    window.markDirty(colName, data.id, "upsert");
-    window.saveLocal(`${colName}:${data.id}`, { skipSnapshotDirty: true });
+    window.markDirty(collection, data.id, "upsert");
+    window.saveLocal(`${collection}:${data.id}`, {
+        skipSnapshotDirty: true
+    });
 };
 
-window.deleteFromLocalStore = function (colName, id) {
-    if (colName === "logs") {
+window.deleteFromLocalStore = function (collection, id) {
+    if (collection === "logs") {
         window.logs = (window.logs || []).filter(
             (item) => String(item.id) !== String(id)
         );
     }
 
-    if (colName === "trash") {
+    if (collection === "trash") {
         window.trash = (window.trash || []).filter(
             (item) => String(item.id) !== String(id)
         );
     }
 
-    window.markDirty(colName, id, "delete");
-    window.saveLocal(`${colName}:${id}:delete`, { skipSnapshotDirty: true });
+    window.markDirty(collection, id, "delete");
+    window.saveLocal(`${collection}:${id}:delete`, {
+        skipSnapshotDirty: true
+    });
+};
+
+window.startSync = async function () {
+    try {
+        if (window.hasDirtyChanges()) {
+            await window.syncNow(false);
+        }
+
+        const result = await window.loadFromServer();
+        const serverData = window.getServerData(result);
+        const serverStamp = window.getServerStamp(result);
+
+        if (serverData && !window.hasDirtyChanges()) {
+            window.applyServerData(serverData);
+            window.setSyncStamp(serverStamp);
+            console.log("초기 서버 데이터 불러오기 완료", serverStamp);
+        } else {
+            window.isInitialLoad = false;
+            window.refreshCurrentUI();
+        }
+    } catch (e) {
+        console.warn("초기 동기화 실패, 로컬 데이터로 실행:", e);
+        window.isInitialLoad = false;
+        window.refreshCurrentUI();
+    }
 };
 
 window.forceSync = async function () {
@@ -653,20 +825,12 @@ window.forceSync = async function () {
             window.showLoading("서버 동기화 중...");
         }
 
-        const dirty = window.getDirtyMap();
-        const hasDirty = Object.keys(dirty).length > 0;
-
-        if (hasDirty) {
+        if (window.hasDirtyChanges()) {
             await window.syncNow(true);
             alert("변경사항을 서버에 저장했습니다.");
         } else {
-            const loaded = await window.syncFromServerIfSafe("force");
-
-            if (loaded) {
-                alert("서버 최신 데이터를 불러왔습니다.");
-            } else {
-                alert("이미 최신 상태입니다.");
-            }
+            const changed = await window.pullRemoteChanges("force", true);
+            alert(changed ? "서버 변경사항을 반영했습니다." : "이미 최신 상태입니다.");
         }
     } catch (e) {
         alert("서버 동기화 실패: " + e.message);
@@ -677,42 +841,52 @@ window.forceSync = async function () {
     }
 };
 
-window.startAutoPullSync = function () {
-    if (window.autoPullSyncTimer) {
-        clearInterval(window.autoPullSyncTimer);
+window.installAutomaticPull = function () {
+    if (window.automaticPullInstalled) {
+        return;
     }
 
-    window.autoPullSyncTimer = setInterval(() => {
-        window.syncFromServerIfSafe("auto-pull");
-    }, 20000);
+    window.automaticPullInstalled = true;
+
+    const originalOpenPop = window.openPop;
+
+    if (typeof originalOpenPop === "function") {
+        window.openPop = function (month) {
+            const result = originalOpenPop(month);
+            window.pullRemoteChanges("calendar-open", true);
+            return result;
+        };
+    }
 
     document.addEventListener("visibilitychange", () => {
         if (!document.hidden) {
-            window.syncFromServerIfSafe("visible");
+            window.pullRemoteChanges("visible", false);
         }
     });
 
     window.addEventListener("online", () => {
-        if (Object.keys(window.getDirtyMap()).length > 0) {
+        if (window.hasDirtyChanges()) {
             window.scheduleSync();
         } else {
-            window.syncFromServerIfSafe("online");
+            window.pullRemoteChanges("online", true);
         }
     });
 
-    window.addEventListener("storage", (event) => {
-        if (event.key && event.key.startsWith("wm_") && !window.isApplyingServerData) {
-            window.logs = (window.safeParseLocal ? window.safeParseLocal("wm_logs", []) : window.logs) || [];
-            window.trash = (window.safeParseLocal ? window.safeParseLocal("wm_trash", []) : window.trash) || [];
-            window.refreshCurrentUI();
+    window.autoPullSyncTimer = setInterval(() => {
+        const popupLayer = document.getElementById("popupLayer");
+        const calendarOpen =
+            popupLayer &&
+            popupLayer.style.display === "flex" &&
+            !document.hidden;
+
+        if (calendarOpen) {
+            window.pullRemoteChanges("calendar-open-interval", false);
         }
-    });
+    }, WORK_CALENDAR_PULL_INTERVAL);
 };
 
 setTimeout(() => {
-    if (window.startSync) {
-        window.startSync().finally(() => {
-            if (window.startAutoPullSync) window.startAutoPullSync();
-        });
-    }
+    window.startSync().finally(() => {
+        window.installAutomaticPull();
+    });
 }, 500);
