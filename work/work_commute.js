@@ -15,7 +15,22 @@ window.handleCommuteFile = async (input) => {
     input.value = "";
 };
 
-window.removeCommuteImg = () => {
+window.handleCommuteImg = window.handleCommuteFile;
+
+window.handleCommuteThumbClick = (event) => {
+    if (event && event.target && event.target.id === 'commuteImgDelBtn') return;
+
+    if (window.tempCommuteImg) {
+        if (window.openImageViewer) window.openImageViewer(0, 'tempCommute');
+        return;
+    }
+
+    const input = document.getElementById('commuteImgInput');
+    if (input) input.click();
+};
+
+window.removeCommuteImg = (event) => {
+    if (event && event.stopPropagation) event.stopPropagation();
     window.tempCommuteImg = null;
     document.getElementById('commuteNoPhotoText').style.display = 'block';
     document.getElementById('commuteImgPreview').style.display = 'none';
@@ -174,11 +189,21 @@ window.saveCommute = () => {
         exceptionText = ` [${exceptionStatus} 적용]`;
     }
 
-    let imgsArr = window.tempCommuteImg ? [{ id: 'c_' + Date.now(), src: window.tempCommuteImg }] : [];
     const catType = window.currentCommuteType === 'in' ? 'commute_in' : 'commute_out';
 
     let existingIdx = window.logs.findIndex(l => l.y === window.currentYear && l.m === window.curMonth && l.d === window.curDay && l.cat === catType);
-    let newId = existingIdx > -1 ? window.logs[existingIdx].id : Date.now().toString();
+    const existingLog = existingIdx > -1 ? window.logs[existingIdx] : null;
+    let newId = existingLog ? existingLog.id : Date.now().toString();
+    const nowIso = new Date().toISOString();
+    let imgsArr = [];
+    if (window.tempCommuteImg) {
+        const prevImg = existingLog && existingLog.imgs && existingLog.imgs[0] ? existingLog.imgs[0] : null;
+        imgsArr = [{
+            id: prevImg && prevImg.src === window.tempCommuteImg ? prevImg.id : 'c_' + Date.now(),
+            src: window.tempCommuteImg,
+            updatedAt: nowIso
+        }];
+    }
 
     const newLog = { 
         id: newId, 
@@ -198,13 +223,27 @@ window.saveCommute = () => {
         km: km,
         imgs: imgsArr,
         memo: `${window.currentCommuteType === 'in' ? '출근' : '퇴근'} 기록: ${cTime} / ${Number(km).toLocaleString()}km${exceptionText}`,
-        personalCheck: null 
+        personalCheck: existingLog ? (existingLog.personalCheck || null) : null,
+        updatedAt: nowIso
     };
 
-    if (existingIdx !== -1) window.logs[existingIdx] = newLog; 
-    else window.logs.push(newLog);
+    if (window.saveToLocalStore) {
+        window.saveToLocalStore('logs', newLog);
+    } else {
+        if (existingIdx !== -1) window.logs[existingIdx] = newLog;
+        else window.logs.push(newLog);
+    }
 
+    const beforeDetail = window.logs.find(l => l.id === `calc_commute_${window.currentYear}_${window.curMonth}_${window.curDay}`);
     window.updateCommuteDetailByDate(window.currentYear, window.curMonth, window.curDay);
-    window.saveLocal(); 
+    const afterDetail = window.logs.find(l => l.id === `calc_commute_${window.currentYear}_${window.curMonth}_${window.curDay}`);
+    if (afterDetail) {
+        afterDetail.updatedAt = nowIso;
+        if (window.markDirty) window.markDirty('logs', afterDetail.id, beforeDetail ? 'upsert' : 'upsert');
+    } else if (beforeDetail && window.markDirty) {
+        window.markDirty('logs', beforeDetail.id, 'delete');
+    }
+
+    if (window.saveLocal) window.saveLocal(`logs:${newId}:commute`);
     window.closeCommuteModal();
 };

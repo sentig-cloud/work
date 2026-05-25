@@ -560,7 +560,7 @@ window.saveToServer = async function (showError = false) {
     return await window.syncNow(showError);
 };
 
-window.saveLocal = function (dirtyKey = "_all") {
+window.saveLocal = function (dirtyKey = "_all", options = {}) {
     if (!window.logs) {
         window.logs = [];
     }
@@ -576,7 +576,15 @@ window.saveLocal = function (dirtyKey = "_all") {
     }
 
     if (!window.isApplyingServerData) {
-        window.markDirty("snapshot", dirtyKey, "save");
+        const keyText = String(dirtyKey || "_all");
+        const alreadyTracked = keyText.includes(":") || options.skipSnapshotDirty;
+
+        // 개별 카드(logs:id) 변경은 이미 markDirty('logs', id)로 추적한다.
+        // 전체 마스터 배열/설정 변경처럼 대상이 애매할 때만 snapshot dirty를 남긴다.
+        if (!alreadyTracked) {
+            window.markDirty("snapshot", keyText, "save");
+        }
+
         window.scheduleSync();
     }
 
@@ -619,7 +627,7 @@ window.saveToLocalStore = function (colName, data) {
     }
 
     window.markDirty(colName, data.id, "upsert");
-    window.saveLocal(`${colName}:${data.id}`);
+    window.saveLocal(`${colName}:${data.id}`, { skipSnapshotDirty: true });
 };
 
 window.deleteFromLocalStore = function (colName, id) {
@@ -636,7 +644,7 @@ window.deleteFromLocalStore = function (colName, id) {
     }
 
     window.markDirty(colName, id, "delete");
-    window.saveLocal(`${colName}:${id}:delete`);
+    window.saveLocal(`${colName}:${id}:delete`, { skipSnapshotDirty: true });
 };
 
 window.forceSync = async function () {
@@ -669,8 +677,42 @@ window.forceSync = async function () {
     }
 };
 
+window.startAutoPullSync = function () {
+    if (window.autoPullSyncTimer) {
+        clearInterval(window.autoPullSyncTimer);
+    }
+
+    window.autoPullSyncTimer = setInterval(() => {
+        window.syncFromServerIfSafe("auto-pull");
+    }, 20000);
+
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+            window.syncFromServerIfSafe("visible");
+        }
+    });
+
+    window.addEventListener("online", () => {
+        if (Object.keys(window.getDirtyMap()).length > 0) {
+            window.scheduleSync();
+        } else {
+            window.syncFromServerIfSafe("online");
+        }
+    });
+
+    window.addEventListener("storage", (event) => {
+        if (event.key && event.key.startsWith("wm_") && !window.isApplyingServerData) {
+            window.logs = (window.safeParseLocal ? window.safeParseLocal("wm_logs", []) : window.logs) || [];
+            window.trash = (window.safeParseLocal ? window.safeParseLocal("wm_trash", []) : window.trash) || [];
+            window.refreshCurrentUI();
+        }
+    });
+};
+
 setTimeout(() => {
     if (window.startSync) {
-        window.startSync();
+        window.startSync().finally(() => {
+            if (window.startAutoPullSync) window.startAutoPullSync();
+        });
     }
 }, 500);
