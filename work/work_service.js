@@ -1,4 +1,4 @@
-// === 기초 필수 함수 정의 (맨 위에 위치) ===
+// === 기초 필수 함수 정의 ===
 window.getDirtyMap = function () {
     try {
         return JSON.parse(localStorage.getItem("wm_dirty_map") || "{}");
@@ -15,49 +15,7 @@ window.clearDirtyMap = function () {
     localStorage.removeItem("wm_dirty_map");
 };
 
-// ... 기존의 다른 함수들 (syncNow, startSync 등) ...
-window.startSync = async function () {
-    try {
-        window.logs = window.logs || [];
-        window.trash = window.trash || [];
-
-        const dirty = window.getDirtyMap ? window.getDirtyMap() : {};
-        const hasDirty = Object.keys(dirty).length > 0;
-
-        if (hasDirty) {
-            console.log("시작 동기화 건너뜀: 로컬 변경사항이 있어 서버 저장을 우선합니다.", dirty);
-
-            if (window.scheduleSync) window.scheduleSync();
-            if (window.renderMain) window.renderMain();
-
-            return;
-        }
-
-        if (!window.loadFromServer || !window.getServerData || !window.applyServerData) {
-            console.warn("시작 동기화 실패: work_sync.js 함수가 준비되지 않았습니다.");
-            return;
-        }
-
-        const result = await window.loadFromServer();
-        const serverData = window.getServerData(result);
-        const serverStamp = window.getServerStamp ? window.getServerStamp(result) : null;
-
-        if (serverData) {
-            window.applyServerData(serverData, false);
-
-            if (window.setSyncStamp) {
-                window.setSyncStamp(serverStamp);
-            }
-
-            console.log("시작 동기화 완료: 서버 데이터 반영", serverStamp);
-        }
-    } catch (e) {
-        console.warn("시작 동기화 실패, 로컬 데이터로 실행:", e);
-        window.isInitialLoad = false;
-
-        if (window.renderMain) window.renderMain();
-    }
-};
+// 🚨 [수정 완료] 중복 정의되어 충돌을 일으키던 startSync 함수를 제거하고 work_sync.js 로 일원화
 
 window.exportBackupData = () => {
     if (!window.logs || window.logs.length === 0) {
@@ -161,6 +119,12 @@ window.importData = (event) => {
 
             window.saveAllLocalOnly();
             window.markDirty("snapshot", "import", "replace");
+            
+            // 🚨 [핵심 수정] 복원 즉시 로컬 동기화 스탬프를 최신 시간으로 강제 지정
+            // 이 처리가 없으면 새로고침 시 과거 서버 데이터가 복원된 로컬 데이터를 증발시킵니다.
+            if (window.setSyncStamp) {
+                window.setSyncStamp(new Date().toISOString());
+            }
 
             if (window.refreshCurrentUI) {
                 window.refreshCurrentUI();

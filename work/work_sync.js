@@ -21,7 +21,6 @@ window.fetchWithTimeout = async function (url, options = {}, timeoutMs = 15000) 
         if (e.name === "AbortError") {
             throw new Error(`서버 응답 시간 초과: ${timeoutMs / 1000}초`);
         }
-
         throw e;
     } finally {
         clearTimeout(timer);
@@ -131,7 +130,6 @@ window.touchUpdatedAt = function (item) {
     if (item && typeof item === "object") {
         item.updatedAt = new Date().toISOString();
     }
-
     return item;
 };
 
@@ -304,6 +302,7 @@ window.loadFromServer = async function () {
     return text ? JSON.parse(text) : {};
 };
 
+// 🚨 [핵심 수정] 새로고침 시 데이터가 무조건 덮어씌워져 증발하는 현상 방지
 window.startSync = async function () {
     try {
         window.logs = window.logs || [];
@@ -312,48 +311,41 @@ window.startSync = async function () {
         const dirty = window.getDirtyMap ? window.getDirtyMap() : {};
         const hasDirty = Object.keys(dirty).length > 0;
 
+        // 미전송 로컬 데이터가 있다면, 덮어쓰지 않고 최우선으로 보호
         if (hasDirty) {
             window.isInitialLoad = false;
-
-            console.warn("미전송 로컬 변경사항이 있습니다. 서버 데이터를 덮어쓰지 않고 로컬을 유지합니다.", dirty);
-
-            if (window.renderMain) {
-                window.renderMain();
-            }
-
-            try {
-                await window.syncNow(true);
-            } catch (e) {
-                console.warn("미전송 로컬 데이터 서버 반영 실패:", e);
-            }
-
+            console.warn("미전송 로컬 변경사항(Dirty)이 있어 서버 데이터 덮어쓰기를 차단합니다.");
+            if (window.renderMain) window.renderMain();
+            
+            try { await window.syncNow(true); } catch (e) { console.warn("자동 동기화 재시도 실패:", e); }
             return;
         }
 
         const result = await window.loadFromServer();
         const serverData = window.getServerData(result);
         const serverStamp = window.getServerStamp(result);
+        const localStamp = window.getSyncStamp();
 
         if (serverData) {
-            window.applyServerData(serverData, false);
-            window.setSyncStamp(serverStamp);
-
-            console.log("시작 동기화 완료: 서버 데이터 적용", serverStamp);
+            // 서버 스탬프가 로컬보다 최신일 때만 병합. 또한 무조건 merge=true를 사용하여 로컬 데이터 증발 원천 차단.
+            if (!localStamp || serverStamp > localStamp) {
+                console.log("서버에서 최신 데이터를 가져와 병합합니다.", serverStamp);
+                window.applyServerData(serverData, true); // true: ID별로 안전하게 병합
+                window.setSyncStamp(serverStamp);
+            } else {
+                console.log("로컬 데이터가 서버와 같거나 더 최신입니다. 서버 데이터를 무시합니다.");
+                window.isInitialLoad = false;
+                if (window.renderMain) window.renderMain();
+            }
         } else {
             window.isInitialLoad = false;
             window.saveAllLocalOnly();
-
-            if (window.renderMain) {
-                window.renderMain();
-            }
+            if (window.renderMain) window.renderMain();
         }
     } catch (e) {
-        console.warn("서버 불러오기 실패, 로컬 데이터로 실행:", e);
+        console.warn("서버 불러오기 실패, 로컬 데이터만으로 실행:", e);
         window.isInitialLoad = false;
-
-        if (window.renderMain) {
-            window.renderMain();
-        }
+        if (window.renderMain) window.renderMain();
     }
 };
 
@@ -408,7 +400,7 @@ window.syncNow = async function (showError = false) {
             throw new Error(
                 `동기화 데이터가 ${bodyMb.toFixed(2)}MB입니다. ` +
                 "Cloudflare KV 저장 한도에 가까워 서버 저장할 수 없습니다. " +
-                "사진 데이터는 R2 분리가 필요합니다."
+                "사진 데이터는 분리가 필요합니다."
             );
         }
 
@@ -440,11 +432,7 @@ window.syncNow = async function (showError = false) {
         return result;
     } catch (e) {
         console.warn("서버 저장 실패, 로컬 변경사항 유지:", e);
-
-        if (showError) {
-            throw e;
-        }
-
+        if (showError) throw e;
         return null;
     } finally {
         window.syncInProgress = false;
@@ -560,7 +548,8 @@ window.syncFromServerIfSafe = async function (reason = "manual") {
             return false;
         }
 
-        window.applyServerData(serverData, false);
+        // 🚨 [핵심 수정] 데이터를 불러올 때 무조건 병합(true) 처리하여 렌더링 증발 막음
+        window.applyServerData(serverData, true);
         window.setSyncStamp(serverStamp);
 
         console.log("서버 최신 데이터 적용 완료", reason, serverStamp);
@@ -570,7 +559,6 @@ window.syncFromServerIfSafe = async function (reason = "manual") {
         return false;
     }
 };
-
 
 window.forceSync = async function () {
     try {
