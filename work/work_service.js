@@ -153,28 +153,47 @@ window.uploadToStorage = async (dataUrl) => {
 
 
 // 🚨 [신규 추가] 원본 이미지(Blob)를 Cloudflare Worker(프록시)로 전송하는 함수
+// 1. [신규] 원본 사진을 프록시 서버(Worker)를 통해 R2로 업로드
 window.uploadFileToR2 = async function (blob, originalName) {
-    // 파일 확장자 및 고유 파일명 생성
-    const ext = originalName.split('.').pop().toLowerCase() || 'jpg';
-    const fileName = `img_${Date.now()}_${Math.random().toString(36).substring(2)}.${ext}`;
-    
-    // Base64가 아닌 순수 바이너리 폼 데이터로 구성 (용량 팽창 방지)
     const formData = new FormData();
-    formData.append("file", blob, fileName);
-
-    // 🌟 현재 사용 중인 프록시 Worker의 업로드 API 경로 호출
+    formData.append("file", blob, `img_${Date.now()}_${originalName}`);
+    
     const response = await fetch("https://work.sentig335.workers.dev/api/upload", {
         method: "POST",
         body: formData
     });
-
-    if (!response.ok) {
-        throw new Error(`R2 업로드 실패: ${response.status}`);
-    }
     
-    // Worker가 R2에 저장을 완료하고 반환해준 이미지 인터넷 주소(URL)
+    if (!response.ok) throw new Error(`업로드 실패: ${response.status}`);
     const result = await response.json();
-    return result.url; 
+    return result.url; // R2에 저장된 사진의 URL 주소
+};
+
+// 2. [교체] 기존 resizeImage 삭제 후 이 함수로 전체 교체
+window.resizeImage = function (file, callback) {
+    const reader = new FileReader();
+    reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 800;
+            canvas.height = (img.height / img.width) * 800;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            canvas.toBlob(async (blob) => {
+                try {
+                    // R2 업로드 수행 후 URL을 반환받음
+                    const r2Url = await window.uploadFileToR2(blob, file.name);
+                    callback(r2Url); // Base64 대신 R2 주소 저장
+                } catch (error) {
+                    alert("사진 업로드 실패");
+                    callback(null);
+                }
+            }, 'image/jpeg', 0.7);
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
 };
 
 // 🚨 [전체 교체] 리사이징 후 Base64 대신 Blob으로 추출하여 바로 R2로 던지는 로직으로 개편
