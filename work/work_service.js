@@ -151,6 +151,99 @@ window.uploadToStorage = async (dataUrl) => {
     return dataUrl;
 };
 
+
+// 🚨 [신규 추가] 원본 이미지(Blob)를 Cloudflare Worker(프록시)로 전송하는 함수
+window.uploadFileToR2 = async function (blob, originalName) {
+    // 파일 확장자 및 고유 파일명 생성
+    const ext = originalName.split('.').pop().toLowerCase() || 'jpg';
+    const fileName = `img_${Date.now()}_${Math.random().toString(36).substring(2)}.${ext}`;
+    
+    // Base64가 아닌 순수 바이너리 폼 데이터로 구성 (용량 팽창 방지)
+    const formData = new FormData();
+    formData.append("file", blob, fileName);
+
+    // 🌟 현재 사용 중인 프록시 Worker의 업로드 API 경로 호출
+    const response = await fetch("https://work.sentig335.workers.dev/api/upload", {
+        method: "POST",
+        body: formData
+    });
+
+    if (!response.ok) {
+        throw new Error(`R2 업로드 실패: ${response.status}`);
+    }
+    
+    // Worker가 R2에 저장을 완료하고 반환해준 이미지 인터넷 주소(URL)
+    const result = await response.json();
+    return result.url; 
+};
+
+// 🚨 [전체 교체] 리사이징 후 Base64 대신 Blob으로 추출하여 바로 R2로 던지는 로직으로 개편
+window.resizeImage = function (file, callback) {
+    const reader = new FileReader();
+
+    reader.onload = e => {
+        const img = new Image();
+
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+
+            let width = img.width;
+            let height = img.height;
+
+            const MAX_WIDTH = 1200;
+            const MAX_HEIGHT = 1200;
+
+            if (width > height) {
+                if (width > MAX_WIDTH) {
+                    height *= MAX_WIDTH / width;
+                    width = MAX_WIDTH;
+                }
+            } else {
+                if (height > MAX_HEIGHT) {
+                    width *= MAX_HEIGHT / height;
+                    height = MAX_HEIGHT;
+                }
+            }
+
+            canvas.width = Math.round(width);
+            canvas.height = Math.round(height);
+
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            // 🌟 [핵심 변경점] canvas.toDataURL(Base64) 대신 toBlob(바이너리) 사용
+            canvas.toBlob(async (blob) => {
+                try {
+                    // Blob 데이터를 R2 업로드 함수로 전달
+                    const r2Url = await window.uploadFileToR2(blob, file.name || "image.jpg");
+                    
+                    // 업로드가 완료되면 Base64 긴 텍스트 대신 '깔끔한 짧은 R2 URL'을 반환
+                    callback(r2Url);
+                } catch (error) {
+                    console.error("사진 R2 전송 에러:", error);
+                    alert("사진을 R2 서버에 업로드하는 데 실패했습니다.");
+                    callback(null);
+                }
+            }, 'image/jpeg', 0.75);
+        };
+
+        img.onerror = () => {
+            alert("이미지 파일을 읽을 수 없습니다.");
+            callback(null);
+        };
+
+        img.src = e.target.result;
+    };
+
+    reader.onerror = () => {
+        alert("파일 읽기 실패");
+        callback(null);
+    };
+
+    // 로컬에서 이미지를 그리기 위해 DataURL로 읽지만, 최종 저장은 Blob으로 수행됨
+    reader.readAsDataURL(file);
+};
+
 window.resizeImage = function (file, callback) {
     const reader = new FileReader();
 
