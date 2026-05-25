@@ -68,6 +68,7 @@ window.triggerImport = () => {
     }
 };
 
+// 🚨 [수정 4] 복원 직후 로컬 타임스탬프를 최신으로 강제 조작
 window.importData = (event) => {
     const file = event.target.files[0];
 
@@ -84,10 +85,7 @@ window.importData = (event) => {
 
         try {
             let text = e.target.result || "";
-
-            if (text.charCodeAt(0) === 0xFEFF) {
-                text = text.slice(1);
-            }
+            if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
 
             const importedData = JSON.parse(text.trim());
 
@@ -120,45 +118,28 @@ window.importData = (event) => {
             window.saveAllLocalOnly();
             window.markDirty("snapshot", "import", "replace");
             
-            // 🚨 [핵심 수정] 복원 즉시 로컬 동기화 스탬프를 최신 시간으로 강제 지정
+            // [핵심] 복원 즉시 로컬 동기화 스탬프를 최신 시간으로 강제 지정
             // 이 처리가 없으면 새로고침 시 과거 서버 데이터가 복원된 로컬 데이터를 증발시킵니다.
             if (window.setSyncStamp) {
                 window.setSyncStamp(new Date().toISOString());
             }
 
-            if (window.refreshCurrentUI) {
-                window.refreshCurrentUI();
-            }
+            if (window.refreshCurrentUI) window.refreshCurrentUI();
 
             await window.syncNow(true);
 
-            alert(
-                `복원 성공!\n` +
-                `작업/메모 기록: ${window.logs.length}개\n` +
-                `서버에도 반영되었습니다.`
-            );
+            alert(`복원 성공!\n작업/메모 기록: ${window.logs.length}개\n서버에도 반영되었습니다.`);
         } catch (e) {
             console.error("복원 데이터 서버 반영 실패:", e);
-
-            alert(
-                "파일은 이 기기에 복원되었습니다.\n" +
-                "하지만 서버 동기화에는 실패했습니다.\n\n" +
-                e.message
-            );
+            alert("파일은 이 기기에 복원되었습니다.\n하지만 서버 동기화에는 실패했습니다.\n\n" + e.message);
         } finally {
-            if (window.hideLoading) {
-                window.hideLoading();
-            }
-
+            if (window.hideLoading) window.hideLoading();
             event.target.value = "";
         }
     };
 
     reader.onerror = () => {
-        if (window.hideLoading) {
-            window.hideLoading();
-        }
-
+        if (window.hideLoading) window.hideLoading();
         alert("파일 읽기 실패");
         event.target.value = "";
     };

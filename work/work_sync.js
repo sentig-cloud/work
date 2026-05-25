@@ -303,6 +303,7 @@ window.loadFromServer = async function () {
 };
 
 // 🚨 [핵심 수정] 새로고침 시 데이터가 무조건 덮어씌워져 증발하는 현상 방지
+// 🚨 [수정 1] 새로고침 시 데이터 덮어쓰기(증발) 원천 차단
 window.startSync = async function () {
     try {
         window.logs = window.logs || [];
@@ -346,6 +347,129 @@ window.startSync = async function () {
         console.warn("서버 불러오기 실패, 로컬 데이터만으로 실행:", e);
         window.isInitialLoad = false;
         if (window.renderMain) window.renderMain();
+    }
+};
+
+// 🚨 [수정 2] 수동 동기화 시에도 안전하게 병합(merge=true)하도록 강제
+window.syncFromServerIfSafe = async function (reason = "manual") {
+    if (window.syncInProgress || window.isApplyingServerData) return false;
+
+    const dirty = window.getDirtyMap ? window.getDirtyMap() : {};
+    if (Object.keys(dirty).length > 0) {
+        console.log("서버 불러오기 건너뜀: 로컬 변경사항 있음", reason);
+        return false;
+    }
+
+    if (window.isSyncApplyBlocked && window.isSyncApplyBlocked()) {
+        console.log("서버 불러오기 건너뜀: 편집 중", reason);
+        return false;
+    }
+
+    try {
+        const result = await window.loadFromServer();
+        const serverData = window.getServerData(result);
+        const serverStamp = window.getServerStamp(result);
+        const localStamp = window.getSyncStamp();
+
+        if (!serverData) return false;
+
+        if (serverStamp && serverStamp <= localStamp) {
+            console.log("서버 불러오기 건너뜀: 최신 상태", reason);
+            return false;
+        }
+
+        // 데이터를 불러올 때 무조건 병합(true) 처리하여 렌더링 증발 막음
+        window.applyServerData(serverData, true);
+        window.setSyncStamp(serverStamp);
+
+        console.log("서버 최신 데이터 적용 완료", reason, serverStamp);
+        return true;
+    } catch (e) {
+        console.warn("서버 최신 데이터 확인 실패:", reason, e);
+        return false;
+    }
+};
+
+// 🚨 [수정 3] 동기화 교착 상태(Deadlock)를 방지하는 업로드 로직
+window.syncNow = async function (showError = false) {
+    if (window.syncInProgress) {
+        window.pendingSyncAfterCurrent = true;
+        return null;
+    }
+
+    const dirty = window.getDirtyMap();
+    const hasDirty = Object.keys(dirty).length > 0;
+
+    if (!hasDirty && !showError) return null;
+
+    window.syncInProgress = true;
+
+    try {
+        const stamp = new Date().toISOString();
+
+        const payload = {
+            savedAt: stamp,
+            syncUpdatedAt: stamp,
+            app: "work",
+            dirty,
+            data: {
+                logs: window.logs || [],
+                trash: window.trash || [],
+                taskTypes: window.taskTypes || [],
+                coworkers: window.coworkers || [],
+                statuses: window.statuses || [],
+                equipments: window.equipments || [],
+                memoTags: window.memoTags || []
+            }
+        };
+
+        const body = JSON.stringify(payload);
+        const bodyBytes = new Blob([body]).size;
+        const bodyMb = bodyBytes / 1024 / 1024;
+        const safeLimitBytes = 24 * 1024 * 1024; // 24MB 제한
+
+        if (bodyBytes > safeLimitBytes) {
+            throw new Error(
+                `동기화 데이터가 ${bodyMb.toFixed(2)}MB입니다. ` +
+                "Cloudflare KV 저장 한도에 가까워 서버 저장할 수 없습니다. " +
+                "사진 데이터를 지우거나 분리해야 합니다."
+            );
+        }
+
+        const res = await window.fetchWithTimeout("https://work.sentig335.workers.dev/api/save", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
+            body
+        }, 15000);
+
+        const text = await res.text();
+
+        if (!res.ok) {
+            throw new Error(`서버 저장 실패: ${res.status} / ${text}`);
+        }
+
+        const result = text ? JSON.parse(text) : {};
+
+        window.setSyncStamp(stamp);
+        window.clearDirtyMap(); // 성공 시에만 더티맵 초기화
+
+        console.log("자동 동기화 완료", { result, sizeMb: bodyMb.toFixed(2) });
+
+        return result;
+    } catch (e) {
+        console.warn("서버 저장 실패, 로컬 변경사항 유지:", e);
+        if (showError) throw e;
+        return null;
+    } finally {
+        window.syncInProgress = false;
+
+        if (window.pendingSyncAfterCurrent) {
+            window.pendingSyncAfterCurrent = false;
+            window.scheduleSync();
+        }
     }
 };
 
