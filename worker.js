@@ -45,7 +45,7 @@ function json(data, status = 200) {
   });
 }
 
-export default {
+  export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
@@ -56,19 +56,15 @@ export default {
       });
     }
 
-    if (shouldProtectPath(url.pathname) && !isAllowedAccessUser(request)) {
-      return accessDenied();
-    }
-
-    if (request.method === "OPTIONS") {
-      return new Response(null, {
-        status: 204,
-        headers: CORS_HEADERS,
-      });
+    if (!env.WORK_KV) {
+      return json({
+        ok: false,
+        error: "WORK_KV binding is missing",
+      }, 500);
     }
 
     if (url.pathname === "/") {
-      return new Response("# WORK Worker 실행중\nKV + R2 연결 완료", {
+      return new Response("# WORK Worker 실행중\nKV 연결 완료", {
         headers: {
           ...CORS_HEADERS,
           "Content-Type": "text/plain; charset=utf-8",
@@ -85,7 +81,7 @@ export default {
           JSON.stringify({
             savedAt: new Date().toISOString(),
             saved: body,
-          }),
+          })
         );
 
         return json({
@@ -94,13 +90,10 @@ export default {
           savedAt: new Date().toISOString(),
         });
       } catch (e) {
-        return json(
-          {
-            ok: false,
-            error: e.message,
-          },
-          500,
-        );
+        return json({
+          ok: false,
+          error: e.message,
+        }, 500);
       }
     }
 
@@ -122,23 +115,17 @@ export default {
           ...JSON.parse(raw),
         });
       } catch (e) {
-        return json(
-          {
-            ok: false,
-            error: e.message,
-          },
-          500,
-        );
+        return json({
+          ok: false,
+          error: e.message,
+        }, 500);
       }
     }
 
-    return json(
-      {
-        ok: false,
-        error: "not found",
-        path: url.pathname,
-      },
-      404,
-    );
+    return json({
+      ok: false,
+      error: "not found",
+      path: url.pathname,
+    }, 404);
   },
 };
