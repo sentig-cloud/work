@@ -110,7 +110,6 @@ html, body {
 
 .btn-del { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; font-size: 0.9rem; font-weight: bold; z-index: 50; }
 
-/* 🌟 [수정 완료] 타스크 번호 버튼이 'X' 삭제 버튼을 가리지 않도록 내용 본문 라인 높이로 위치 강제 수정 */
 .task-no-btn {
     position: absolute; 
     top: 42px; 
@@ -134,7 +133,6 @@ html, body {
 }
 .task-no-btn:active { background: #cbd5e1; transform: scale(0.95); }
 
-/* 🌟 [수정 완료] 내용창 본문 및 내부 박스 좌우 사방 여백 증설을 통한 시인성 강화 */
 .card-content-zone {
     padding: 10px 12px 2px 12px;
     box-sizing: border-box;
@@ -188,56 +186,27 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
 .spinner { width: 40px; height: 40px; border: 4px solid var(--w-white); border-top-color: var(--w-blue); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* 🌟 [수정 완료] 작업일지 내 칸간 간격 최소화 (순정 복원) */
 .drag-item {
     position: relative;
     padding: 2px;
     background: var(--w-gray);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     border: 2px solid transparent;
-    margin-bottom: 2px; /* 세로 간격 극한 압축 */
-}
-
-/* 🌟 [수정 완료] 내부 요소 위아래 여백 제거로 간격 압축 */
-.drag-item p, .drag-item div {
-    margin: 0;
-    line-height: normal;
-}
-
-/* 🌟 [수정 완료] 이동점 원래 위치(좌측 하단) 및 크기(1/10 크기) 완벽 복원 */
-.drag-handle {
-    position: absolute;
-    left: 2px;
-    bottom: 2px;
-    width: 12px;
-    height: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: grab;
-    z-index: 10;
-}
-
-.drag-handle:active {
-    cursor: grabbing;
-}
-.drag-handle i {
-    font-size: 6px !important;
-    color: #888;
-}
-
-/* 롱탭 가능한 제목 연동 스타일 */
-.box-title {
-    font-size: 0.8rem;
-    font-weight: bold;
     margin-bottom: 2px;
-    margin-left: 2px;
-    color: var(--w-blue);
-    cursor: pointer;
-    user-select: none;
-    -webkit-user-select: none;
-    display: inline-block;
-    padding: 2px 4px;
-    border-radius: 4px;
+}
+
+.drag-item p, .drag-item div { margin: 0; line-height: normal; }
+
+.drag-handle {
+    position: absolute; left: 2px; bottom: 2px; width: 12px; height: 12px;
+    display: flex; align-items: center; justify-content: center; cursor: grab; z-index: 10;
+}
+.drag-handle:active { cursor: grabbing; }
+.drag-handle i { font-size: 6px !important; color: #888; }
+
+.box-title {
+    font-size: 0.8rem; font-weight: bold; margin-bottom: 2px; margin-left: 2px;
+    color: var(--w-blue); cursor: pointer; user-select: none; -webkit-user-select: none;
+    display: inline-block; padding: 2px 4px; border-radius: 4px;
 }
 .box-title:active { background: rgba(0,0,0,0.1); }

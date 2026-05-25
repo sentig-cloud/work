@@ -6,9 +6,7 @@
     <title>Work Master Local Pro</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    
-        <link rel="stylesheet" href="work_style.css">
-    
+    <link rel="stylesheet" href="work_style.css">
 </head>
 <body>
 
@@ -17,6 +15,7 @@
 
     <div class="header w95-out" id="mainHeader">
         <div class="toolbar-group">
+            <button type="button" class="w95-btn icon-btn" onclick="window.triggerImport()" title="백업 복원"><i class="fa-solid fa-file-import" style="color:#dc2626;"></i></button>
             <button type="button" class="w95-btn icon-btn" onclick="if(window.WorkExportUI) window.WorkExportUI.open(); else alert('내보내기 모듈이 로드되지 않았습니다.');" title="엑셀 내보내기"><i class="fa-solid fa-file-excel" style="color:#10b981;"></i></button>
         </div>
         <div class="toolbar-group">
@@ -25,37 +24,21 @@
         </div>
     </div>
     
+    <input type="file" id="importFile" hidden accept=".json,.txt,application/json,text/plain" onchange="window.importData(event)">
+    
     <div class="month-grid" id="mainGrid"></div>
     
-    <div id="dashboardPanel" class="w95-out" style="background: var(--w-gray); padding:4px; display:flex; align-items:stretch;">
-        <div id="dashboardStats" class="w95-in" style="flex: 1; padding: 4px; overflow-y: auto; font-size: 0.8rem; line-height: 1.5; background: var(--w-white);"></div>
+    <div id="dashboardPanel" class="w95-out" style="background: var(--w-gray); padding:4px; display:flex; align-items:stretch; margin-bottom: 6px;">
+        <div id="dashboardStats" class="w95-in" style="flex: 1; padding: 6px; overflow-y: auto; font-size: 0.8rem; line-height: 1.5; background: var(--w-white);"></div>
     </div>
 
-<!-- 🔥 백업 복원 버튼 -->
-<button type="button" class="w95-btn icon-btn" onclick="window.triggerImport()" title="백업 복원">
-    <i class="fa-solid fa-file-import" style="color:#dc2626;"></i>
-</button>
-
-<!-- 🔥 파일 선택 -->
-<input 
-    type="file"
-    id="importFile"
-    hidden
-    accept=".json,.txt,application/json,text/plain"
-    onchange="window.importData(event)">
-
-    <div style="padding: 0 10px; margin-top: 6px; display:flex; gap: 4px; flex-shrink: 0;">
+    <div style="padding: 0 10px; display:flex; gap: 6px; align-items: stretch; flex-shrink: 0; margin-bottom: 8px;">
         <button type="button" class="w95-btn icon-btn" id="quickMicBtn" onclick="window.toggleMicFor(event, 'quickInput', 'quickMicBtn')" title="음성 인식"><i class="fa-solid fa-microphone"></i></button>
         <input type="text" id="quickInput" class="m-input w95-in" style="flex:1; margin:0; min-width:0;" placeholder="주소 / 전화번호 등 빠른 입력" autocomplete="nope" spellcheck="false" data-lpignore="true">
-        <button type="button" class="w95-btn" onclick="window.openQuickWorkModal()" style="font-weight:bold; color:var(--w-blue);">입력</button>
+        <button type="button" class="w95-btn" onclick="window.openQuickWorkModal()" style="font-weight:bold; color:var(--w-blue);">빠른 입력</button>
     </div>
-    <button type="button" class="w95-btn icon-btn" onclick="window.triggerImport()" title="백업 복원">
-  <i class="fa-solid fa-file-import" style="color:#dc2626;"></i>
-</button>
 
-<input type="file" id="importFile" hidden accept=".json,.txt,application/json,text/plain" onchange="window.importData(event)">
-
-    <div class="yearly-summary w95-out" style="margin-top: 8px;" id="yearlySummary"></div>
+    <div class="yearly-summary w95-out" id="yearlySummary"></div>
 
     <div id="fabToday" style="position:fixed; bottom:110px; right:20px; width:45px; height:45px; background:#84cc16; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:2px 2px 8px rgba(0,0,0,0.5); z-index:4000; cursor:pointer; border:2px solid #fff;">
         <i class="fa-solid fa-calendar-day" style="color:#fff; font-size:1.3rem;"></i>
@@ -331,21 +314,17 @@
 </div>
 
 <script src="work_data.js"></script>
-
 <script src="work_utils.js"></script>
 <script src="work_service.js"></script>
 <script src="work_commute.js"></script>
 <script src="work_tag_manager.js"></script>
 <script src="work_sync.js"></script>
-
 <script src="work_render.js"></script>
 <script src="work_ui.js"></script>
 <script src="work_modal.js"></script>
 <script src="work_logic.js"></script>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-
 <script src="work_export_html.js"></script>
 <script src="work_export_ui.js"></script>
 <script src="work_export.js"></script>
