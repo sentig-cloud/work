@@ -97,6 +97,7 @@
 
     window.renderTaskTypes = () => {
         window.taskTypes = window.taskTypes || [];
+        window.taskTypes.sort((a, b) => getSortCount(b) - getSortCount(a));
         document.getElementById("taskTypeArea").innerHTML =
             window.taskTypes.map((tag, index) => tagButton("task", tag, index, (window.activeTaskTypes || []).includes(tag.name))).join(" ") +
             `<button type="button" class="w95-btn" onclick="window.addNewType('task')"><b>+</b></button>`;
@@ -104,6 +105,7 @@
 
     window.renderCoworkers = () => {
         window.coworkers = window.coworkers || [];
+        window.coworkers.sort((a, b) => getSortCount(b) - getSortCount(a));
         document.getElementById("coworkerArea").innerHTML =
             window.coworkers.map((tag, index) => tagButton("coworker", tag, index, (window.selectedCoworkers || []).includes(tag.name))).join(" ") +
             `<button type="button" class="w95-btn" onclick="window.addNewType('coworker')"><b>+</b></button>`;
@@ -111,6 +113,7 @@
 
     window.renderEquips = () => {
         window.equipments = window.equipments || [];
+        window.equipments.sort((a, b) => getSortCount(b) - getSortCount(a));
         document.getElementById("equipArea").innerHTML =
             window.equipments.map((tag, index) => tagButton("equip", tag, index, Number(window.activeEquips && window.activeEquips[tag.name] || 0) > 0)).join(" ") +
             `<button type="button" class="w95-btn" onclick="window.addNewType('equip')"><b>+</b></button>`;
@@ -118,6 +121,7 @@
 
     window.renderStatuses = () => {
         window.statuses = window.statuses || [];
+        window.statuses.sort((a, b) => getSortCount(b) - getSortCount(a));
         document.getElementById("statusArea").innerHTML =
             window.statuses.map((tag, index) => tagButton("status", tag, index, window.activeStatus === tag.name)).join(" ") +
             `<button type="button" class="w95-btn" onclick="window.addNewType('status')"><b>+</b></button>`;
@@ -125,6 +129,7 @@
 
     window.renderMemoTags = () => {
         window.memoTags = window.memoTags || [];
+        window.memoTags.sort((a, b) => getSortCount(b) - getSortCount(a));
         window.activeEditTags = window.activeEditTags || [];
         const area = document.getElementById("editTagArea");
         if (!area) return;
@@ -430,39 +435,58 @@
     const getInnerLayoutSpecs = () => {
         const date = document.getElementById("workDateInput");
         const address = document.getElementById("workAddress");
+        const photoGrid = document.getElementById("workPhotoGrid");
         return [
             {
-                key: "1-top", axis: "x",
+                key: "1-top",
                 items: [
-                    ["date", date && date.parentElement, 2],
-                    ["time", document.getElementById("workTime"), 1],
-                    ["duty", document.getElementById("workDutyBtn"), 0],
-                    ["ot", document.getElementById("workOT"), 1],
-                    ["undo", document.getElementById("workUndoBtn"), 0]
+                    ["date", date && date.parentElement, 2, 1],
+                    ["time", document.getElementById("workTime"), 1, 1],
+                    ["duty", document.getElementById("workDutyBtn"), 1, 1],
+                    ["ot", document.getElementById("workOT"), 1, 1],
+                    ["undo", document.getElementById("workUndoBtn"), 1, 1]
                 ]
             },
             {
-                key: "1-info", axis: "x",
+                key: "1-info",
                 items: [
-                    ["taskNo", document.getElementById("taskNo"), 1],
-                    ["customer", document.getElementById("customerName"), 1]
+                    ["taskNo", document.getElementById("taskNo"), 3, 1],
+                    ["customer", document.getElementById("customerName"), 3, 1]
                 ]
             },
             {
-                key: "1-address", axis: "x",
+                key: "1-address",
                 items: [
-                    ["address", address, 1],
-                    ["map", document.querySelector('.inner-layout-cell[data-inner-id="map"] > button') || (address && address.parentElement.querySelector("button")), 0]
+                    ["address", address, 5, 1],
+                    ["map", document.querySelector('.inner-layout-cell[data-inner-id="map"] > button') || (address && address.parentElement.querySelector("button")), 1, 1]
                 ]
             },
             {
-                key: "2-text", axis: "y",
+                key: "2-text",
                 items: [
-                    ["content", document.getElementById("workContent"), 1],
-                    ["note", document.getElementById("workNote"), 1]
+                    ["content", document.getElementById("workContent"), 6, 3],
+                    ["note", document.getElementById("workNote"), 6, 1]
+                ]
+            },
+            {
+                key: "7-photo",
+                items: [
+                    ["photoGrid", photoGrid, 4, 2],
+                    ["photoAlbum", document.querySelector('.inner-layout-cell[data-inner-id="photoAlbum"] > button') || document.querySelector('button[onclick*="workPhotoInput"]'), 1, 1],
+                    ["photoCamera", document.querySelector('.inner-layout-cell[data-inner-id="photoCamera"] > button') || document.querySelector('button[onclick*="workCamInput"]'), 1, 1]
                 ]
             }
         ];
+    };
+
+    const clampWidgetSpan = (value, max) => Math.max(1, Math.min(max, Number(value) || 1));
+    const setWidgetSize = (cell, colSpan, rowSpan) => {
+        const cols = clampWidgetSpan(colSpan, 6);
+        const rows = clampWidgetSpan(rowSpan, 6);
+        cell.dataset.widgetCols = String(cols);
+        cell.dataset.widgetRows = String(rows);
+        cell.style.setProperty("--widget-cols", cols);
+        cell.style.setProperty("--widget-rows", rows);
     };
 
     window.ensureInnerLayoutObjects = () => {
@@ -474,21 +498,23 @@
             if (!group) group = firstElement.parentElement;
             group.classList.add("inner-layout-group");
             group.dataset.innerGroup = spec.key;
-            group.dataset.innerAxis = spec.axis;
-            validItems.forEach(([id, element, flex]) => {
+            group.style.display = "grid";
+            group.style.gridTemplateColumns = "repeat(6, minmax(0, 1fr))";
+            validItems.forEach(([id, element, colSpan, rowSpan]) => {
                 let cell = element.closest(".inner-layout-cell");
                 if (!cell || cell.parentElement !== group) {
                     cell = document.createElement("div");
                     cell.className = "inner-layout-cell";
-                    group.insertBefore(cell, element);
+                    if (element.parentElement === group) group.insertBefore(cell, element);
+                    else group.appendChild(cell);
                     cell.appendChild(element);
                 }
                 cell.dataset.innerId = id;
-                cell.style.flex = flex === 0 ? "0 0 auto" : `${flex} 1 0`;
-                if (!cell.querySelector(":scope > .inner-move-handle")) {
+                if (!cell.dataset.widgetCols) setWidgetSize(cell, colSpan, rowSpan);
+                if (!cell.querySelector(":scope > .widget-resize-handle")) {
                     const handle = document.createElement("div");
-                    handle.className = "inner-move-handle";
-                    handle.title = "길게 누른 뒤 끌어 칸 이동";
+                    handle.className = "widget-resize-handle";
+                    handle.title = "모서리를 끌어 칸 크기 조절";
                     cell.appendChild(handle);
                 }
             });
@@ -508,14 +534,23 @@
         const items = getWorkLayoutItems();
         const heights = {};
         const innerOrder = {};
+        const widgets = {};
         items.forEach((item) => {
             heights[item.dataset.id] = clampLayoutHeight(item, parseFloat(item.dataset.layoutHeight || DEFAULT_WORK_LAYOUT_HEIGHT));
         });
         document.querySelectorAll(".inner-layout-group").forEach((group) => {
-            innerOrder[group.dataset.innerGroup] = [...group.querySelectorAll(":scope > .inner-layout-cell")]
-                .map((cell) => cell.dataset.innerId);
+            const groupKey = group.dataset.innerGroup;
+            widgets[groupKey] = {};
+            innerOrder[groupKey] = [...group.querySelectorAll(":scope > .inner-layout-cell")]
+                .map((cell) => {
+                    widgets[groupKey][cell.dataset.innerId] = {
+                        colSpan: clampWidgetSpan(cell.dataset.widgetCols, 6),
+                        rowSpan: clampWidgetSpan(cell.dataset.widgetRows, 6)
+                    };
+                    return cell.dataset.innerId;
+                });
         });
-        const layout = { order: items.map((item) => item.dataset.id), heights, innerOrder };
+        const layout = { order: items.map((item) => item.dataset.id), heights, innerOrder, widgets };
         localStorage.setItem(WORK_LAYOUT_KEY, JSON.stringify(layout));
         // 예전 순서 설정과도 호환한다.
         localStorage.setItem("wm_work_drag_order", JSON.stringify(layout.order));
@@ -543,10 +578,16 @@
         });
         document.querySelectorAll(".inner-layout-group").forEach((group) => {
             const order = layout.innerOrder && layout.innerOrder[group.dataset.innerGroup];
-            if (!Array.isArray(order)) return;
-            order.forEach((id) => {
-                const cell = group.querySelector(`:scope > .inner-layout-cell[data-inner-id="${id}"]`);
-                if (cell) group.appendChild(cell);
+            if (Array.isArray(order)) {
+                order.forEach((id) => {
+                    const cell = group.querySelector(`:scope > .inner-layout-cell[data-inner-id="${id}"]`);
+                    if (cell) group.appendChild(cell);
+                });
+            }
+            const widgetSizes = layout.widgets && layout.widgets[group.dataset.innerGroup];
+            [...group.querySelectorAll(":scope > .inner-layout-cell")].forEach((cell) => {
+                const size = widgetSizes && widgetSizes[cell.dataset.innerId];
+                setWidgetSize(cell, size && size.colSpan || cell.dataset.widgetCols, size && size.rowSpan || cell.dataset.widgetRows);
             });
         });
     };
@@ -568,7 +609,12 @@
         if (modal) modal.classList.toggle("layout-edit-mode", window.isWorkLayoutMode);
         if (titlebar) titlebar.classList.toggle("is-layout-edit", window.isWorkLayoutMode);
         window.ensureWorkResizeHandles();
-        if (!window.isWorkLayoutMode) window.saveWorkLayout();
+        if (!window.isWorkLayoutMode) {
+            document.querySelectorAll(".is-widget-selected, .is-section-selected").forEach((item) => {
+                item.classList.remove("is-widget-selected", "is-section-selected");
+            });
+            window.saveWorkLayout();
+        }
     };
 
     window.startWorkLayoutPress = (event) => {
@@ -621,9 +667,12 @@
         getInnerLayoutSpecs().forEach((spec) => {
             const group = document.querySelector(`.inner-layout-group[data-inner-group="${spec.key}"]`);
             if (!group) return;
-            spec.items.forEach(([id]) => {
+            spec.items.forEach(([id, , colSpan, rowSpan]) => {
                 const cell = group.querySelector(`:scope > .inner-layout-cell[data-inner-id="${id}"]`);
-                if (cell) group.appendChild(cell);
+                if (cell) {
+                    group.appendChild(cell);
+                    setWidgetSize(cell, colSpan, rowSpan);
+                }
             });
         });
         window.saveWorkLayout();
@@ -636,6 +685,7 @@
         if (!container) return;
         let dragEl = null;
         let dragTimer = null;
+        let dragOrigin = null;
         let resizeEl = null;
         let resizeViewportHeight = 0;
 
@@ -650,7 +700,14 @@
             }
             const dragHandle = event.target.closest(".drag-handle");
             if (!dragHandle) return;
+            container.querySelectorAll(".drag-item.is-section-selected").forEach((item) => {
+                item.classList.remove("is-section-selected");
+            });
+            const selectedSection = dragHandle.closest(".drag-item");
+            if (selectedSection) selectedSection.classList.add("is-section-selected");
             if (event.cancelable) event.preventDefault();
+            const point = event.touches ? event.touches[0] : event;
+            dragOrigin = { x: point.clientX, y: point.clientY };
             dragTimer = setTimeout(() => {
                 dragEl = dragHandle.closest(".drag-item");
                 if (dragEl) dragEl.classList.add("dragging");
@@ -670,7 +727,9 @@
                 return;
             }
             if (!dragEl) {
-                clearTimeout(dragTimer);
+                if (dragOrigin && Math.hypot(point.clientX - dragOrigin.x, point.clientY - dragOrigin.y) > 12) {
+                    clearTimeout(dragTimer);
+                }
                 return;
             }
             if (event.cancelable) event.preventDefault();
@@ -686,6 +745,7 @@
             if (dragEl) dragEl.classList.remove("dragging");
             if (dragEl || resizeEl) window.saveWorkLayout();
             dragEl = null;
+            dragOrigin = null;
             resizeEl = null;
         };
 
@@ -735,71 +795,16 @@
         if (window.hasInitTagReorderListeners) return;
         const modal = document.getElementById("workModal");
         if (!modal) return;
-        let pendingTagButton = null;
-        let tagButtonEl = null;
-        let tagArea = null;
-        let tagType = null;
-        let tagTimer = null;
-
-        const start = (event) => {
+        modal.addEventListener("click", (event) => {
             if (!window.isWorkLayoutMode) return;
             const button = event.target.closest(".layout-tag-button");
             if (!button || !modal.contains(button)) return;
-            if (event.cancelable) event.preventDefault();
-            pendingTagButton = button;
-            tagTimer = setTimeout(() => {
-                tagButtonEl = button;
-                tagArea = button.parentElement;
-                tagType = button.dataset.tagType;
-                tagButtonEl.classList.add("is-tag-dragging");
-                if (navigator.vibrate) navigator.vibrate(25);
-            }, 450);
-        };
-
-        const move = (event) => {
-            if (!tagButtonEl || !tagArea) return;
-            if (event.cancelable) event.preventDefault();
-            const point = event.touches ? event.touches[0] : event;
-            const over = document.elementFromPoint(point.clientX, point.clientY);
-            const target = over && over.closest(".layout-tag-button");
-            if (!target || target === tagButtonEl || target.parentElement !== tagArea || target.dataset.tagType !== tagType) return;
-            const rect = target.getBoundingClientRect();
-            const before = point.clientX < rect.left + rect.width / 2;
-            tagArea.insertBefore(tagButtonEl, before ? target : target.nextSibling);
-        };
-
-        const end = () => {
-            clearTimeout(tagTimer);
-            if (!tagButtonEl || !tagArea || !tagType) {
-                if (pendingTagButton && window.isWorkLayoutMode) {
-                    const type = pendingTagButton.dataset.tagType;
-                    const index = getTagArray(type).findIndex((tag) => tag.name === pendingTagButton.dataset.tagName);
-                    if (index > -1) window.openTagEditBox(type, index);
-                }
-                pendingTagButton = null;
-                return;
-            }
-            tagButtonEl.classList.remove("is-tag-dragging");
-            const orderedNames = [...tagArea.querySelectorAll(`.layout-tag-button[data-tag-type="${tagType}"]`)]
-                .map((button) => button.dataset.tagName);
-            const arr = getTagArray(tagType);
-            const byName = new Map(arr.map((tag) => [tag.name, tag]));
-            arr.splice(0, arr.length, ...orderedNames.map((name) => byName.get(name)).filter(Boolean));
-            if (window.saveLocal) window.saveLocal("tag-order");
-            renderTagType(tagType);
-            tagButtonEl = null;
-            pendingTagButton = null;
-            tagArea = null;
-            tagType = null;
-        };
-
-        modal.addEventListener("touchstart", start, { passive: false });
-        modal.addEventListener("touchmove", move, { passive: false });
-        modal.addEventListener("touchend", end);
-        modal.addEventListener("touchcancel", end);
-        modal.addEventListener("mousedown", start);
-        window.addEventListener("mousemove", move);
-        window.addEventListener("mouseup", end);
+            event.preventDefault();
+            event.stopPropagation();
+            const type = button.dataset.tagType;
+            const index = getTagArray(type).findIndex((tag) => tag.name === button.dataset.tagName);
+            if (index > -1) window.openTagEditBox(type, index);
+        }, true);
         window.hasInitTagReorderListeners = true;
     };
 
@@ -808,44 +813,91 @@
         if (window.hasInitInnerReorderListeners) return;
         const modal = document.getElementById("workModal");
         if (!modal) return;
-        let cell = null;
-        let group = null;
+        let selectedCell = null;
+        let dragCell = null;
+        let dragGroup = null;
+        let resizeCell = null;
+        let resizeStart = null;
+        let pressOrigin = null;
         let timer = null;
+
+        const selectCell = (cell) => {
+            if (selectedCell && selectedCell !== cell) selectedCell.classList.remove("is-widget-selected");
+            selectedCell = cell || null;
+            if (selectedCell) selectedCell.classList.add("is-widget-selected");
+        };
 
         const start = (event) => {
             if (!window.isWorkLayoutMode) return;
-            const handle = event.target.closest(".inner-move-handle");
-            if (!handle || !modal.contains(handle)) return;
+            const resizeHandle = event.target.closest(".widget-resize-handle");
+            if (resizeHandle && modal.contains(resizeHandle)) {
+                resizeCell = resizeHandle.closest(".inner-layout-cell");
+                selectCell(resizeCell);
+                const point = event.touches ? event.touches[0] : event;
+                const groupRect = resizeCell.parentElement.getBoundingClientRect();
+                resizeStart = {
+                    x: point.clientX,
+                    y: point.clientY,
+                    cols: Number(resizeCell.dataset.widgetCols) || 1,
+                    rows: Number(resizeCell.dataset.widgetRows) || 1,
+                    colWidth: Math.max(1, groupRect.width / 6),
+                    rowHeight: 32
+                };
+                if (event.cancelable) event.preventDefault();
+                return;
+            }
+            const cell = event.target.closest(".inner-layout-cell");
+            if (!cell || !modal.contains(cell)) return;
+            selectCell(cell);
             if (event.cancelable) event.preventDefault();
+            const point = event.touches ? event.touches[0] : event;
+            pressOrigin = { x: point.clientX, y: point.clientY };
             timer = setTimeout(() => {
-                cell = handle.closest(".inner-layout-cell");
-                group = cell && cell.parentElement;
-                if (cell) cell.classList.add("is-inner-dragging");
+                dragCell = cell;
+                dragGroup = cell.parentElement;
+                dragCell.classList.add("is-widget-dragging");
                 if (navigator.vibrate) navigator.vibrate(25);
-            }, 400);
+            }, 350);
         };
 
         const move = (event) => {
-            if (!cell || !group) return;
-            if (event.cancelable) event.preventDefault();
             const point = event.touches ? event.touches[0] : event;
+            if (resizeCell && resizeStart) {
+                if (event.cancelable) event.preventDefault();
+                const cols = resizeStart.cols + Math.round((point.clientX - resizeStart.x) / resizeStart.colWidth);
+                const rows = resizeStart.rows + Math.round((point.clientY - resizeStart.y) / resizeStart.rowHeight);
+                setWidgetSize(resizeCell, cols, rows);
+                return;
+            }
+            if (!dragCell || !dragGroup) {
+                if (pressOrigin && Math.hypot(point.clientX - pressOrigin.x, point.clientY - pressOrigin.y) > 12) {
+                    clearTimeout(timer);
+                }
+                return;
+            }
+            if (event.cancelable) event.preventDefault();
             const over = document.elementFromPoint(point.clientX, point.clientY);
             const target = over && over.closest(".inner-layout-cell");
-            if (!target || target === cell || target.parentElement !== group) return;
+            modal.querySelectorAll(".is-widget-drop-target").forEach((item) => item.classList.remove("is-widget-drop-target"));
+            if (!target || target === dragCell || target.parentElement !== dragGroup) return;
             const rect = target.getBoundingClientRect();
-            const before = group.dataset.innerAxis === "y"
-                ? point.clientY < rect.top + rect.height / 2
-                : point.clientX < rect.left + rect.width / 2;
-            group.insertBefore(cell, before ? target : target.nextSibling);
+            target.classList.add("is-widget-drop-target");
+            const before = point.clientY < rect.top + rect.height / 2 ||
+                (Math.abs(point.clientY - (rect.top + rect.height / 2)) < rect.height / 3 &&
+                    point.clientX < rect.left + rect.width / 2);
+            dragGroup.insertBefore(dragCell, before ? target : target.nextSibling);
         };
 
         const end = () => {
             clearTimeout(timer);
-            if (!cell) return;
-            cell.classList.remove("is-inner-dragging");
-            window.saveWorkLayout();
-            cell = null;
-            group = null;
+            modal.querySelectorAll(".is-widget-drop-target").forEach((item) => item.classList.remove("is-widget-drop-target"));
+            if (dragCell) dragCell.classList.remove("is-widget-dragging");
+            if (dragCell || resizeCell) window.saveWorkLayout();
+            dragCell = null;
+            dragGroup = null;
+            resizeCell = null;
+            resizeStart = null;
+            pressOrigin = null;
         };
 
         modal.addEventListener("touchstart", start, { passive: false });
@@ -853,6 +905,12 @@
         modal.addEventListener("touchend", end);
         modal.addEventListener("touchcancel", end);
         modal.addEventListener("mousedown", start);
+        modal.addEventListener("click", (event) => {
+            if (!window.isWorkLayoutMode) return;
+            if (!event.target.closest(".inner-layout-cell")) return;
+            event.preventDefault();
+            event.stopPropagation();
+        }, true);
         window.addEventListener("mousemove", move);
         window.addEventListener("mouseup", end);
         window.hasInitInnerReorderListeners = true;
