@@ -427,6 +427,74 @@
         return container ? [...container.querySelectorAll(".drag-item")] : [];
     };
 
+    const getInnerLayoutSpecs = () => {
+        const date = document.getElementById("workDateInput");
+        const address = document.getElementById("workAddress");
+        return [
+            {
+                key: "1-top", axis: "x",
+                items: [
+                    ["date", date && date.parentElement, 2],
+                    ["time", document.getElementById("workTime"), 1],
+                    ["duty", document.getElementById("workDutyBtn"), 0],
+                    ["ot", document.getElementById("workOT"), 1],
+                    ["undo", document.getElementById("workUndoBtn"), 0]
+                ]
+            },
+            {
+                key: "1-info", axis: "x",
+                items: [
+                    ["taskNo", document.getElementById("taskNo"), 1],
+                    ["customer", document.getElementById("customerName"), 1]
+                ]
+            },
+            {
+                key: "1-address", axis: "x",
+                items: [
+                    ["address", address, 1],
+                    ["map", document.querySelector('.inner-layout-cell[data-inner-id="map"] > button') || (address && address.parentElement.querySelector("button")), 0]
+                ]
+            },
+            {
+                key: "2-text", axis: "y",
+                items: [
+                    ["content", document.getElementById("workContent"), 1],
+                    ["note", document.getElementById("workNote"), 1]
+                ]
+            }
+        ];
+    };
+
+    window.ensureInnerLayoutObjects = () => {
+        getInnerLayoutSpecs().forEach((spec) => {
+            const validItems = spec.items.filter((item) => item[1]);
+            if (validItems.length === 0) return;
+            const firstElement = validItems[0][1];
+            let group = firstElement.closest(".inner-layout-group");
+            if (!group) group = firstElement.parentElement;
+            group.classList.add("inner-layout-group");
+            group.dataset.innerGroup = spec.key;
+            group.dataset.innerAxis = spec.axis;
+            validItems.forEach(([id, element, flex]) => {
+                let cell = element.closest(".inner-layout-cell");
+                if (!cell || cell.parentElement !== group) {
+                    cell = document.createElement("div");
+                    cell.className = "inner-layout-cell";
+                    group.insertBefore(cell, element);
+                    cell.appendChild(element);
+                }
+                cell.dataset.innerId = id;
+                cell.style.flex = flex === 0 ? "0 0 auto" : `${flex} 1 0`;
+                if (!cell.querySelector(":scope > .inner-move-handle")) {
+                    const handle = document.createElement("div");
+                    handle.className = "inner-move-handle";
+                    handle.title = "길게 누른 뒤 끌어 칸 이동";
+                    cell.appendChild(handle);
+                }
+            });
+        });
+    };
+
     window.readWorkLayout = () => {
         try {
             return JSON.parse(localStorage.getItem(WORK_LAYOUT_KEY) || "{}");
@@ -439,10 +507,15 @@
     window.saveWorkLayout = () => {
         const items = getWorkLayoutItems();
         const heights = {};
+        const innerOrder = {};
         items.forEach((item) => {
             heights[item.dataset.id] = clampLayoutHeight(item, parseFloat(item.dataset.layoutHeight || DEFAULT_WORK_LAYOUT_HEIGHT));
         });
-        const layout = { order: items.map((item) => item.dataset.id), heights };
+        document.querySelectorAll(".inner-layout-group").forEach((group) => {
+            innerOrder[group.dataset.innerGroup] = [...group.querySelectorAll(":scope > .inner-layout-cell")]
+                .map((cell) => cell.dataset.innerId);
+        });
+        const layout = { order: items.map((item) => item.dataset.id), heights, innerOrder };
         localStorage.setItem(WORK_LAYOUT_KEY, JSON.stringify(layout));
         // 예전 순서 설정과도 호환한다.
         localStorage.setItem("wm_work_drag_order", JSON.stringify(layout.order));
@@ -451,6 +524,7 @@
     window.applyWorkLayout = () => {
         const container = getWorkLayoutContainer();
         if (!container) return;
+        window.ensureInnerLayoutObjects();
         const layout = window.readWorkLayout();
         if (Array.isArray(layout.order)) {
             layout.order.forEach((id) => {
@@ -467,6 +541,14 @@
             item.style.height = height ? `${Math.round(getLayoutViewportHeight() * height / 100)}px` : "";
             item.style.overflow = height ? "auto" : "";
         });
+        document.querySelectorAll(".inner-layout-group").forEach((group) => {
+            const order = layout.innerOrder && layout.innerOrder[group.dataset.innerGroup];
+            if (!Array.isArray(order)) return;
+            order.forEach((id) => {
+                const cell = group.querySelector(`:scope > .inner-layout-cell[data-inner-id="${id}"]`);
+                if (cell) group.appendChild(cell);
+            });
+        });
     };
 
     window.ensureWorkResizeHandles = () => {
@@ -474,7 +556,7 @@
             if (item.querySelector(":scope > .work-resize-handle")) return;
             const handle = document.createElement("div");
             handle.className = "work-resize-handle";
-            handle.title = "좌우로 끌어 칸 너비 조절";
+            handle.title = "위아래로 끌어 칸 높이 조절";
             item.appendChild(handle);
         });
     };
@@ -529,6 +611,20 @@
             item.style.height = "";
             item.style.overflow = "";
             container.appendChild(item);
+        });
+        document.querySelectorAll(".inner-layout-group").forEach((group) => {
+            [...group.querySelectorAll(":scope > .inner-layout-cell")]
+                .sort((a, b) => a.dataset.innerId.localeCompare(b.dataset.innerId))
+                .forEach((cell) => group.appendChild(cell));
+        });
+        // 기본 순서는 객체화 정의 순서로 다시 적용한다.
+        getInnerLayoutSpecs().forEach((spec) => {
+            const group = document.querySelector(`.inner-layout-group[data-inner-group="${spec.key}"]`);
+            if (!group) return;
+            spec.items.forEach(([id]) => {
+                const cell = group.querySelector(`:scope > .inner-layout-cell[data-inner-id="${id}"]`);
+                if (cell) group.appendChild(cell);
+            });
         });
         window.saveWorkLayout();
     };
@@ -639,6 +735,7 @@
         if (window.hasInitTagReorderListeners) return;
         const modal = document.getElementById("workModal");
         if (!modal) return;
+        let pendingTagButton = null;
         let tagButtonEl = null;
         let tagArea = null;
         let tagType = null;
@@ -649,6 +746,7 @@
             const button = event.target.closest(".layout-tag-button");
             if (!button || !modal.contains(button)) return;
             if (event.cancelable) event.preventDefault();
+            pendingTagButton = button;
             tagTimer = setTimeout(() => {
                 tagButtonEl = button;
                 tagArea = button.parentElement;
@@ -672,7 +770,15 @@
 
         const end = () => {
             clearTimeout(tagTimer);
-            if (!tagButtonEl || !tagArea || !tagType) return;
+            if (!tagButtonEl || !tagArea || !tagType) {
+                if (pendingTagButton && window.isWorkLayoutMode) {
+                    const type = pendingTagButton.dataset.tagType;
+                    const index = getTagArray(type).findIndex((tag) => tag.name === pendingTagButton.dataset.tagName);
+                    if (index > -1) window.openTagEditBox(type, index);
+                }
+                pendingTagButton = null;
+                return;
+            }
             tagButtonEl.classList.remove("is-tag-dragging");
             const orderedNames = [...tagArea.querySelectorAll(`.layout-tag-button[data-tag-type="${tagType}"]`)]
                 .map((button) => button.dataset.tagName);
@@ -682,6 +788,7 @@
             if (window.saveLocal) window.saveLocal("tag-order");
             renderTagType(tagType);
             tagButtonEl = null;
+            pendingTagButton = null;
             tagArea = null;
             tagType = null;
         };
@@ -694,6 +801,61 @@
         window.addEventListener("mousemove", move);
         window.addEventListener("mouseup", end);
         window.hasInitTagReorderListeners = true;
+    };
+
+    window.hasInitInnerReorderListeners = false;
+    window.initInnerReorderListeners = () => {
+        if (window.hasInitInnerReorderListeners) return;
+        const modal = document.getElementById("workModal");
+        if (!modal) return;
+        let cell = null;
+        let group = null;
+        let timer = null;
+
+        const start = (event) => {
+            if (!window.isWorkLayoutMode) return;
+            const handle = event.target.closest(".inner-move-handle");
+            if (!handle || !modal.contains(handle)) return;
+            if (event.cancelable) event.preventDefault();
+            timer = setTimeout(() => {
+                cell = handle.closest(".inner-layout-cell");
+                group = cell && cell.parentElement;
+                if (cell) cell.classList.add("is-inner-dragging");
+                if (navigator.vibrate) navigator.vibrate(25);
+            }, 400);
+        };
+
+        const move = (event) => {
+            if (!cell || !group) return;
+            if (event.cancelable) event.preventDefault();
+            const point = event.touches ? event.touches[0] : event;
+            const over = document.elementFromPoint(point.clientX, point.clientY);
+            const target = over && over.closest(".inner-layout-cell");
+            if (!target || target === cell || target.parentElement !== group) return;
+            const rect = target.getBoundingClientRect();
+            const before = group.dataset.innerAxis === "y"
+                ? point.clientY < rect.top + rect.height / 2
+                : point.clientX < rect.left + rect.width / 2;
+            group.insertBefore(cell, before ? target : target.nextSibling);
+        };
+
+        const end = () => {
+            clearTimeout(timer);
+            if (!cell) return;
+            cell.classList.remove("is-inner-dragging");
+            window.saveWorkLayout();
+            cell = null;
+            group = null;
+        };
+
+        modal.addEventListener("touchstart", start, { passive: false });
+        modal.addEventListener("touchmove", move, { passive: false });
+        modal.addEventListener("touchend", end);
+        modal.addEventListener("touchcancel", end);
+        modal.addEventListener("mousedown", start);
+        window.addEventListener("mousemove", move);
+        window.addEventListener("mouseup", end);
+        window.hasInitInnerReorderListeners = true;
     };
 
     const countAllowed = (type, name) => includesMonthly(getTag(type, name));
@@ -756,4 +918,5 @@
 
     bindDraftFieldUndo();
     window.initTagReorderListeners();
+    window.initInnerReorderListeners();
 })();
