@@ -84,7 +84,7 @@
         <div class="modal-box w95-window">
             <div class="w95-titlebar">
                 <span>작업 일지 작성</span>
-                <button type="button" class="w95-btn" style="padding:0 6px;" onclick="window.closeWorkModal()">X</button>
+                <button type="button" class="w95-btn" style="padding:0 6px;" title="하단 취소 버튼을 사용하세요">X</button>
             </div>
             
             <div class="modal-content-scroll" style="padding:4px; display:flex; flex-direction:column;">
@@ -92,13 +92,14 @@
 
                     <div class="drag-item w95-out" data-id="1" style="display:flex; flex-direction:column; gap:2px;">
                         <div style="display:flex; gap:2px; align-items:center;">
-                            <div style="position:relative; flex:2; min-width:80px; max-width:95px; display:flex; align-items:center; justify-content:center; background:#fff; border: 2px solid; border-color: #808080 #fff #fff #808080; height:28px;">
+                            <div style="position:relative; flex:2; min-width:80px; display:flex; align-items:center; justify-content:center; background:#fff; border: 2px solid; border-color: #808080 #fff #fff #808080; height:28px;">
                                 <span id="workDayLabel" style="font-weight:bold; font-size:0.8rem; color:var(--w-blue);"></span>
                                 <input type="date" id="workDateInput" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;" onchange="window.updateWorkDateLabel()">
                             </div>
-                            <input type="text" id="workTime" inputmode="numeric" class="m-input w95-in" style="flex:1; max-width: 50px; text-align:center; height:28px;" placeholder="시간" onblur="window.formatTimeInput(this)">
+                            <input type="text" id="workTime" inputmode="numeric" class="m-input w95-in" style="flex:1; min-width:42px; text-align:center; height:28px;" placeholder="시간" onblur="window.formatTimeInput(this)">
                             <button type="button" id="workDutyBtn" class="w95-btn" style="padding:0 4px; height:28px;" onclick="window.toggleDuty()">당직</button>
-                            <input type="text" id="workOT" inputmode="numeric" class="m-input w95-in" style="flex:1; max-width: 55px; text-align:center; height:28px;" placeholder="OT(00:00)" onblur="window.formatOTInput(this)">
+                            <input type="text" id="workOT" inputmode="numeric" class="m-input w95-in" style="flex:1; min-width:48px; text-align:center; height:28px;" placeholder="OT(00:00)" onblur="window.formatOTInput(this)">
+                            <button type="button" id="workUndoBtn" class="w95-btn work-undo-btn" title="방금 작업 취소" onclick="window.undoWorkDraft()">↶</button>
                         </div>
                         <div style="display:flex; gap:2px;">
                             <input type="text" id="taskNo" inputmode="numeric" class="m-input w95-in" style="flex:1; height:28px;" placeholder="Task 번호">
@@ -227,18 +228,21 @@
         <div class="modal-box w95-window" style="max-width: 250px;">
             <div class="w95-titlebar"><span>항목 편집</span><button type="button" class="w95-btn" onclick="window.closeTagEditModal()">X</button></div>
             <div style="padding:10px; background:var(--w-gray);">
-                <input type="text" id="tagEditInput" class="m-input w95-in" style="width:100%; margin-bottom:8px;">
-                <div id="equipQtyContainer" style="display:none; align-items:center; justify-content:space-between; margin-bottom:8px; padding:4px; background:#fff; border:1px solid #888;">
-                    <span style="font-size:0.8rem; font-weight:bold;">장비 수량 조절</span>
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <button type="button" class="w95-btn icon-btn" style="height:24px;" onclick="window.changeEquipQty(-1)">-</button>
-                        <b id="equipQtyDisplay" style="font-size:1.1rem; min-width:20px; text-align:center;">0</b>
-                        <button type="button" class="w95-btn icon-btn" style="height:24px;" onclick="window.changeEquipQty(1)">+</button>
-                    </div>
+                <div class="tag-edit-name-row">
+                    <input type="text" id="tagEditInput" class="m-input w95-in">
+                    <button type="button" id="tagSaveDeleteBtn" class="w95-btn tag-save-delete-btn"
+                        title="짧게 누르면 저장, 3초 이상 누르면 삭제"
+                        onpointerdown="window.startTagSaveDelete(event)"
+                        onpointerup="window.endTagSaveDelete(event)"
+                        onpointerleave="window.cancelTagSaveDelete()"
+                        onpointercancel="window.cancelTagSaveDelete()">저/삭</button>
                 </div>
-                <div style="display:flex; gap:6px;">
-                    <button type="button" class="w95-btn" style="flex:1; color:var(--w-blue); font-weight:bold;" onclick="window.saveTagEdit()">저장</button>
-                    <button type="button" class="w95-btn" style="flex:1; color:red;" onclick="window.deleteTagEdit()">삭제</button>
+                <div class="tag-edit-control-row">
+                    <button type="button" class="w95-btn icon-btn" onclick="window.changeTagQty(-1)">-</button>
+                    <b id="tagQtyDisplay">0</b>
+                    <button type="button" class="w95-btn icon-btn" onclick="window.changeTagQty(1)">+</button>
+                    <button type="button" id="tagShowCountBtn" class="w95-btn tag-toggle-btn" onclick="window.toggleTagShowCount()">숫자</button>
+                    <button type="button" id="tagMonthlyBtn" class="w95-btn tag-toggle-btn" onclick="window.toggleTagMonthly()">월별</button>
                 </div>
             </div>
         </div>
@@ -323,6 +327,7 @@
 <script src="work_ui.js"></script>
 <script src="work_modal.js"></script>
 <script src="work_logic.js"></script>
+<script src="work_enhancements.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 <script src="work_export_html.js"></script>

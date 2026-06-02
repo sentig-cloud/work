@@ -265,9 +265,17 @@ window.WorkExport = {
     },
 
     addPreparedImage: async function(workbook, worksheet, src, position) {
-        const prepared = await this.prepareImage(src);
-        const imageId = workbook.addImage(prepared);
-        worksheet.addImage(imageId, position);
+        try {
+            const prepared = await this.prepareImage(src);
+            const imageId = workbook.addImage(prepared);
+            worksheet.addImage(imageId, position);
+            return true;
+        }
+        catch (error) {
+            console.warn("엑셀 사진 삽입 실패:", src, error);
+            this.failedImageSources.push(src);
+            return false;
+        }
     },
 
     getBorder: function(color, style) {
@@ -287,6 +295,7 @@ window.WorkExport = {
     buildXlsx: async function(headers, rows, maxLens, fileName, widthMode) {
         await this.ensureLibraries();
         this.imageCache = new Map();
+        this.failedImageSources = [];
 
         const workbook = new ExcelJS.Workbook();
         const dataSheet = workbook.addWorksheet("Data");
@@ -422,6 +431,10 @@ window.WorkExport = {
         );
 
         saveAs(blob, `${fileName}.xlsx`);
+
+        if (this.failedImageSources.length > 0) {
+            alert(`엑셀 파일은 생성되었지만 사진 ${this.failedImageSources.length}개를 넣지 못했습니다. 콘솔에서 누락된 사진 주소를 확인하세요.`);
+        }
 
         if (window.WorkExportUI) {
             window.WorkExportUI.close();
