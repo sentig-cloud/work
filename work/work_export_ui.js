@@ -47,6 +47,7 @@ window.WorkExportUI = {
         if(conf) {
             let parsed = JSON.parse(conf);
             this.state = { ...this.state, ...parsed };
+            if (this.state.selectedType === "xls") this.state.selectedType = "xlsx";
             if(parsed.customNames) {
                 parsed.customNames.forEach(cn => {
                     let match = this.columnsMaster.find(c => c.id === cn.id);
@@ -136,10 +137,9 @@ window.WorkExportUI = {
             <div class="exp-tag ${this.state.selectedSort === 'asc' ? 'on' : 'off'}" onclick="window.WorkExportUI.setSort('asc')">과거순</div>
         `;
 
-        document.getElementById('expFormatArea').innerHTML = `
-            <div class="exp-tag ${this.state.selectedType === 'xlsx' ? 'on' : 'off'}" onclick="window.WorkExportUI.setFormat('xlsx')">최신</div>
-            <div class="exp-tag ${this.state.selectedType === 'xls' ? 'on' : 'off'}" onclick="window.WorkExportUI.setFormat('xls')">구형</div>
-            <div class="exp-tag ${this.state.selectedType === 'csv' ? 'on' : 'off'}" onclick="window.WorkExportUI.setFormat('csv')">CSV</div>
+        document.getElementById("expFormatArea").innerHTML = `
+            <div class="exp-tag ${this.state.selectedType === "xlsx" ? "on" : "off"}" onclick="window.WorkExportUI.setFormat('xlsx')">XLSX</div>
+            <div class="exp-tag ${this.state.selectedType === "csv" ? "on" : "off"}" onclick="window.WorkExportUI.setFormat('csv')">CSV</div>
         `;
 
         document.getElementById('expWidthArea').innerHTML = `
