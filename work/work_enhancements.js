@@ -86,7 +86,8 @@
     };
 
     const tagButton = (type, tag, index, active) => `
-        <button type="button" class="w95-btn ${active ? "active-btn" : ""}"
+        <button type="button" class="w95-btn layout-tag-button ${active ? "active-btn" : ""}"
+            data-tag-type="${type}" data-tag-name="${esc(tag.name)}"
             onmousedown="window.startPress(event, '${type}', ${index})"
             onmouseup="window.endPress(event, '${type}', ${index})"
             onmouseleave="window.cancelPress()"
@@ -96,7 +97,6 @@
 
     window.renderTaskTypes = () => {
         window.taskTypes = window.taskTypes || [];
-        window.taskTypes.sort((a, b) => getSortCount(b) - getSortCount(a));
         document.getElementById("taskTypeArea").innerHTML =
             window.taskTypes.map((tag, index) => tagButton("task", tag, index, (window.activeTaskTypes || []).includes(tag.name))).join(" ") +
             `<button type="button" class="w95-btn" onclick="window.addNewType('task')"><b>+</b></button>`;
@@ -104,7 +104,6 @@
 
     window.renderCoworkers = () => {
         window.coworkers = window.coworkers || [];
-        window.coworkers.sort((a, b) => getSortCount(b) - getSortCount(a));
         document.getElementById("coworkerArea").innerHTML =
             window.coworkers.map((tag, index) => tagButton("coworker", tag, index, (window.selectedCoworkers || []).includes(tag.name))).join(" ") +
             `<button type="button" class="w95-btn" onclick="window.addNewType('coworker')"><b>+</b></button>`;
@@ -119,7 +118,6 @@
 
     window.renderStatuses = () => {
         window.statuses = window.statuses || [];
-        window.statuses.sort((a, b) => getSortCount(b) - getSortCount(a));
         document.getElementById("statusArea").innerHTML =
             window.statuses.map((tag, index) => tagButton("status", tag, index, window.activeStatus === tag.name)).join(" ") +
             `<button type="button" class="w95-btn" onclick="window.addNewType('status')"><b>+</b></button>`;
@@ -128,7 +126,6 @@
     window.renderMemoTags = () => {
         window.memoTags = window.memoTags || [];
         window.activeEditTags = window.activeEditTags || [];
-        window.memoTags.sort((a, b) => getSortCount(b) - getSortCount(a));
         const area = document.getElementById("editTagArea");
         if (!area) return;
         area.innerHTML = window.memoTags.map((tag, index) =>
@@ -359,12 +356,16 @@
     window.openWorkModal = (...args) => {
         window.workUndoStack = [];
         const result = originalOpenWorkModal(...args);
+        window.applyWorkLayout();
+        window.ensureWorkResizeHandles();
+        window.setWorkLayoutMode(false);
         window.updateWorkUndoButton();
         return result;
     };
     const originalCloseWorkModal = window.closeWorkModal;
     window.closeWorkModal = (...args) => {
         window.workUndoStack = [];
+        if (window.isWorkLayoutMode) window.setWorkLayoutMode(false);
         window.updateWorkUndoButton();
         return originalCloseWorkModal(...args);
     };
@@ -404,47 +405,295 @@
         });
     };
 
+    const WORK_LAYOUT_KEY = "wm_work_layout_v2";
+    const DEFAULT_WORK_LAYOUT_HEIGHT = 0;
+    const MAX_WORK_LAYOUT_HEIGHT = 150;
+    window.isWorkLayoutMode = false;
+    window.workLayoutLongPressed = false;
+    window.workLayoutPressTimer = null;
+
+    const getWorkLayoutContainer = () => document.getElementById("workDragContainer");
+    const getLayoutViewportHeight = () => {
+        const scroll = document.querySelector("#workModal .modal-content-scroll");
+        return Math.max(1, scroll ? scroll.clientHeight : window.innerHeight);
+    };
+    const getMinLayoutHeight = (item) => item && item.dataset.id === "2" ? 18 : 10;
+    const clampLayoutHeight = (item, value) => {
+        if (!value) return DEFAULT_WORK_LAYOUT_HEIGHT;
+        return Math.max(getMinLayoutHeight(item), Math.min(MAX_WORK_LAYOUT_HEIGHT, Number(value) || DEFAULT_WORK_LAYOUT_HEIGHT));
+    };
+    const getWorkLayoutItems = () => {
+        const container = getWorkLayoutContainer();
+        return container ? [...container.querySelectorAll(".drag-item")] : [];
+    };
+
+    window.readWorkLayout = () => {
+        try {
+            return JSON.parse(localStorage.getItem(WORK_LAYOUT_KEY) || "{}");
+        } catch (error) {
+            console.warn("레이아웃 설정 읽기 실패:", error);
+            return {};
+        }
+    };
+
+    window.saveWorkLayout = () => {
+        const items = getWorkLayoutItems();
+        const heights = {};
+        items.forEach((item) => {
+            heights[item.dataset.id] = clampLayoutHeight(item, parseFloat(item.dataset.layoutHeight || DEFAULT_WORK_LAYOUT_HEIGHT));
+        });
+        const layout = { order: items.map((item) => item.dataset.id), heights };
+        localStorage.setItem(WORK_LAYOUT_KEY, JSON.stringify(layout));
+        // 예전 순서 설정과도 호환한다.
+        localStorage.setItem("wm_work_drag_order", JSON.stringify(layout.order));
+    };
+
+    window.applyWorkLayout = () => {
+        const container = getWorkLayoutContainer();
+        if (!container) return;
+        const layout = window.readWorkLayout();
+        if (Array.isArray(layout.order)) {
+            layout.order.forEach((id) => {
+                const item = container.querySelector(`.drag-item[data-id="${id}"]`);
+                if (item) container.appendChild(item);
+            });
+        }
+        getWorkLayoutItems().forEach((item) => {
+            const height = clampLayoutHeight(item, layout.heights && layout.heights[item.dataset.id]);
+            item.dataset.layoutHeight = String(height);
+            item.style.width = "100%";
+            item.style.maxWidth = "100%";
+            item.style.alignSelf = "flex-start";
+            item.style.height = height ? `${Math.round(getLayoutViewportHeight() * height / 100)}px` : "";
+            item.style.overflow = height ? "auto" : "";
+        });
+    };
+
+    window.ensureWorkResizeHandles = () => {
+        getWorkLayoutItems().forEach((item) => {
+            if (item.querySelector(":scope > .work-resize-handle")) return;
+            const handle = document.createElement("div");
+            handle.className = "work-resize-handle";
+            handle.title = "좌우로 끌어 칸 너비 조절";
+            item.appendChild(handle);
+        });
+    };
+
+    window.setWorkLayoutMode = (enabled) => {
+        window.isWorkLayoutMode = !!enabled;
+        const modal = document.getElementById("workModal");
+        const titlebar = document.getElementById("workModalTitlebar");
+        if (modal) modal.classList.toggle("layout-edit-mode", window.isWorkLayoutMode);
+        if (titlebar) titlebar.classList.toggle("is-layout-edit", window.isWorkLayoutMode);
+        window.ensureWorkResizeHandles();
+        if (!window.isWorkLayoutMode) window.saveWorkLayout();
+    };
+
+    window.startWorkLayoutPress = (event) => {
+        if (event) event.preventDefault();
+        clearTimeout(window.workLayoutPressTimer);
+        window.workLayoutLongPressed = false;
+        const button = document.getElementById("workLayoutModeBtn");
+        if (button) button.classList.add("is-layout-pressing");
+        window.workLayoutPressTimer = setTimeout(() => {
+            window.workLayoutLongPressed = true;
+            window.setWorkLayoutMode(true);
+            if (button) button.classList.remove("is-layout-pressing");
+            if (navigator.vibrate) navigator.vibrate(40);
+        }, 2000);
+    };
+
+    window.endWorkLayoutPress = (event) => {
+        if (event) event.preventDefault();
+        clearTimeout(window.workLayoutPressTimer);
+        const button = document.getElementById("workLayoutModeBtn");
+        if (button) button.classList.remove("is-layout-pressing");
+        if (!window.workLayoutLongPressed && window.isWorkLayoutMode) window.setWorkLayoutMode(false);
+        window.workLayoutLongPressed = false;
+    };
+    window.cancelWorkLayoutPress = () => {
+        clearTimeout(window.workLayoutPressTimer);
+        const button = document.getElementById("workLayoutModeBtn");
+        if (button) button.classList.remove("is-layout-pressing");
+    };
+
+    window.resetWorkLayout = () => {
+        if (!window.isWorkLayoutMode) return;
+        localStorage.removeItem(WORK_LAYOUT_KEY);
+        localStorage.removeItem("wm_work_drag_order");
+        const container = getWorkLayoutContainer();
+        if (!container) return;
+        [...getWorkLayoutItems()].sort((a, b) => Number(a.dataset.id) - Number(b.dataset.id)).forEach((item) => {
+            item.dataset.layoutHeight = String(DEFAULT_WORK_LAYOUT_HEIGHT);
+            item.style.width = "100%";
+            item.style.height = "";
+            item.style.overflow = "";
+            container.appendChild(item);
+        });
+        window.saveWorkLayout();
+    };
+
     window.hasInitDragListeners = false;
     window.initWorkDragListeners = () => {
         if (window.hasInitDragListeners) return;
-        const container = document.getElementById("workDragContainer");
+        const container = getWorkLayoutContainer();
         if (!container) return;
         let dragEl = null;
-        let timer = null;
+        let dragTimer = null;
+        let resizeEl = null;
+        let resizeViewportHeight = 0;
+
         const start = (event) => {
-            const handle = event.target.closest(".drag-handle");
-            if (!handle) return;
-            timer = setTimeout(() => {
-                dragEl = handle.closest(".drag-item");
+            if (!window.isWorkLayoutMode) return;
+            const resizeHandle = event.target.closest(".work-resize-handle");
+            if (resizeHandle) {
+                resizeEl = resizeHandle.closest(".drag-item");
+                resizeViewportHeight = getLayoutViewportHeight();
+                if (event.cancelable) event.preventDefault();
+                return;
+            }
+            const dragHandle = event.target.closest(".drag-handle");
+            if (!dragHandle) return;
+            if (event.cancelable) event.preventDefault();
+            dragTimer = setTimeout(() => {
+                dragEl = dragHandle.closest(".drag-item");
                 if (dragEl) dragEl.classList.add("dragging");
-            }, 200);
+            }, 300);
         };
+
         const move = (event) => {
-            if (!dragEl) { clearTimeout(timer); return; }
-            event.preventDefault();
-            const y = event.touches ? event.touches[0].clientY : event.clientY;
+            if (!window.isWorkLayoutMode) return;
+            const point = event.touches ? event.touches[0] : event;
+            if (resizeEl) {
+                if (event.cancelable) event.preventDefault();
+                const top = resizeEl.getBoundingClientRect().top;
+                const height = clampLayoutHeight(resizeEl, ((point.clientY - top) / resizeViewportHeight) * 100);
+                resizeEl.dataset.layoutHeight = String(Math.round(height * 10) / 10);
+                resizeEl.style.height = `${Math.round(resizeViewportHeight * height / 100)}px`;
+                resizeEl.style.overflow = "auto";
+                return;
+            }
+            if (!dragEl) {
+                clearTimeout(dragTimer);
+                return;
+            }
+            if (event.cancelable) event.preventDefault();
             const next = [...container.querySelectorAll(".drag-item:not(.dragging)")].find((item) => {
                 const rect = item.getBoundingClientRect();
-                return y < rect.top + rect.height / 2;
+                return point.clientY < rect.top + rect.height / 2;
             });
             if (next) container.insertBefore(dragEl, next); else container.appendChild(dragEl);
         };
+
         const end = () => {
-            clearTimeout(timer);
-            if (!dragEl) return;
-            dragEl.classList.remove("dragging");
+            clearTimeout(dragTimer);
+            if (dragEl) dragEl.classList.remove("dragging");
+            if (dragEl || resizeEl) window.saveWorkLayout();
             dragEl = null;
-            localStorage.setItem("wm_work_drag_order",
-                JSON.stringify([...container.querySelectorAll(".drag-item")].map((item) => item.dataset.id)));
+            resizeEl = null;
         };
-        container.addEventListener("touchstart", start, { passive: true });
+
+        container.addEventListener("touchstart", start, { passive: false });
         container.addEventListener("touchmove", move, { passive: false });
         container.addEventListener("touchend", end);
+        container.addEventListener("touchcancel", end);
         container.addEventListener("mousedown", start);
-        container.addEventListener("mousemove", move);
-        container.addEventListener("mouseup", end);
-        container.addEventListener("mouseleave", end);
+        window.addEventListener("mousemove", move);
+        window.addEventListener("mouseup", end);
         window.hasInitDragListeners = true;
+    };
+
+    const isTextEditingTarget = (target) => !!target && (
+        target.matches("input, textarea, [contenteditable='true']") ||
+        !!target.closest("input, textarea, [contenteditable='true']")
+    );
+
+    document.addEventListener("contextmenu", (event) => {
+        if (!isTextEditingTarget(event.target)) event.preventDefault();
+    });
+    document.addEventListener("selectstart", (event) => {
+        if (!isTextEditingTarget(event.target)) event.preventDefault();
+    });
+    document.addEventListener("dragstart", (event) => {
+        if (!isTextEditingTarget(event.target)) event.preventDefault();
+    });
+
+    const originalStartPress = window.startPress;
+    const originalEndPress = window.endPress;
+    const originalCancelPress = window.cancelPress;
+    window.startPress = (...args) => {
+        if (window.isWorkLayoutMode) return;
+        return originalStartPress(...args);
+    };
+    window.endPress = (...args) => {
+        if (window.isWorkLayoutMode) return;
+        return originalEndPress(...args);
+    };
+    window.cancelPress = (...args) => {
+        if (window.isWorkLayoutMode) return;
+        return originalCancelPress(...args);
+    };
+
+    window.hasInitTagReorderListeners = false;
+    window.initTagReorderListeners = () => {
+        if (window.hasInitTagReorderListeners) return;
+        const modal = document.getElementById("workModal");
+        if (!modal) return;
+        let tagButtonEl = null;
+        let tagArea = null;
+        let tagType = null;
+        let tagTimer = null;
+
+        const start = (event) => {
+            if (!window.isWorkLayoutMode) return;
+            const button = event.target.closest(".layout-tag-button");
+            if (!button || !modal.contains(button)) return;
+            if (event.cancelable) event.preventDefault();
+            tagTimer = setTimeout(() => {
+                tagButtonEl = button;
+                tagArea = button.parentElement;
+                tagType = button.dataset.tagType;
+                tagButtonEl.classList.add("is-tag-dragging");
+                if (navigator.vibrate) navigator.vibrate(25);
+            }, 450);
+        };
+
+        const move = (event) => {
+            if (!tagButtonEl || !tagArea) return;
+            if (event.cancelable) event.preventDefault();
+            const point = event.touches ? event.touches[0] : event;
+            const over = document.elementFromPoint(point.clientX, point.clientY);
+            const target = over && over.closest(".layout-tag-button");
+            if (!target || target === tagButtonEl || target.parentElement !== tagArea || target.dataset.tagType !== tagType) return;
+            const rect = target.getBoundingClientRect();
+            const before = point.clientX < rect.left + rect.width / 2;
+            tagArea.insertBefore(tagButtonEl, before ? target : target.nextSibling);
+        };
+
+        const end = () => {
+            clearTimeout(tagTimer);
+            if (!tagButtonEl || !tagArea || !tagType) return;
+            tagButtonEl.classList.remove("is-tag-dragging");
+            const orderedNames = [...tagArea.querySelectorAll(`.layout-tag-button[data-tag-type="${tagType}"]`)]
+                .map((button) => button.dataset.tagName);
+            const arr = getTagArray(tagType);
+            const byName = new Map(arr.map((tag) => [tag.name, tag]));
+            arr.splice(0, arr.length, ...orderedNames.map((name) => byName.get(name)).filter(Boolean));
+            if (window.saveLocal) window.saveLocal("tag-order");
+            renderTagType(tagType);
+            tagButtonEl = null;
+            tagArea = null;
+            tagType = null;
+        };
+
+        modal.addEventListener("touchstart", start, { passive: false });
+        modal.addEventListener("touchmove", move, { passive: false });
+        modal.addEventListener("touchend", end);
+        modal.addEventListener("touchcancel", end);
+        modal.addEventListener("mousedown", start);
+        window.addEventListener("mousemove", move);
+        window.addEventListener("mouseup", end);
+        window.hasInitTagReorderListeners = true;
     };
 
     const countAllowed = (type, name) => includesMonthly(getTag(type, name));
@@ -506,4 +755,5 @@
     };
 
     bindDraftFieldUndo();
+    window.initTagReorderListeners();
 })();

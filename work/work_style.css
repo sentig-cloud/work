@@ -202,9 +202,79 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
     position: absolute; right: 8%; bottom: -5px; width: 38px; height: 24px;
     display: flex; align-items: center; justify-content: center; cursor: grab; z-index: 10;
     touch-action: none;
+    opacity: 0.34;
 }
 .drag-handle:active { cursor: grabbing; }
 .drag-handle i { font-size: 7px !important; color: #777; pointer-events: none; }
+
+#workModalTitlebar.is-layout-edit {
+    background: #ffe08a;
+    color: #6b3b00;
+}
+#workLayoutModeBtn.is-layout-pressing {
+    color: #fff;
+    background: #d97706;
+    box-shadow: inset 1px 1px 0 #7c2d12;
+}
+.work-layout-title-actions { display:flex; align-items:center; gap:4px; }
+.work-layout-reset-btn {
+    display: none;
+    height: 24px;
+    padding: 0 6px;
+    color: #8a4300;
+    font-size: 0.72rem;
+}
+.layout-edit-mode .work-layout-reset-btn { display: inline-block; }
+.layout-edit-mode .drag-item {
+    outline: 1px dashed #d97706;
+    background: #fff8df;
+}
+.layout-edit-mode .drag-handle {
+    opacity: 1;
+    background: rgba(255, 224, 138, 0.75);
+    border: 1px solid #d97706;
+}
+.work-resize-handle {
+    display: none;
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    bottom: -8px;
+    height: 16px;
+    z-index: 20;
+    cursor: ns-resize;
+    touch-action: none;
+}
+.work-resize-handle::after {
+    content: "";
+    position: absolute;
+    left: 8%;
+    right: 8%;
+    top: 7px;
+    height: 3px;
+    border-top: 1px solid #d97706;
+    border-bottom: 1px solid #d97706;
+}
+.layout-edit-mode .work-resize-handle { display: block; }
+.layout-edit-mode .layout-tag-button {
+    cursor: grab;
+    touch-action: none;
+}
+.layout-edit-mode .layout-tag-button.is-tag-dragging {
+    opacity: 0.58;
+    outline: 2px dashed #d97706;
+}
+
+body *:not(input):not(textarea):not([contenteditable="true"]) {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+input, textarea, [contenteditable="true"] {
+    -webkit-touch-callout: default;
+    -webkit-user-select: text;
+    user-select: text;
+}
 
 .work-undo-btn {
     width: 28px; min-width: 28px; height: 28px; padding: 0;
