@@ -514,7 +514,7 @@
                 if (!cell.querySelector(":scope > .widget-resize-handle")) {
                     const handle = document.createElement("div");
                     handle.className = "widget-resize-handle";
-                    handle.title = "모서리를 끌어 칸 크기 조절";
+                    handle.title = "오른쪽 삼각점을 상하좌우로 끌어 칸 크기 조절";
                     cell.appendChild(handle);
                 }
             });
@@ -594,11 +594,7 @@
 
     window.ensureWorkResizeHandles = () => {
         getWorkLayoutItems().forEach((item) => {
-            if (item.querySelector(":scope > .work-resize-handle")) return;
-            const handle = document.createElement("div");
-            handle.className = "work-resize-handle";
-            handle.title = "위아래로 끌어 칸 높이 조절";
-            item.appendChild(handle);
+            item.querySelector(":scope > .work-resize-handle")?.remove();
         });
     };
 
@@ -686,18 +682,9 @@
         let dragEl = null;
         let dragTimer = null;
         let dragOrigin = null;
-        let resizeEl = null;
-        let resizeViewportHeight = 0;
 
         const start = (event) => {
             if (!window.isWorkLayoutMode) return;
-            const resizeHandle = event.target.closest(".work-resize-handle");
-            if (resizeHandle) {
-                resizeEl = resizeHandle.closest(".drag-item");
-                resizeViewportHeight = getLayoutViewportHeight();
-                if (event.cancelable) event.preventDefault();
-                return;
-            }
             const dragHandle = event.target.closest(".drag-handle");
             if (!dragHandle) return;
             container.querySelectorAll(".drag-item.is-section-selected").forEach((item) => {
@@ -717,15 +704,6 @@
         const move = (event) => {
             if (!window.isWorkLayoutMode) return;
             const point = event.touches ? event.touches[0] : event;
-            if (resizeEl) {
-                if (event.cancelable) event.preventDefault();
-                const top = resizeEl.getBoundingClientRect().top;
-                const height = clampLayoutHeight(resizeEl, ((point.clientY - top) / resizeViewportHeight) * 100);
-                resizeEl.dataset.layoutHeight = String(Math.round(height * 10) / 10);
-                resizeEl.style.height = `${Math.round(resizeViewportHeight * height / 100)}px`;
-                resizeEl.style.overflow = "auto";
-                return;
-            }
             if (!dragEl) {
                 if (dragOrigin && Math.hypot(point.clientX - dragOrigin.x, point.clientY - dragOrigin.y) > 12) {
                     clearTimeout(dragTimer);
@@ -743,10 +721,9 @@
         const end = () => {
             clearTimeout(dragTimer);
             if (dragEl) dragEl.classList.remove("dragging");
-            if (dragEl || resizeEl) window.saveWorkLayout();
+            if (dragEl) window.saveWorkLayout();
             dragEl = null;
             dragOrigin = null;
-            resizeEl = null;
         };
 
         container.addEventListener("touchstart", start, { passive: false });
