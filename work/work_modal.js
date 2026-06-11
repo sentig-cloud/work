@@ -164,6 +164,11 @@ window.openWorkModal = (id = null) => {
     if(window.isWorkDuty) { dutyBtn.style.color = 'red'; dutyBtn.classList.add('active-btn'); } 
     else { dutyBtn.style.color = 'var(--w-black)'; dutyBtn.classList.remove('active-btn'); }
 
+    const editSaveBtn = document.getElementById('workEditSaveBtn');
+    if (editSaveBtn) {
+        editSaveBtn.style.display = id ? 'block' : 'none';
+    }
+
     document.getElementById('workDateInput').value = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     window.updateWorkDateLabel();
     window.renderTaskTypes(); window.renderStatuses(); window.renderCoworkers(); window.renderEquips(); window.renderWorkPhotoGrid();

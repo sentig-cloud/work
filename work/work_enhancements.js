@@ -411,6 +411,7 @@
     };
 
     const WORK_LAYOUT_KEY = "wm_work_layout_v2";
+    const WORK_LAYOUT_VERSION = 3;
     const DEFAULT_WORK_LAYOUT_HEIGHT = 0;
     const MAX_WORK_LAYOUT_HEIGHT = 150;
     window.isWorkLayoutMode = false;
@@ -450,7 +451,8 @@
             {
                 key: "1-info",
                 items: [
-                    ["taskNo", document.getElementById("taskNo"), 3, 1],
+                    ["taskNo", document.getElementById("taskNo"), 2, 1],
+                    ["copy", document.getElementById("workCopyBtn"), 1, 1],
                     ["customer", document.getElementById("customerName"), 3, 1]
                 ]
             },
@@ -472,8 +474,8 @@
                 key: "7-photo",
                 items: [
                     ["photoGrid", photoGrid, 4, 2],
-                    ["photoAlbum", document.querySelector('.inner-layout-cell[data-inner-id="photoAlbum"] > button') || document.querySelector('button[onclick*="workPhotoInput"]'), 1, 1],
-                    ["photoCamera", document.querySelector('.inner-layout-cell[data-inner-id="photoCamera"] > button') || document.querySelector('button[onclick*="workCamInput"]'), 1, 1]
+                    ["photoAlbum", document.querySelector('.inner-layout-cell[data-inner-id="photoAlbum"] > button') || document.querySelector('button[onclick*="workPhotoInput"]'), 2, 1],
+                    ["photoCamera", document.querySelector('.inner-layout-cell[data-inner-id="photoCamera"] > button') || document.querySelector('button[onclick*="workCamInput"]'), 2, 1]
                 ]
             }
         ];
@@ -550,7 +552,7 @@
                     return cell.dataset.innerId;
                 });
         });
-        const layout = { order: items.map((item) => item.dataset.id), heights, innerOrder, widgets };
+        const layout = { version: WORK_LAYOUT_VERSION, order: items.map((item) => item.dataset.id), heights, innerOrder, widgets };
         localStorage.setItem(WORK_LAYOUT_KEY, JSON.stringify(layout));
         // 예전 순서 설정과도 호환한다.
         localStorage.setItem("wm_work_drag_order", JSON.stringify(layout.order));
@@ -561,6 +563,7 @@
         if (!container) return;
         window.ensureInnerLayoutObjects();
         const layout = window.readWorkLayout();
+        const shouldMigratePhotoButtons = layout.version !== WORK_LAYOUT_VERSION;
         if (Array.isArray(layout.order)) {
             layout.order.forEach((id) => {
                 const item = container.querySelector(`.drag-item[data-id="${id}"]`);
@@ -577,7 +580,9 @@
             item.style.overflow = height ? "auto" : "";
         });
         document.querySelectorAll(".inner-layout-group").forEach((group) => {
-            const order = layout.innerOrder && layout.innerOrder[group.dataset.innerGroup];
+            const order = shouldMigratePhotoButtons && group.dataset.innerGroup === "7-photo"
+                ? ["photoGrid", "photoAlbum", "photoCamera"]
+                : layout.innerOrder && layout.innerOrder[group.dataset.innerGroup];
             if (Array.isArray(order)) {
                 order.forEach((id) => {
                     const cell = group.querySelector(`:scope > .inner-layout-cell[data-inner-id="${id}"]`);
@@ -586,6 +591,14 @@
             }
             const widgetSizes = layout.widgets && layout.widgets[group.dataset.innerGroup];
             [...group.querySelectorAll(":scope > .inner-layout-cell")].forEach((cell) => {
+                if (
+                    shouldMigratePhotoButtons &&
+                    group.dataset.innerGroup === "7-photo" &&
+                    (cell.dataset.innerId === "photoAlbum" || cell.dataset.innerId === "photoCamera")
+                ) {
+                    setWidgetSize(cell, 2, 1);
+                    return;
+                }
                 const size = widgetSizes && widgetSizes[cell.dataset.innerId];
                 setWidgetSize(cell, size && size.colSpan || cell.dataset.widgetCols, size && size.rowSpan || cell.dataset.widgetRows);
             });
@@ -839,7 +852,7 @@
                 selectCell(cell);
                 dragCell.classList.add("is-widget-dragging");
                 if (navigator.vibrate) navigator.vibrate(25);
-            }, 350);
+            }, 700);
         };
 
         const move = (event) => {

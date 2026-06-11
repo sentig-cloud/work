@@ -176,6 +176,68 @@ window.saveGeneralEntry = async () => {
     window.tempImgs = [];
 };
 
+window.getWorkDraftText = () => {
+    const date = document.getElementById("workDateInput")?.value || "";
+    const time = document.getElementById("workTime")?.value || "";
+    const taskNo = document.getElementById("taskNo")?.value.trim() || "";
+    const customerName = document.getElementById("customerName")?.value.trim() || "";
+    const address = document.getElementById("workAddress")?.value.trim() || "";
+    const content = document.getElementById("workContent")?.value.trim() || "";
+    const note = document.getElementById("workNote")?.value.trim() || "";
+    const ot = document.getElementById("workOT")?.value.trim() || "";
+    const equips = Object.entries(window.activeEquips || {})
+        .filter((entry) => Number(entry[1]) > 0)
+        .map((entry) => `${entry[0]} ${entry[1]}`)
+        .join(", ");
+
+    return [
+        "[작업일지]",
+        date ? `일자: ${date}` : "",
+        time ? `시간: ${time}` : "",
+        taskNo ? `Task: ${taskNo}` : "",
+        customerName ? `고객명: ${customerName}` : "",
+        address ? `주소: ${address}` : "",
+        (window.activeTaskTypes || []).length ? `작업유형: ${window.activeTaskTypes.join(", ")}` : "",
+        window.activeStatus ? `상태: ${window.activeStatus}` : "",
+        (window.selectedCoworkers || []).length ? `매니저: ${window.selectedCoworkers.join(", ")}` : "",
+        equips ? `장비: ${equips}` : "",
+        content ? `내용: ${content}` : "",
+        note ? `특이사항: ${note}` : "",
+        ot ? `OT: ${ot}` : "",
+        window.isWorkDuty ? "당직: O" : ""
+    ].filter(Boolean).join("\n");
+};
+
+window.copyWorkDraft = async () => {
+    const text = window.getWorkDraftText();
+
+    if (!text.trim()) {
+        alert("복사할 작업일지 내용이 없습니다.");
+        return;
+    }
+
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+        } else {
+            const textarea = document.createElement("textarea");
+            textarea.value = text;
+            textarea.style.position = "fixed";
+            textarea.style.left = "-9999px";
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            document.execCommand("copy");
+            document.body.removeChild(textarea);
+        }
+
+        alert("작업일지 내용을 복사했습니다.");
+    } catch (error) {
+        console.error(error);
+        alert("복사에 실패했습니다. 브라우저 권한을 확인해주세요.");
+    }
+};
+
 window.saveWorkLog = async () => {
     try {
         const timeInput = document.getElementById("workTime");

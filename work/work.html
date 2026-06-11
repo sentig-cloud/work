@@ -108,6 +108,7 @@
                         </div>
                         <div style="display:flex; gap:2px;">
                             <input type="text" id="taskNo" inputmode="numeric" class="m-input w95-in" style="flex:1; height:28px;" placeholder="Task 번호">
+                            <button type="button" id="workCopyBtn" class="w95-btn icon-btn" style="height:28px; padding:0 8px;" title="작업일지 내용 복사" onclick="window.copyWorkDraft()"><i class="fa-solid fa-copy"></i></button>
                             <input type="text" id="customerName" class="m-input w95-in" style="flex:1; height:28px;" placeholder="고객명">
                         </div>
                         <div style="display:flex; gap:2px;">
@@ -163,6 +164,7 @@
                 </div>
             </div>
             <div class="modal-footer" style="padding:4px; background:var(--w-gray); display:flex; gap:4px;">
+                <button type="button" id="workEditSaveBtn" class="w95-btn" style="display:none; flex:1; height:32px; font-weight:bold; color:#7c3aed;" onclick="window.saveWorkLog()">수정</button>
                 <button type="button" class="w95-btn" style="flex:1; height:32px; font-weight:bold; color:var(--w-blue);" onclick="window.saveWorkLog()">저장</button>
                 <button type="button" class="w95-btn" style="flex:1; height:32px; font-weight:bold; color:red;" onclick="window.closeWorkModal()">취소</button>
             </div>
