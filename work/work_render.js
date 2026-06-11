@@ -160,6 +160,15 @@ window.updateUI = () => {
     let mLogs = window.logs.filter(l => l && l.m === window.curMonth);
     let sumWorkEl = document.getElementById('popSumWork');
     if(sumWorkEl) sumWorkEl.innerText = mLogs.filter(l => l.cat === 'work').length; 
+    let commuteOtEl = document.getElementById('popCommuteOt');
+    if (commuteOtEl) {
+        const commuteOtMin = mLogs.reduce((sum, log) => {
+            if (!log || (log.cat !== 'commute_in' && log.cat !== 'commute_out')) return sum;
+            if (log.inException || log.outException) return sum;
+            return sum + (Number(log.overtimeMin) || 0);
+        }, 0);
+        commuteOtEl.innerText = `출퇴근 OT ${Math.floor(commuteOtMin / 60)}:${String(commuteOtMin % 60).padStart(2, '0')}`;
+    }
 };
 
 window.getLogCardHtml = (l, indexStr = '') => {

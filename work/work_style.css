@@ -74,8 +74,22 @@ html, body {
 
 .pop-nav { background: var(--w-gray); border-bottom: 2px solid var(--w-black); display: flex; align-items: center; padding: 8px 10px; flex-shrink: 0; justify-content: space-between; overflow-x: auto; white-space: nowrap; }
 .pop-title { font-weight: bold; font-size: 1.2rem; cursor: pointer; margin-left: 8px; margin-right: 15px; color: var(--w-black); }
-.pop-nav-stats { display: flex; gap: 12px; font-size: 0.9rem; color: var(--w-black); align-items: center; font-weight: bold; }
+.pop-nav-stats { display: flex; gap: 6px; font-size: 0.9rem; color: var(--w-black); align-items: center; font-weight: bold; }
 .pop-nav-stats b { color: var(--w-blue); font-size: 1rem; margin-left: 4px; }
+.pop-month-summary {
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+    line-height: 1.05;
+    max-height: 32px;
+}
+.pop-commute-ot {
+    color: #dc2626;
+    font-size: 0.68rem;
+    font-weight: 900;
+    letter-spacing: 0;
+}
 
 #popContentArea { flex: 1; display: flex; flex-direction: column; overflow: hidden; width: 100%; }
 
