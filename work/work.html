@@ -28,10 +28,6 @@
     
     <div class="month-grid" id="mainGrid"></div>
     
-    <div id="dashboardPanel" class="w95-out" style="background: var(--w-gray); padding:4px; display:flex; align-items:stretch; margin-bottom: 6px;">
-        <div id="dashboardStats" class="w95-in" style="flex: 1; padding: 6px; overflow-y: auto; font-size: 0.8rem; line-height: 1.5; background: var(--w-white);"></div>
-    </div>
-
     <div style="padding: 0 10px; display:flex; gap: 6px; align-items: stretch; flex-shrink: 0; margin-bottom: 8px;">
         <button type="button" class="w95-btn icon-btn" id="quickMicBtn" onclick="window.toggleMicFor(event, 'quickInput', 'quickMicBtn')" title="음성 인식"><i class="fa-solid fa-microphone"></i></button>
         <input type="text" id="quickInput" class="m-input w95-in" style="flex:1; margin:0; min-width:0;" placeholder="주소 / 전화번호 등 빠른 입력" autocomplete="nope" spellcheck="false" data-lpignore="true">

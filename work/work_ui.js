@@ -41,6 +41,7 @@ window.setupSwipeGesture = () => {
 window.setupFAB = () => {
     const fab = document.getElementById('fabToday');
     if (!fab) return;
+    const fabPositionKey = 'wm_fab_today_position';
 
     let isDragging = false;
     let isTouching = false;
@@ -51,6 +52,24 @@ window.setupFAB = () => {
     let startY = 0;
     let initialX = 0;
     let initialY = 0;
+
+    try {
+        const savedPosition = JSON.parse(localStorage.getItem(fabPositionKey) || 'null');
+        if (
+            savedPosition &&
+            Number.isFinite(savedPosition.left) &&
+            Number.isFinite(savedPosition.top)
+        ) {
+            const maxLeft = Math.max(0, window.innerWidth - fab.offsetWidth);
+            const maxTop = Math.max(0, window.innerHeight - fab.offsetHeight);
+            fab.style.left = `${Math.min(Math.max(0, savedPosition.left), maxLeft)}px`;
+            fab.style.top = `${Math.min(Math.max(0, savedPosition.top), maxTop)}px`;
+            fab.style.right = 'auto';
+            fab.style.bottom = 'auto';
+        }
+    } catch (error) {
+        localStorage.removeItem(fabPositionKey);
+    }
 
     const clearTodayPressTimer = () => {
         clearTimeout(todayPressTimer);
@@ -108,6 +127,11 @@ window.setupFAB = () => {
 
         if (!isDragging && !isTodayLongPress && (!e || e.type !== 'touchcancel')) {
             window.goToToday();
+        } else if (isDragging) {
+            localStorage.setItem(fabPositionKey, JSON.stringify({
+                left: fab.offsetLeft,
+                top: fab.offsetTop
+            }));
         }
 
         setTimeout(() => {

@@ -53,6 +53,9 @@ window.renderMain = () => {
 };
 
 window.updateDashboardStats = () => {
+    const dashboardStats = document.getElementById('dashboardStats');
+    if (!dashboardStats) return;
+
     let cwCounts = {}; let ttCounts = {}; let stCounts = {}; 
     
     window.logs.forEach(l => {
@@ -78,7 +81,7 @@ window.updateDashboardStats = () => {
         return `<span class="dashboard-tag" style="background:${bg}; border-color:${border}; color:${text};">${e[0]}: ${e[1]}</span>`;
     }).join(' ');
 
-    document.getElementById('dashboardStats').innerHTML = `
+    dashboardStats.innerHTML = `
         <div style="margin-bottom:6px; display:flex; flex-wrap:wrap; gap:4px; align-items:center;">
             <b style="color:#0f766e; margin-right:4px;">[상태]</b> ${stHtml || '<span style="color:#888; font-size:0.75rem;">기록 없음</span>'}
         </div>
