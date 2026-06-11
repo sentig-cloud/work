@@ -234,7 +234,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
     }
 
     if (l.cat === 'work') {
-        seqHtml = indexStr ? `<div class="log-seq" style="padding: 8px 12px 0 12px; font-size:1.1rem; color:red; font-weight:bold;">No.${indexStr} <span style="font-size:0.9rem; color:var(--w-black); font-weight:900;">[${l.taskType||'기본'}]</span></div>` : '';
+        seqHtml = indexStr ? `<div class="log-seq" style="padding: 8px 96px 0 12px; font-size:1.1rem; line-height:1.35; word-break:break-word; color:red; font-weight:bold;">No.${indexStr} <span style="font-size:0.9rem; color:var(--w-black); font-weight:900;">[${l.taskType||'기본'}]</span></div>` : '';
         
         let dutyBadge = l.isDuty ? `<span style="color:red; font-weight:bold; margin-right:4px;">[당직]</span>` : '';
         let statusBadge = l.status ? `<span style="background:var(--w-blue); color:white; padding:1px 4px; font-size:0.75rem; border-radius:2px; margin-right:4px;">${l.status}</span>` : '';
@@ -286,15 +286,47 @@ window.getLogCardHtml = (l, indexStr = '') => {
 
         let commuteNoteHtml = l.commuteNote ? `<div style="background:#fce7f3; color:#9d174d; padding:6px 8px; border-radius:4px; font-size:0.85rem; font-weight:bold; margin-top:8px; border:1px solid #f9a8d4; width:100%; box-sizing:border-box;"><i class="fa-solid fa-triangle-exclamation"></i> ${l.commuteNote}</div>` : '';
         
-        let kmText = l.km ? ` | 🚗 ${Number(l.km).toLocaleString()}km` : '';
+        const sameDayCommutes = (window.logs || []).filter((log) =>
+            log &&
+            log.y === l.y &&
+            log.m === l.m &&
+            log.d === l.d &&
+            (log.cat === 'commute_in' || log.cat === 'commute_out')
+        );
+        const inLog = sameDayCommutes.find((log) => log.cat === 'commute_in');
+        const outLog = sameDayCommutes.find((log) => log.cat === 'commute_out');
+        const currentKm = Number(l.km || 0);
+        const driveKm = inLog && outLog
+            ? Math.max(0, Number(outLog.km || 0) - Number(inLog.km || 0))
+            : 0;
+        const monthDriveKm = (window.logs || []).reduce((sum, log) => {
+            if (!log || log.cat !== 'commute_out' || log.y !== l.y || log.m !== l.m) return sum;
+            const dayInLog = (window.logs || []).find((item) =>
+                item &&
+                item.cat === 'commute_in' &&
+                item.y === log.y &&
+                item.m === log.m &&
+                item.d === log.d
+            );
+            if (!dayInLog) return sum;
+            return sum + Math.max(0, Number(log.km || 0) - Number(dayInLog.km || 0));
+        }, 0);
+        const kmSummaryHtml = currentKm
+            ? `<div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; font-size:0.82rem; font-weight:bold;">
+                    <span style="background:#fff; border:1px solid #f9a8d4; color:#9d174d; padding:2px 6px;">현재 ${currentKm.toLocaleString()}km</span>
+                    <span style="background:#fff; border:1px solid #f9a8d4; color:#9d174d; padding:2px 6px;">당일 ${driveKm.toLocaleString()}km</span>
+                    <span style="background:#fff; border:1px solid #f9a8d4; color:#9d174d; padding:2px 6px;">총 ${monthDriveKm.toLocaleString()}km</span>
+               </div>`
+            : '';
 
         workDetailsHtml = `
             <div class="card-content-zone" style="display:flex; flex-direction:column; padding: 10px 12px;">
                 <div style="display:flex; align-items:center;">
                     ${imgH}
                     <div style="flex:1;">
-                        <div style="font-weight:bold; color:${cColor}; font-size:1rem; margin-bottom:4px;"><i class="fa-solid ${cIcon}"></i> ${cTitle} ${kmText}</div>
+                        <div style="font-weight:bold; color:${cColor}; font-size:1rem; margin-bottom:4px;"><i class="fa-solid ${cIcon}"></i> ${cTitle}</div>
                         <div style="font-size:0.85rem; color:#475569;">시간: <b style="color:var(--w-blue);">${cTime||'-'}</b> ${otStr}</div>
+                        ${kmSummaryHtml}
                     </div>
                 </div>
                 ${commuteNoteHtml}

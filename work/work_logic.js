@@ -114,18 +114,30 @@ window.openSpecificMap = (appType) => {
     localStorage.setItem("wm_default_map", appType);
     window.closeMapAppModal();
 
+    const encodedAddress = encodeURIComponent(address);
     let url = "";
+    let fallbackUrl = "";
 
     if (appType === "tmap") {
-        url = `tmap://search?name=${encodeURIComponent(address)}`;
+        url = `tmap://search?name=${encodedAddress}`;
     } else if (appType === "naver") {
-        url = `nmap://search?query=${encodeURIComponent(address)}&appname=workmaster`;
+        url = `nmap://search?query=${encodedAddress}&appname=workmaster`;
     } else if (appType === "kakaomap") {
-        url = `kakaomap://search?q=${encodeURIComponent(address)}`;
+        url = `kakaomap://search?q=${encodedAddress}`;
+        fallbackUrl = `https://map.kakao.com/link/search/${encodedAddress}`;
     }
 
     if (url) {
+        const openedAt = Date.now();
         window.top.location.href = url;
+
+        if (fallbackUrl) {
+            setTimeout(() => {
+                if (Date.now() - openedAt < 1800 && !document.hidden) {
+                    window.top.location.href = fallbackUrl;
+                }
+            }, 1200);
+        }
     }
 };
 
@@ -493,7 +505,28 @@ window.doSearch = () => {
         );
     });
 
-    resultList.innerHTML = results.map((log) => window.getLogCardHtml(log)).join("");
+    const workIndexByDate = {};
+    (window.logs || [])
+        .filter((log) => log && log.cat === "work")
+        .sort((a, b) => {
+            const dateA = `${a.y || ""}-${String(a.m || "").padStart(2, "0")}-${String(a.d || "").padStart(2, "0")}`;
+            const dateB = `${b.y || ""}-${String(b.m || "").padStart(2, "0")}-${String(b.d || "").padStart(2, "0")}`;
+            if (dateA !== dateB) return dateA.localeCompare(dateB);
+            return String(a.workTime || a.time || "").localeCompare(String(b.workTime || b.time || ""));
+        })
+        .forEach((log) => {
+            const key = `${log.y}-${log.m}-${log.d}`;
+            workIndexByDate[key] = workIndexByDate[key] || {};
+            workIndexByDate[key][String(log.id)] = Object.keys(workIndexByDate[key]).length + 1;
+        });
+
+    resultList.innerHTML = results.map((log) => {
+        const key = `${log.y}-${log.m}-${log.d}`;
+        const indexStr = log.cat === "work" && workIndexByDate[key]
+            ? workIndexByDate[key][String(log.id)] || ""
+            : "";
+        return window.getLogCardHtml(log, indexStr);
+    }).join("");
 
     const counts = {
         work: 0,

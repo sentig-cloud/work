@@ -610,6 +610,7 @@
                 item.classList.remove("is-widget-selected", "is-section-selected");
             });
             window.saveWorkLayout();
+            window.applyWorkLayout();
         }
     };
 
@@ -795,6 +796,7 @@
         let dragGroup = null;
         let resizeCell = null;
         let resizeStart = null;
+        let pendingSelectCell = null;
         let pressOrigin = null;
         let timer = null;
 
@@ -806,8 +808,10 @@
 
         const start = (event) => {
             if (!window.isWorkLayoutMode) return;
+            clearTimeout(timer);
             const resizeHandle = event.target.closest(".widget-resize-handle");
             if (resizeHandle && modal.contains(resizeHandle)) {
+                pendingSelectCell = null;
                 resizeCell = resizeHandle.closest(".inner-layout-cell");
                 selectCell(resizeCell);
                 const point = event.touches ? event.touches[0] : event;
@@ -825,13 +829,14 @@
             }
             const cell = event.target.closest(".inner-layout-cell");
             if (!cell || !modal.contains(cell)) return;
-            selectCell(cell);
+            pendingSelectCell = cell;
             if (event.cancelable) event.preventDefault();
             const point = event.touches ? event.touches[0] : event;
             pressOrigin = { x: point.clientX, y: point.clientY };
             timer = setTimeout(() => {
                 dragCell = cell;
                 dragGroup = cell.parentElement;
+                selectCell(cell);
                 dragCell.classList.add("is-widget-dragging");
                 if (navigator.vibrate) navigator.vibrate(25);
             }, 350);
@@ -868,12 +873,16 @@
         const end = () => {
             clearTimeout(timer);
             modal.querySelectorAll(".is-widget-drop-target").forEach((item) => item.classList.remove("is-widget-drop-target"));
+            const movedWidget = !!dragCell;
+            const resizedWidget = !!resizeCell;
             if (dragCell) dragCell.classList.remove("is-widget-dragging");
             if (dragCell || resizeCell) window.saveWorkLayout();
+            if (pendingSelectCell && !movedWidget && !resizedWidget) selectCell(pendingSelectCell);
             dragCell = null;
             dragGroup = null;
             resizeCell = null;
             resizeStart = null;
+            pendingSelectCell = null;
             pressOrigin = null;
         };
 
