@@ -178,6 +178,7 @@ window.openWorkModal = (id = null) => {
     
     document.getElementById('workModal').style.display = 'flex'; 
     window.initWorkDragListeners(); 
+    if (window.setWorkEditLocked) window.setWorkEditLocked(!!id);
 };
 
 // 취소 버튼 누르면 깔끔하게 초기화 후 닫힘

@@ -238,8 +238,53 @@ window.copyWorkDraft = async () => {
     }
 };
 
+window.isWorkEditLocked = false;
+
+window.setWorkEditLocked = (locked) => {
+    window.isWorkEditLocked = !!locked;
+    const modal = document.getElementById("workModal");
+    if (modal) modal.classList.toggle("work-edit-locked", window.isWorkEditLocked);
+
+    const editButton = document.getElementById("workEditSaveBtn");
+    const saveButton = document.getElementById("workSaveBtn");
+
+    if (editButton) editButton.style.display = window.currentWorkId ? (window.isWorkEditLocked ? "block" : "none") : "none";
+    if (saveButton) saveButton.disabled = window.isWorkEditLocked;
+
+    const editableRoot = document.getElementById("workDragContainer");
+    if (!editableRoot) return;
+
+    editableRoot.querySelectorAll("input, textarea, select, button").forEach((element) => {
+        if (element.id === "workCopyBtn") {
+            element.disabled = false;
+            return;
+        }
+
+        if (element.matches("input[type='text'], input[type='date'], textarea")) {
+            element.readOnly = window.isWorkEditLocked;
+        }
+
+        if (element.matches("button, input[type='file']")) {
+            element.disabled = window.isWorkEditLocked;
+        }
+
+        element.classList.toggle("work-locked-control", window.isWorkEditLocked);
+    });
+};
+
+window.unlockWorkEdit = () => {
+    window.setWorkEditLocked(false);
+    const firstInput = document.getElementById("workContent") || document.getElementById("taskNo");
+    if (firstInput && firstInput.focus) firstInput.focus();
+};
+
 window.saveWorkLog = async () => {
     try {
+        if (window.isWorkEditLocked) {
+            alert("수정 버튼을 눌러 잠금을 해제한 뒤 저장해주세요.");
+            return;
+        }
+
         const timeInput = document.getElementById("workTime");
 
         if (timeInput) {

@@ -489,6 +489,7 @@
         cell.dataset.widgetRows = String(rows);
         cell.style.setProperty("--widget-cols", cols);
         cell.style.setProperty("--widget-rows", rows);
+        cell.style.minHeight = `calc((${rows} * 32px) + ((${rows} - 1) * 2px))`;
     };
 
     window.ensureInnerLayoutObjects = () => {
@@ -812,6 +813,8 @@
         let pendingSelectCell = null;
         let pressOrigin = null;
         let timer = null;
+        let resizeModeTimer = null;
+        let resizeHandleLongPressed = false;
 
         const selectCell = (cell) => {
             if (selectedCell && selectedCell !== cell) selectedCell.classList.remove("is-widget-selected");
@@ -822,6 +825,8 @@
         const start = (event) => {
             if (!window.isWorkLayoutMode) return;
             clearTimeout(timer);
+            clearTimeout(resizeModeTimer);
+            resizeHandleLongPressed = false;
             const resizeHandle = event.target.closest(".widget-resize-handle");
             if (resizeHandle && modal.contains(resizeHandle)) {
                 pendingSelectCell = null;
@@ -837,6 +842,18 @@
                     colWidth: Math.max(1, groupRect.width / 6),
                     rowHeight: 32
                 };
+                resizeModeTimer = setTimeout(() => {
+                    resizeHandleLongPressed = true;
+                    dragCell = resizeCell;
+                    dragGroup = resizeCell && resizeCell.parentElement;
+                    if (dragCell) {
+                        selectCell(dragCell);
+                        dragCell.classList.add("is-widget-dragging");
+                    }
+                    resizeCell = null;
+                    resizeStart = null;
+                    if (navigator.vibrate) navigator.vibrate(50);
+                }, 3000);
                 if (event.cancelable) event.preventDefault();
                 return;
             }
@@ -859,6 +876,9 @@
             const point = event.touches ? event.touches[0] : event;
             if (resizeCell && resizeStart) {
                 if (event.cancelable) event.preventDefault();
+                if (Math.hypot(point.clientX - resizeStart.x, point.clientY - resizeStart.y) > 8) {
+                    clearTimeout(resizeModeTimer);
+                }
                 const cols = resizeStart.cols + Math.round((point.clientX - resizeStart.x) / resizeStart.colWidth);
                 const rows = resizeStart.rows + Math.round((point.clientY - resizeStart.y) / resizeStart.rowHeight);
                 setWidgetSize(resizeCell, cols, rows);
@@ -885,9 +905,10 @@
 
         const end = () => {
             clearTimeout(timer);
+            clearTimeout(resizeModeTimer);
             modal.querySelectorAll(".is-widget-drop-target").forEach((item) => item.classList.remove("is-widget-drop-target"));
             const movedWidget = !!dragCell;
-            const resizedWidget = !!resizeCell;
+            const resizedWidget = !!resizeCell || resizeHandleLongPressed;
             if (dragCell) dragCell.classList.remove("is-widget-dragging");
             if (dragCell || resizeCell) window.saveWorkLayout();
             if (pendingSelectCell && !movedWidget && !resizedWidget) selectCell(pendingSelectCell);
@@ -895,6 +916,7 @@
             dragGroup = null;
             resizeCell = null;
             resizeStart = null;
+            resizeHandleLongPressed = false;
             pendingSelectCell = null;
             pressOrigin = null;
         };

@@ -199,7 +199,7 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
 .drag-item p, .drag-item div { margin: 0; line-height: normal; }
 
 .drag-handle {
-    position: absolute; right: 8%; bottom: -5px; width: 38px; height: 24px;
+    position: absolute; right: 8%; bottom: -16px; width: 38px; height: 22px;
     display: flex; align-items: center; justify-content: center; cursor: grab; z-index: 10;
     touch-action: none;
     opacity: 0.34;
@@ -235,17 +235,29 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
     border: 1px solid #d97706;
 }
 .layout-edit-mode .layout-tag-button { cursor: pointer; }
+.work-edit-locked #workDragContainer {
+    filter: saturate(0.82);
+}
+.work-edit-locked .work-locked-control {
+    cursor: not-allowed;
+}
+.work-edit-locked input[readonly],
+.work-edit-locked textarea[readonly] {
+    background: #e2e8f0 !important;
+    color: #475569 !important;
+}
 .inner-layout-group {
     display: grid;
     grid-template-columns: repeat(6, minmax(0, 1fr));
     grid-auto-flow: row dense;
-    grid-auto-rows: minmax(28px, auto);
+    grid-auto-rows: 32px;
     gap: 2px;
 }
 .inner-layout-cell {
     position: relative;
     display: flex;
     min-width: 0;
+    min-height: calc((var(--widget-rows, 1) * 32px) + ((var(--widget-rows, 1) - 1) * 2px));
     grid-column: span var(--widget-cols, 1);
     grid-row: span var(--widget-rows, 1);
 }
@@ -255,6 +267,7 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
 .inner-layout-cell > div {
     flex: 1;
     width: 100%;
+    min-height: 100%;
 }
 .inner-move-handle {
     display: none;
