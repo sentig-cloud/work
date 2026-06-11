@@ -243,7 +243,10 @@ window.isWorkEditLocked = false;
 window.setWorkEditLocked = (locked) => {
     window.isWorkEditLocked = !!locked;
     const modal = document.getElementById("workModal");
-    if (modal) modal.classList.toggle("work-edit-locked", window.isWorkEditLocked);
+    if (modal) {
+        modal.classList.toggle("work-edit-locked", window.isWorkEditLocked);
+        modal.classList.toggle("work-new-mode", !window.currentWorkId);
+    }
 
     const editButton = document.getElementById("workEditSaveBtn");
     const saveButton = document.getElementById("workSaveBtn");

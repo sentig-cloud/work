@@ -166,11 +166,13 @@ window.setupFAB = () => {
 };
 
 window.startPress = (e, type, index) => {
+    if (window.isWorkEditLocked) return;
     if(e) e.preventDefault(); window.isLongPress = false;
     window.pressTimer = setTimeout(() => { window.isLongPress = true; window.handleLongPress(type, index); }, 600);
 };
 
 window.endPress = (e, type, index) => {
+    if (window.isWorkEditLocked) return;
     if(e) e.preventDefault(); clearTimeout(window.pressTimer);
     if (!window.isLongPress) { let now = Date.now(); if (now - window.lastClickTime < 300) return; window.lastClickTime = now; window.handleClick(type, index); }
     window.isLongPress = false;
@@ -179,6 +181,7 @@ window.endPress = (e, type, index) => {
 window.cancelPress = () => { clearTimeout(window.pressTimer); window.isLongPress = false; };
 
 window.handleLongPress = (type, index) => {
+    if (window.isWorkEditLocked) return;
     window.editingTagType = type; window.editingTagIndex = index;
     let arr = type === 'task' ? window.taskTypes : (type === 'coworker' ? window.coworkers : (type === 'equip' ? window.equipments : window.statuses));
     let tagName = arr[index].name; 

@@ -143,6 +143,7 @@
     window.handleLongPress = (type, index) => window.openTagEditBox(type, index);
 
     window.handleClick = (type, index) => {
+        if (window.isWorkEditLocked) return;
         const tag = getTagArray(type)[index];
         if (!tag) return;
         if (document.activeElement && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) document.activeElement.blur();
@@ -770,10 +771,12 @@
     const originalEndPress = window.endPress;
     const originalCancelPress = window.cancelPress;
     window.startPress = (...args) => {
+        if (window.isWorkEditLocked) return;
         if (window.isWorkLayoutMode) return;
         return originalStartPress(...args);
     };
     window.endPress = (...args) => {
+        if (window.isWorkEditLocked) return;
         if (window.isWorkLayoutMode) return;
         return originalEndPress(...args);
     };
@@ -810,6 +813,8 @@
         let dragGroup = null;
         let resizeCell = null;
         let resizeStart = null;
+        let pendingResizeCell = null;
+        let pendingResizeStart = null;
         let pendingSelectCell = null;
         let pressOrigin = null;
         let timer = null;
@@ -827,33 +832,35 @@
             clearTimeout(timer);
             clearTimeout(resizeModeTimer);
             resizeHandleLongPressed = false;
+            pendingResizeCell = null;
+            pendingResizeStart = null;
             const resizeHandle = event.target.closest(".widget-resize-handle");
             if (resizeHandle && modal.contains(resizeHandle)) {
                 pendingSelectCell = null;
-                resizeCell = resizeHandle.closest(".inner-layout-cell");
-                selectCell(resizeCell);
+                pendingResizeCell = resizeHandle.closest(".inner-layout-cell");
+                selectCell(pendingResizeCell);
                 const point = event.touches ? event.touches[0] : event;
-                const groupRect = resizeCell.parentElement.getBoundingClientRect();
-                resizeStart = {
+                const groupRect = pendingResizeCell.parentElement.getBoundingClientRect();
+                pendingResizeStart = {
                     x: point.clientX,
                     y: point.clientY,
-                    cols: Number(resizeCell.dataset.widgetCols) || 1,
-                    rows: Number(resizeCell.dataset.widgetRows) || 1,
+                    cols: Number(pendingResizeCell.dataset.widgetCols) || 1,
+                    rows: Number(pendingResizeCell.dataset.widgetRows) || 1,
                     colWidth: Math.max(1, groupRect.width / 6),
                     rowHeight: 32
                 };
                 resizeModeTimer = setTimeout(() => {
                     resizeHandleLongPressed = true;
-                    dragCell = resizeCell;
-                    dragGroup = resizeCell && resizeCell.parentElement;
+                    dragCell = pendingResizeCell;
+                    dragGroup = pendingResizeCell && pendingResizeCell.parentElement;
                     if (dragCell) {
                         selectCell(dragCell);
                         dragCell.classList.add("is-widget-dragging");
                     }
-                    resizeCell = null;
-                    resizeStart = null;
+                    pendingResizeCell = null;
+                    pendingResizeStart = null;
                     if (navigator.vibrate) navigator.vibrate(50);
-                }, 3000);
+                }, 1500);
                 if (event.cancelable) event.preventDefault();
                 return;
             }
@@ -874,11 +881,24 @@
 
         const move = (event) => {
             const point = event.touches ? event.touches[0] : event;
+            if (pendingResizeCell && pendingResizeStart) {
+                if (event.cancelable) event.preventDefault();
+                const distance = Math.hypot(point.clientX - pendingResizeStart.x, point.clientY - pendingResizeStart.y);
+                if (resizeHandleLongPressed) {
+                    pendingResizeCell = null;
+                    pendingResizeStart = null;
+                } else if (distance > 10) {
+                    clearTimeout(resizeModeTimer);
+                    resizeCell = pendingResizeCell;
+                    resizeStart = pendingResizeStart;
+                    pendingResizeCell = null;
+                    pendingResizeStart = null;
+                } else {
+                    return;
+                }
+            }
             if (resizeCell && resizeStart) {
                 if (event.cancelable) event.preventDefault();
-                if (Math.hypot(point.clientX - resizeStart.x, point.clientY - resizeStart.y) > 8) {
-                    clearTimeout(resizeModeTimer);
-                }
                 const cols = resizeStart.cols + Math.round((point.clientX - resizeStart.x) / resizeStart.colWidth);
                 const rows = resizeStart.rows + Math.round((point.clientY - resizeStart.y) / resizeStart.rowHeight);
                 setWidgetSize(resizeCell, cols, rows);
@@ -916,6 +936,8 @@
             dragGroup = null;
             resizeCell = null;
             resizeStart = null;
+            pendingResizeCell = null;
+            pendingResizeStart = null;
             resizeHandleLongPressed = false;
             pendingSelectCell = null;
             pressOrigin = null;

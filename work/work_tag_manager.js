@@ -236,6 +236,7 @@ window.addNewType = (type) => {
 };
 
 window.toggleTagSelection = (type, name) => {
+    if (window.isWorkEditLocked) return;
     if(type !== 'memoTag') return;
 
     if(window.editingLogId &&
@@ -255,6 +256,7 @@ window.toggleTagSelection = (type, name) => {
 };
 
 window.openTagEditBox = (type, index) => {
+    if (window.isWorkEditLocked) return;
     const arr = window.getTagArray(type);
     const tag = arr && arr[index];
 
