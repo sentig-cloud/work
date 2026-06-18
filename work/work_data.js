@@ -90,6 +90,7 @@ window.currentCommuteType = null;
 window.isCommuteException = false;
 window.calculatedOvertimeMin = 0;
 window.tempCommuteImg = null;
+window.tempCommuteOriginalName = "";
 window.isWorkDuty = false;
 
 // work_data.js 맨 아래에 추가

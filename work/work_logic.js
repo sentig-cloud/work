@@ -153,6 +153,7 @@ window.saveGeneralEntry = async () => {
     const finalImgs = window.tempImgs.map((img) => ({
         id: img.id,
         src: img.src,
+        originalName: img.originalName || "",
         updatedAt: img.updatedAt || now
     }));
 
@@ -792,9 +793,66 @@ window.downloadViewerImage = async () => {
         const sourcePath = String(image.src).split("?")[0];
         const sourceMatch = sourcePath.match(/\.([a-zA-Z0-9]{2,5})$/);
         const extension = mimeExtension[blob.type] || (sourceMatch ? sourceMatch[1].toLowerCase() : "jpg");
-        const imageId = String(image.id || `photo_${window.currentViewerIndex + 1}`)
-            .replace(/[\\/:*?"<>|]/g, "_");
-        const fileName = `${imageId}.${extension}`;
+        const sourceFileName = (() => {
+            if (String(image.src).startsWith("data:")) return "";
+            try {
+                const pathname = new URL(image.src, window.location.href).pathname;
+                return decodeURIComponent(pathname.split("/").pop() || "");
+            } catch (error) {
+                return "";
+            }
+        })();
+        const now = new Date();
+        const generatedName =
+            `photo_${now.getFullYear()}` +
+            `${String(now.getMonth() + 1).padStart(2, "0")}` +
+            `${String(now.getDate()).padStart(2, "0")}_` +
+            `${String(now.getHours()).padStart(2, "0")}` +
+            `${String(now.getMinutes()).padStart(2, "0")}` +
+            `${String(now.getSeconds()).padStart(2, "0")}`;
+        const preferredName =
+            image.originalName ||
+            image.fileName ||
+            image.name ||
+            sourceFileName ||
+            image.id ||
+            generatedName;
+        const preferredWithoutExtension = String(preferredName)
+            .replace(/\.[a-zA-Z0-9]{2,5}$/i, "")
+            .replace(/[\\/:*?"<>|]/g, "_")
+            .trim() || generatedName;
+        const defaultFileName = `${preferredWithoutExtension}.${extension}`;
+
+        if (window.showSaveFilePicker) {
+            try {
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: defaultFileName,
+                    types: [{
+                        description: "사진",
+                        accept: {
+                            [blob.type || "image/jpeg"]: [`.${extension}`]
+                        }
+                    }]
+                });
+                const writable = await handle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+                return;
+            } catch (error) {
+                if (error.name === "AbortError") return;
+                console.warn("파일 저장 창 사용 실패:", error);
+            }
+        }
+
+        const requestedName = prompt("저장할 파일명을 입력하세요.", defaultFileName);
+        if (!requestedName) return;
+        const safeRequestedName = String(requestedName)
+            .replace(/[\\/:*?"<>|]/g, "_")
+            .trim();
+        if (!safeRequestedName) return;
+        const fileName = /\.[a-zA-Z0-9]{2,5}$/i.test(safeRequestedName)
+            ? safeRequestedName
+            : `${safeRequestedName}.${extension}`;
         const objectUrl = URL.createObjectURL(blob);
         const link = document.createElement("a");
 
@@ -956,6 +1014,7 @@ window.handleGeneralFiles = (input) => {
                 window.tempImgs.push({
                     id: `img_${Date.now()}_${Math.random()}`,
                     src: dataUrl,
+                    originalName: file.name || "",
                     updatedAt: new Date().toISOString()
                 });
             }
@@ -999,6 +1058,7 @@ window.handleWorkFiles = (input) => {
                 window.workImgs.push({
                     id: `w_${Date.now()}_${Math.random()}`,
                     src: dataUrl,
+                    originalName: file.name || "",
                     updatedAt: new Date().toISOString()
                 });
             }
@@ -1044,6 +1104,7 @@ window.addFilesToEdit = (input) => {
                 log.imgs.push({
                     id: `e_${Date.now()}_${Math.random()}`,
                     src: dataUrl,
+                    originalName: file.name || "",
                     updatedAt: new Date().toISOString()
                 });
 

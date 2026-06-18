@@ -24,6 +24,7 @@ window.handleCommuteFile = async (input) => {
     window.safeProcessImage(file, (dataUrl) => {
         if (dataUrl) {
             window.tempCommuteImg = dataUrl;
+            window.tempCommuteOriginalName = file.name || "";
 
             document.getElementById("commuteNoPhotoText").style.display = "none";
 
@@ -70,6 +71,7 @@ window.removeCommuteImg = (event) => {
     }
 
     window.tempCommuteImg = null;
+    window.tempCommuteOriginalName = "";
 
     document.getElementById("commuteNoPhotoText").style.display = "block";
     document.getElementById("commuteImgPreview").style.display = "none";
@@ -350,6 +352,10 @@ window.saveCommute = () => {
                         ? previousImage.id
                         : `c_${Date.now()}`,
                 src: window.tempCommuteImg,
+                originalName:
+                    window.tempCommuteOriginalName ||
+                    previousImage?.originalName ||
+                    "",
                 updatedAt: now
             }
         ];

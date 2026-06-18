@@ -168,7 +168,12 @@ window.updateUI = () => {
         l.m === window.curMonth
     );
     let sumWorkEl = document.getElementById('popSumWork');
-    if(sumWorkEl) sumWorkEl.innerText = mLogs.filter(l => l.cat === 'work').length; 
+    const monthWorkLogs = mLogs.filter(l => l.cat === 'work');
+    if(sumWorkEl) sumWorkEl.innerText = monthWorkLogs.length;
+    const completedWorkEl = document.getElementById('popCompletedWork');
+    if (completedWorkEl) {
+        completedWorkEl.innerText = monthWorkLogs.filter(l => l.status === '완료').length;
+    }
     let commuteOtEl = document.getElementById('popCommuteOt');
     if (commuteOtEl) {
         const commuteOtMin = mLogs.reduce((sum, log) => {

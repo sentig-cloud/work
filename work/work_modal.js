@@ -253,7 +253,7 @@ window.initWorkDragListeners = () => {
 };
 
 window.openCommuteModal = (type) => { /* 출퇴근 모달 (기존 코드 생략 없이 완전 구동) */
-    window.currentCommuteType = type; window.isCommuteException = false; window.calculatedOvertimeMin = 0; window.tempCommuteImg = null;
+    window.currentCommuteType = type; window.isCommuteException = false; window.calculatedOvertimeMin = 0; window.tempCommuteImg = null; window.tempCommuteOriginalName = "";
     if(window.removeCommuteImg) window.removeCommuteImg();
     
     let lastKm = '';
@@ -284,6 +284,7 @@ window.openCommuteModal = (type) => { /* 출퇴근 모달 (기존 코드 생략 
         document.getElementById('commuteNote').value = existingLog.commuteNote || '';
         if (existingLog.imgs && existingLog.imgs.length > 0) {
             window.tempCommuteImg = existingLog.imgs[0].src;
+            window.tempCommuteOriginalName = existingLog.imgs[0].originalName || "";
             document.getElementById('commuteNoPhotoText').style.display = 'none';
             const preview = document.getElementById('commuteImgPreview'); preview.style.display = 'block'; preview.src = window.tempCommuteImg;
             document.getElementById('commuteImgDelBtn').style.display = 'block';

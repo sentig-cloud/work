@@ -190,9 +190,9 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
 .photo-item img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; }
 .remove-img-btn { position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; font-size: 12px; padding: 0; z-index: 10;}
 
-#imageViewer { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--w-bg); z-index: 3000; flex-direction: column; }
-#viewerImgArea { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; padding: 10px;}
-#viewerImg { max-width: 100%; max-height: 100%; object-fit: contain; cursor: crosshair; border: 2px solid var(--w-black);}
+#imageViewer { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 3000; flex-direction: column; }
+#viewerImgArea { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; padding: 2px;}
+#viewerImg { width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain; cursor: crosshair; border: 0;}
 .viewer-toolbar { background: var(--w-gray); border-top: 2px solid var(--w-white); padding: 10px; display: flex; justify-content: space-between; gap: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
 
 #tagInputBox { display: none; position: absolute; z-index: 3100; background: var(--w-gray); padding: 5px; border: 2px solid; border-color: var(--w-white) var(--w-black) var(--w-black) var(--w-white); box-shadow: 2px 2px 5px rgba(0,0,0,0.5); }
