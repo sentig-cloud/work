@@ -802,20 +802,34 @@ window.downloadViewerImage = async () => {
                 return "";
             }
         })();
-        const now = new Date();
+        const photoDate = image.updatedAt && !Number.isNaN(Date.parse(image.updatedAt))
+            ? new Date(image.updatedAt)
+            : new Date();
         const generatedName =
-            `photo_${now.getFullYear()}` +
-            `${String(now.getMonth() + 1).padStart(2, "0")}` +
-            `${String(now.getDate()).padStart(2, "0")}_` +
-            `${String(now.getHours()).padStart(2, "0")}` +
-            `${String(now.getMinutes()).padStart(2, "0")}` +
-            `${String(now.getSeconds()).padStart(2, "0")}`;
+            `photo_${photoDate.getFullYear()}` +
+            `${String(photoDate.getMonth() + 1).padStart(2, "0")}` +
+            `${String(photoDate.getDate()).padStart(2, "0")}_` +
+            `${String(photoDate.getHours()).padStart(2, "0")}` +
+            `${String(photoDate.getMinutes()).padStart(2, "0")}` +
+            `${String(photoDate.getSeconds()).padStart(2, "0")}`;
+        const isGenericImageName = (value) => {
+            const baseName = String(value || "")
+                .split(/[\\/]/)
+                .pop()
+                .replace(/\.[a-zA-Z0-9]{2,5}$/i, "")
+                .toLowerCase();
+            return !baseName ||
+                /^(image|photo|picture|download|blob|file)([_-]?\d+)?$/.test(baseName) ||
+                /^(img|w|e|c)_\d+/.test(baseName);
+        };
+        const candidates = [
+            image.originalName,
+            image.fileName,
+            image.name,
+            sourceFileName
+        ];
         const preferredName =
-            image.originalName ||
-            image.fileName ||
-            image.name ||
-            sourceFileName ||
-            image.id ||
+            candidates.find((value) => value && !isGenericImageName(value)) ||
             generatedName;
         const preferredWithoutExtension = String(preferredName)
             .replace(/\.[a-zA-Z0-9]{2,5}$/i, "")
