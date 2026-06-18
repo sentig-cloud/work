@@ -793,54 +793,14 @@ window.downloadViewerImage = async () => {
         const sourcePath = String(image.src).split("?")[0];
         const sourceMatch = sourcePath.match(/\.([a-zA-Z0-9]{2,5})$/);
         const extension = mimeExtension[blob.type] || (sourceMatch ? sourceMatch[1].toLowerCase() : "jpg");
-        const sourceFileName = (() => {
-            if (String(image.src).startsWith("data:")) return "";
-            try {
-                const pathname = new URL(image.src, window.location.href).pathname;
-                return decodeURIComponent(pathname.split("/").pop() || "");
-            } catch (error) {
-                return "";
-            }
-        })();
-        const photoDate = image.updatedAt && !Number.isNaN(Date.parse(image.updatedAt))
-            ? new Date(image.updatedAt)
-            : new Date();
-        const generatedName =
-            `photo_${photoDate.getFullYear()}` +
-            `${String(photoDate.getMonth() + 1).padStart(2, "0")}` +
-            `${String(photoDate.getDate()).padStart(2, "0")}_` +
-            `${String(photoDate.getHours()).padStart(2, "0")}` +
-            `${String(photoDate.getMinutes()).padStart(2, "0")}` +
-            `${String(photoDate.getSeconds()).padStart(2, "0")}`;
-        const isGenericImageName = (value) => {
-            const baseName = String(value || "")
-                .split(/[\\/]/)
-                .pop()
-                .replace(/\.[a-zA-Z0-9]{2,5}$/i, "")
-                .toLowerCase();
-            return !baseName ||
-                /^(image|photo|picture|download|blob|file)([_-]?\d+)?$/.test(baseName) ||
-                /^(img|w|e|c)_\d+/.test(baseName);
-        };
-        const candidates = [
-            image.originalName,
-            image.fileName,
-            image.name,
-            sourceFileName
-        ];
-        const preferredName =
-            candidates.find((value) => value && !isGenericImageName(value)) ||
-            generatedName;
-        const preferredWithoutExtension = String(preferredName)
-            .replace(/\.[a-zA-Z0-9]{2,5}$/i, "")
-            .replace(/[\\/:*?"<>|]/g, "_")
-            .trim() || generatedName;
-        const defaultFileName = `${preferredWithoutExtension}.${extension}`;
+        const defaultBaseName = "image";
+        const defaultFileName = `${defaultBaseName}.${extension}`;
 
         if (window.showSaveFilePicker) {
             try {
                 const handle = await window.showSaveFilePicker({
                     suggestedName: defaultFileName,
+                    excludeAcceptAllOption: true,
                     types: [{
                         description: "사진",
                         accept: {
@@ -858,15 +818,17 @@ window.downloadViewerImage = async () => {
             }
         }
 
-        const requestedName = prompt("저장할 파일명을 입력하세요.", defaultFileName);
+        const requestedName = prompt(
+            `저장할 파일명을 입력하세요. 확장자 .${extension}는 자동으로 붙습니다.`,
+            defaultBaseName
+        );
         if (!requestedName) return;
         const safeRequestedName = String(requestedName)
+            .replace(/\.[a-zA-Z0-9]{2,5}$/i, "")
             .replace(/[\\/:*?"<>|]/g, "_")
             .trim();
         if (!safeRequestedName) return;
-        const fileName = /\.[a-zA-Z0-9]{2,5}$/i.test(safeRequestedName)
-            ? safeRequestedName
-            : `${safeRequestedName}.${extension}`;
+        const fileName = `${safeRequestedName}.${extension}`;
         const objectUrl = URL.createObjectURL(blob);
         const link = document.createElement("a");
 
