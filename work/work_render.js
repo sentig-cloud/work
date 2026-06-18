@@ -102,7 +102,7 @@ window.renderCal = (year, month) => {
     
     for(let d=1; d<=last; d++) {
         let ds = `${year}${String(month+1).padStart(2,'0')}${String(d).padStart(2,'0')}`;
-        let dayLogs = window.logs.filter(l => l && l.m === window.curMonth && l.d === d);
+        let dayLogs = window.logs.filter(l => l && l.y === year && l.m === month + 1 && l.d === d);
         let dayOfWeek = new Date(year, month, d).getDay();
         
         let isHoliday = window.holidays[ds] || dayOfWeek === 0;
@@ -149,7 +149,12 @@ window.renderCal = (year, month) => {
 
 window.updateUI = () => {
     const list = document.getElementById('logList');
-    const dayLogs = window.logs.filter(l => l && l.m === window.curMonth && l.d === window.curDay).sort((a,b) => {
+    const dayLogs = window.logs.filter(l =>
+        l &&
+        l.y === window.currentYear &&
+        l.m === window.curMonth &&
+        l.d === window.curDay
+    ).sort((a,b) => {
         let ta = a.workTime || a.time || ''; let tb = b.workTime || b.time || '';
         return ta.localeCompare(tb);
     });
@@ -157,7 +162,11 @@ window.updateUI = () => {
     let workIndex = 1;
     list.innerHTML = dayLogs.map(l => window.getLogCardHtml(l, l.cat === 'work' ? workIndex++ : '')).join('');
 
-    let mLogs = window.logs.filter(l => l && l.m === window.curMonth);
+    let mLogs = window.logs.filter(l =>
+        l &&
+        l.y === window.currentYear &&
+        l.m === window.curMonth
+    );
     let sumWorkEl = document.getElementById('popSumWork');
     if(sumWorkEl) sumWorkEl.innerText = mLogs.filter(l => l.cat === 'work').length; 
     let commuteOtEl = document.getElementById('popCommuteOt');
@@ -167,7 +176,7 @@ window.updateUI = () => {
             if (log.inException || log.outException) return sum;
             return sum + (Number(log.overtimeMin) || 0);
         }, 0);
-        commuteOtEl.innerText = `출퇴근 OT ${Math.floor(commuteOtMin / 60)}:${String(commuteOtMin % 60).padStart(2, '0')}`;
+        commuteOtEl.innerText = `출퇴근 초과 ${Math.floor(commuteOtMin / 60)}시 ${commuteOtMin % 60}분`;
     }
 };
 
@@ -371,6 +380,70 @@ window.getLogCardHtml = (l, indexStr = '') => {
             ${bottomTimeHtml}
         </div>` : ''}
     </div>`;
+};
+
+window.renderTrash = () => {
+    const list = document.getElementById('trashList');
+    if (!list) return;
+
+    const escapeHtml = (value) => String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+    const items = [...(window.trash || [])]
+        .filter(Boolean)
+        .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+
+    if (items.length === 0) {
+        list.innerHTML = '<div style="padding:24px; text-align:center; color:#64748b; font-weight:bold;">휴지통이 비어 있습니다.</div>';
+        return;
+    }
+
+    const categoryNames = {
+        work: '작업일지',
+        memo: '메모',
+        photo: '사진',
+        commute_in: '출근',
+        commute_out: '퇴근'
+    };
+
+    list.innerHTML = items.map((log) => {
+        const encodedId = encodeURIComponent(String(log.id));
+        const title = categoryNames[log.cat] || log.cat || '기록';
+        const summary =
+            log.content ||
+            log.memo ||
+            log.commuteNote ||
+            log.address ||
+            '내용 없음';
+        const thumbnail = log.imgs && log.imgs[0] && log.imgs[0].src
+            ? `<img src="${escapeHtml(log.imgs[0].src)}" alt="" style="width:48px; height:48px; object-fit:cover; border:1px solid #94a3b8; flex-shrink:0;">`
+            : '';
+
+        return `
+            <div class="w95-out" style="margin-bottom:8px; padding:8px; background:#fff;">
+                <div style="display:flex; gap:8px; align-items:flex-start;">
+                    ${thumbnail}
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-weight:bold; color:var(--w-blue);">
+                            ${escapeHtml(`${log.y || '-'}년 ${log.m || '-'}월 ${log.d || '-'}일 · ${title}`)}
+                        </div>
+                        <div style="margin-top:4px; color:#475569; font-size:0.85rem; white-space:pre-wrap; word-break:break-word;">
+                            ${escapeHtml(summary)}
+                        </div>
+                    </div>
+                </div>
+                <div style="display:flex; gap:6px; margin-top:8px;">
+                    <button type="button" class="w95-btn" style="flex:1; color:var(--w-blue); font-weight:bold;"
+                        onclick="window.restoreLog(decodeURIComponent('${encodedId}'))">복원</button>
+                    <button type="button" class="w95-btn" style="flex:1; color:#dc2626; font-weight:bold;"
+                        onclick="window.deleteTrashPermanently(decodeURIComponent('${encodedId}'))">영구 삭제</button>
+                </div>
+            </div>`;
+    }).join('');
 };
 
 window.renderEquips = () => {

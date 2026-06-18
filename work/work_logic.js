@@ -456,6 +456,21 @@ window.deleteEntry = async (id) => {
     }
 };
 
+window.deleteTrashPermanently = (id) => {
+    const item = (window.trash || []).find(
+        (log) => String(log.id) === String(id)
+    );
+
+    if (!item) return;
+    if (!confirm("이 항목을 영구 삭제하시겠습니까? 복원할 수 없습니다.")) return;
+
+    window.deleteFromLocalStore("trash", id);
+
+    if (window.renderTrash) {
+        window.renderTrash();
+    }
+};
+
 window.handleSelectChange = (selectElement) => {
     if (selectElement.id === "searchMonth") {
         const selectedMonth = selectElement.value
@@ -745,6 +760,55 @@ window.changeViewerImage = (direction) => {
             window.currentViewerMode,
             window.currentViewerRefId
         );
+    }
+};
+
+window.downloadViewerImage = async () => {
+    const image =
+        window.currentViewerImages &&
+        window.currentViewerImages[window.currentViewerIndex];
+
+    if (!image || !image.src) {
+        alert("다운로드할 사진이 없습니다.");
+        return;
+    }
+
+    const downloadButton = document.getElementById("downloadImgBtn");
+    if (downloadButton) downloadButton.disabled = true;
+
+    try {
+        const response = await fetch(image.src);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const blob = await response.blob();
+        const mimeExtension = {
+            "image/jpeg": "jpg",
+            "image/png": "png",
+            "image/webp": "webp",
+            "image/gif": "gif",
+            "image/heic": "heic",
+            "image/heif": "heif"
+        };
+        const sourcePath = String(image.src).split("?")[0];
+        const sourceMatch = sourcePath.match(/\.([a-zA-Z0-9]{2,5})$/);
+        const extension = mimeExtension[blob.type] || (sourceMatch ? sourceMatch[1].toLowerCase() : "jpg");
+        const imageId = String(image.id || `photo_${window.currentViewerIndex + 1}`)
+            .replace(/[\\/:*?"<>|]/g, "_");
+        const fileName = `${imageId}.${extension}`;
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+
+        link.href = objectUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    } catch (error) {
+        console.error("사진 다운로드 실패:", error);
+        alert("사진 다운로드에 실패했습니다. 저장소의 다운로드 권한을 확인해주세요.");
+    } finally {
+        if (downloadButton) downloadButton.disabled = false;
     }
 };
 

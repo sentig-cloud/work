@@ -49,7 +49,7 @@
             <div class="pop-nav-stats">
                 <span class="pop-month-summary">
                     <span>📋 <b id="popSumWork">0</b>건</span>
-                    <span id="popCommuteOt" class="pop-commute-ot">출퇴근 OT 0:00</span>
+                    <span id="popCommuteOt" class="pop-commute-ot">출퇴근 초과 0시 0분</span>
                 </span>
                 <button type="button" class="w95-btn icon-btn" onclick="window.openSearch()" style="margin-left: 8px;"><i class="fa-solid fa-magnifying-glass"></i></button>
             </div>
@@ -309,7 +309,10 @@
     <div id="imageViewer">
         <div class="viewer-toolbar">
             <button type="button" class="w95-btn" onclick="window.closeImageViewer()">닫기</button>
-            <button type="button" class="w95-btn" id="deleteImgBtn" style="color:red; display:none;" onclick="window.deleteViewerImage()">사진 삭제</button>
+            <div style="display:flex; gap:6px;">
+                <button type="button" class="w95-btn" id="downloadImgBtn" onclick="window.downloadViewerImage()"><i class="fa-solid fa-download"></i> 다운로드</button>
+                <button type="button" class="w95-btn" id="deleteImgBtn" style="color:red; display:none;" onclick="window.deleteViewerImage()">사진 삭제</button>
+            </div>
         </div>
         <div id="viewerImgArea">
             <button type="button" onclick="window.changeViewerImage(-1)" style="position:absolute; left:0; top:50%; transform:translateY(-50%); height:100%; width:80px; background:transparent; border:none; color:white; font-size:2rem; z-index:3100; opacity:0.6;"><i class="fa-solid fa-chevron-left"></i></button>
