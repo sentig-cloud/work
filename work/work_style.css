@@ -265,8 +265,7 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
 }
 .block-move-handle:active { cursor: grabbing; }
 .drag-item.is-block-selected .block-move-handle { display: flex; }
-/* 레이아웃 모드에서는 항상 표시 */
-.layout-edit-mode .drag-item .block-move-handle { display: flex; }
+
 
 /* 리사이즈 핸들 [/] - 블록 우측 하단 */
 .block-resize-handle {
@@ -291,7 +290,7 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
     user-select: none;
 }
 .drag-item.is-block-selected .block-resize-handle { display: flex; }
-.layout-edit-mode .drag-item .block-resize-handle { display: flex; }
+
 
 /* 선택 해제 버튼 - 블록 우측 상단 */
 .block-deselect-btn {
@@ -314,7 +313,7 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
     user-select: none;
 }
 .drag-item.is-block-selected .block-deselect-btn { display: flex; }
-.layout-edit-mode .drag-item .block-deselect-btn { display: flex; }
+
 
 /* ─── 그룹 컨테이너 블록 ─── */
 .drag-item.is-group-block {
@@ -556,4 +555,103 @@ input, textarea, [contenteditable="true"] {
     display: none; /* v2에서는 block-move-handle로 대체 */
     align-items: center; justify-content: center; cursor: grab; z-index: 10;
     touch-action: none; opacity: 0.34;
+}
+
+/* ─── 블록 조작 패널 (탭 시 오버레이로 표시) ─── */
+.block-action-panel {
+    display: none;
+    position: fixed;
+    z-index: 9000;
+    background: rgba(30, 30, 30, 0.95);
+    border: 2px solid #f59e0b;
+    border-radius: 10px;
+    padding: 8px 6px;
+    gap: 8px;
+    flex-direction: column;
+    align-items: stretch;
+    min-width: 120px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    touch-action: none;
+}
+.block-action-panel.is-visible {
+    display: flex;
+}
+/* 패널 제목 */
+.block-action-panel-title {
+    font-size: 0.7rem;
+    color: #f59e0b;
+    font-weight: bold;
+    text-align: center;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(245,158,11,0.3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+}
+/* 패널 버튼 행 */
+.block-action-row {
+    display: flex;
+    gap: 6px;
+}
+/* [O] 이동 버튼 */
+.panel-move-btn {
+    flex: 1;
+    height: 44px;
+    background: #f59e0b;
+    color: #1c0a00;
+    border: none;
+    border-radius: 6px;
+    font-size: 1.1rem;
+    font-weight: 900;
+    cursor: grab;
+    touch-action: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    user-select: none;
+}
+.panel-move-btn:active { background: #d97706; cursor: grabbing; }
+/* [/] 리사이즈 버튼 */
+.panel-resize-btn {
+    flex: 1;
+    height: 44px;
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 1.1rem;
+    font-weight: 900;
+    cursor: nwse-resize;
+    touch-action: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    user-select: none;
+}
+.panel-resize-btn:active { background: #1d4ed8; }
+/* [✕] 닫기 */
+.panel-close-btn {
+    width: 100%;
+    height: 30px;
+    background: rgba(255,255,255,0.1);
+    color: #aaa;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+}
+.panel-close-btn:active { background: rgba(255,255,255,0.2); }
+
+/* 크기 표시 */
+.panel-size-display {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    text-align: center;
 }

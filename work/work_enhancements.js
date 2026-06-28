@@ -221,9 +221,89 @@
     let selectedBlock = null;
     // 현재 그룹화 작업에 선택된 블록들
     let groupCandidates = new Set();
+    // 조작 패널 DOM
+    let actionPanel = null;
 
     const getContainer = () => document.getElementById("workDragContainer");
     const getAllBlocks = (container) => [...(container || getContainer())?.querySelectorAll(":scope > .drag-item") || []];
+
+    // ─── 조작 패널 생성/관리 ───
+    const getOrCreatePanel = () => {
+        if (actionPanel) return actionPanel;
+        actionPanel = document.createElement("div");
+        actionPanel.className = "block-action-panel";
+        actionPanel.id = "blockActionPanel";
+        actionPanel.innerHTML = `
+            <div class="block-action-panel-title" id="panelBlockTitle">블록</div>
+            <div class="block-action-row">
+                <div class="panel-move-btn" id="panelMoveBtn" title="길게 눌러서 이동">
+                    <span style="font-size:1.3rem;">O</span><span style="font-size:0.65rem;">이동</span>
+                </div>
+                <div class="panel-resize-btn" id="panelResizeBtn" title="끌어서 크기 조절">
+                    <span style="font-size:1.3rem;">/</span><span style="font-size:0.65rem;">크기</span>
+                </div>
+            </div>
+            <div class="panel-size-display" id="panelSizeDisplay"></div>
+            <div class="panel-close-btn" id="panelCloseBtn">✕ 닫기</div>
+        `;
+        document.body.appendChild(actionPanel);
+
+        // 닫기 버튼
+        actionPanel.querySelector("#panelCloseBtn").addEventListener("click", (e) => {
+            e.stopPropagation();
+            hidePanel();
+        });
+
+        return actionPanel;
+    };
+
+    const showPanel = (block, anchorEl) => {
+        const panel = getOrCreatePanel();
+        selectedBlock = block;
+
+        // 제목
+        const titleEl = panel.querySelector("#panelBlockTitle");
+        const boxTitle = block.querySelector(".box-title");
+        titleEl.textContent = boxTitle ? boxTitle.textContent.trim() : (block.dataset.id || "블록");
+
+        // 크기 표시
+        const sizeEl = panel.querySelector("#panelSizeDisplay");
+        const cols = block.dataset.cols || "4";
+        const rows = block.dataset.rows || "1";
+        sizeEl.textContent = `${cols}칸 × ${rows}줄`;
+
+        // 위치 계산 - 탭한 요소 기준
+        const rect = (anchorEl || block).getBoundingClientRect();
+        const panelW = 140;
+        const panelH = 130;
+
+        let left = rect.left + rect.width / 2 - panelW / 2;
+        let top = rect.bottom + 6;
+
+        // 화면 밖으로 나가면 조정
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        if (left < 6) left = 6;
+        if (left + panelW > vw - 6) left = vw - panelW - 6;
+        if (top + panelH > vh - 6) top = rect.top - panelH - 6;
+        if (top < 6) top = 6;
+
+        panel.style.left = left + "px";
+        panel.style.top = top + "px";
+        panel.style.minWidth = panelW + "px";
+        panel.classList.add("is-visible");
+
+        // 선택 표시
+        block.classList.add("is-block-selected");
+    };
+
+    const hidePanel = () => {
+        if (actionPanel) actionPanel.classList.remove("is-visible");
+        if (selectedBlock) selectedBlock.classList.remove("is-block-selected");
+        selectedBlock = null;
+    };
+
+    // 패널 [O] [/] 버튼 드래그 연결은 initWorkDragListeners 안에서 처리
 
     // ─── 레이아웃 저장/복원 ───
 
@@ -280,48 +360,21 @@
             const saved = layout.blocks && layout.blocks[id];
             setBlockSize(block, saved?.cols ?? GRID_COLS, saved?.rows ?? 1);
         });
-        window.ensureBlockHandles();
     };
 
-    // ─── 블록 핸들 주입 ───
+    // ─── 블록 핸들 주입 (v2: 패널로 대체, 하위 호환용으로 유지) ───
     window.ensureBlockHandles = () => {
-        const container = getContainer();
-        if (!container) return;
-        getAllBlocks(container).forEach(block => {
-            if (block.querySelector(":scope > .block-move-handle")) return;
-            // 이동 핸들
-            const moveH = document.createElement("div");
-            moveH.className = "block-move-handle";
-            moveH.textContent = "O";
-            moveH.title = "눌러서 이동";
-            block.appendChild(moveH);
-            // 리사이즈 핸들
-            const resizeH = document.createElement("div");
-            resizeH.className = "block-resize-handle";
-            resizeH.textContent = "/";
-            resizeH.title = "눌러서 크기 조절";
-            block.appendChild(resizeH);
-            // 선택해제
-            const deselBtn = document.createElement("div");
-            deselBtn.className = "block-deselect-btn";
-            deselBtn.textContent = "✕";
-            deselBtn.title = "선택 해제";
-            block.appendChild(deselBtn);
-        });
+        // v2에서는 패널(blockActionPanel)이 O/크기 역할을 대신함
+        // 별도 DOM 핸들 불필요
     };
 
-    // ─── 블록 선택 ───
-    const selectBlock = (block) => {
-        if (selectedBlock && selectedBlock !== block) {
-            selectedBlock.classList.remove("is-block-selected");
-        }
-        selectedBlock = block || null;
-        if (selectedBlock) selectedBlock.classList.add("is-block-selected");
+    // ─── 블록 선택 (패널 기반) ───
+    const selectBlock = (block, anchorEl) => {
+        showPanel(block, anchorEl);
     };
 
     const deselectBlock = () => {
-        if (selectedBlock) selectedBlock.classList.remove("is-block-selected");
-        selectedBlock = null;
+        hidePanel();
     };
 
     // ─── 레이아웃 모드 진입/해제 ───
@@ -493,7 +546,6 @@
 
         deselectBlock();
         groupCandidates.clear();
-        window.ensureBlockHandles();
         window.saveWorkLayout();
     };
 
@@ -535,7 +587,6 @@
 
         groupBlock.remove();
         deselectBlock();
-        window.ensureBlockHandles();
         window.saveWorkLayout();
     };
 
@@ -575,7 +626,7 @@
     };
 
     // ═══════════════════════════════════════════
-    // 드래그 이동 + 리사이즈 엔진
+    // 드래그 이동 + 리사이즈 엔진 (패널 O/크기 버튼 기반)
     // ═══════════════════════════════════════════
     window.hasInitDragListeners = false;
     window.initWorkDragListeners = () => {
@@ -586,97 +637,60 @@
         let dragBlock = null;
         let resizeBlock = null;
         let resizeStart = null;
-        let dragTimer = null;
-        let pressOrigin = null;
-        let activeHandle = null; // 'move' | 'resize'
+        let tapTimer = null;
+        let tapOrigin = null;
+        let tapTarget = null;
 
         const getPoint = (e) => e.touches ? e.touches[0] : e;
 
-        const startMove = (block, point) => {
-            dragTimer = setTimeout(() => {
-                dragBlock = block;
-                dragBlock.classList.add("is-block-dragging");
-                if (navigator.vibrate) navigator.vibrate(25);
-            }, 250);
-        };
+        // 레이아웃 모드 탭 → 패널 표시
+        const onContainerTap = (e) => {
+            if (!window.isWorkLayoutMode) return;
 
-        const startResize = (block, point) => {
-            resizeBlock = block;
-            const containerWidth = container.getBoundingClientRect().width;
-            resizeStart = {
-                x: point.clientX,
-                y: point.clientY,
-                cols: Number(block.dataset.cols) || GRID_COLS,
-                rows: Number(block.dataset.rows) || 1,
-                colWidth: Math.max(1, (containerWidth - (GRID_COLS - 1) * 2) / GRID_COLS),
-                rowHeight: 38
-            };
-            if (navigator.vibrate) navigator.vibrate(15);
-        };
+            // 패널 내부 클릭은 무시
+            if (actionPanel && actionPanel.contains(e.target)) return;
 
-        const onStart = (e) => {
-            const point = getPoint(e);
-            const moveHandle = e.target.closest(".block-move-handle");
-            const resizeHandle = e.target.closest(".block-resize-handle");
-            const deselBtn = e.target.closest(".block-deselect-btn");
-
-            if (deselBtn) {
-                e.preventDefault();
-                deselectBlock();
-                return;
-            }
-
-            if (moveHandle) {
-                e.preventDefault();
-                const block = moveHandle.closest(".drag-item");
-                if (!block) return;
-                activeHandle = "move";
-                pressOrigin = { x: point.clientX, y: point.clientY };
-                selectBlock(block);
-                startMove(block, point);
-                return;
-            }
-
-            if (resizeHandle) {
-                e.preventDefault();
-                const block = resizeHandle.closest(".drag-item");
-                if (!block) return;
-                activeHandle = "resize";
-                selectBlock(block);
-                startResize(block, point);
-                return;
-            }
-
-            // 레이아웃 모드에서 블록 탭 → 선택
-            if (window.isWorkLayoutMode) {
-                const block = e.target.closest("#workDragContainer > .drag-item");
-                if (block) {
-                    pressOrigin = { x: point.clientX, y: point.clientY };
-                    // 짧은 탭이면 선택
-                    dragTimer = setTimeout(() => {
-                        selectBlock(block);
-                        dragTimer = null;
-                    }, 150);
+            // 패널 외부 탭 → 패널 닫기
+            if (actionPanel && actionPanel.classList.contains("is-visible")) {
+                if (!e.target.closest(".drag-item")) {
+                    hidePanel();
+                    return;
                 }
             }
+
+            const block = e.target.closest("#workDragContainer .drag-item");
+            if (!block) return;
+
+            // 탭한 요소 (버튼이면 버튼, 아니면 블록)
+            const anchorEl = e.target.closest("button, input, textarea, .box-title, .btn-tag-area") || block;
+
+            e.preventDefault();
+            showPanel(block, anchorEl);
         };
 
-        const onMove = (e) => {
-            const point = getPoint(e);
+        // ─── 이동: 패널 [O] 버튼 드래그 ───
+        const initMoveBtn = () => {
+            const panel = getOrCreatePanel();
+            const moveBtn = panel.querySelector("#panelMoveBtn");
+            if (!moveBtn || moveBtn._bound) return;
+            moveBtn._bound = true;
 
-            if (resizeBlock && resizeStart) {
-                if (e.cancelable) e.preventDefault();
-                const dCols = Math.round((point.clientX - resizeStart.x) / resizeStart.colWidth);
-                const dRows = Math.round((point.clientY - resizeStart.y) / resizeStart.rowHeight);
-                setBlockSize(resizeBlock, resizeStart.cols + dCols, resizeStart.rows + dRows);
-                return;
-            }
+            const startMove = (e) => {
+                if (!selectedBlock) return;
+                e.preventDefault();
+                dragBlock = selectedBlock;
+                dragBlock.classList.add("is-block-dragging");
+                hidePanel();
+                if (navigator.vibrate) navigator.vibrate(25);
+            };
 
-            if (dragBlock) {
+            const moveBlock = (e) => {
+                if (!dragBlock) return;
                 if (e.cancelable) e.preventDefault();
-                // 드롭 타겟 찾기
+                const point = getPoint(e);
+                // 패널 위치도 따라가기
                 const el = document.elementFromPoint(point.clientX, point.clientY);
-                const target = el && el.closest("#workDragContainer > .drag-item:not(.is-block-dragging)");
+                const target = el && el !== dragBlock && el.closest("#workDragContainer > .drag-item:not(.is-block-dragging)");
                 container.querySelectorAll(".is-block-drop-target").forEach(b => b.classList.remove("is-block-drop-target"));
                 if (target) {
                     target.classList.add("is-block-drop-target");
@@ -684,40 +698,92 @@
                     const before = point.clientY < rect.top + rect.height / 2;
                     container.insertBefore(dragBlock, before ? target : target.nextSibling);
                 }
-                return;
-            }
+            };
 
-            // 이동 거리가 크면 탭 취소
-            if (pressOrigin && dragTimer) {
-                const d = Math.hypot(point.clientX - pressOrigin.x, point.clientY - pressOrigin.y);
-                if (d > 8) { clearTimeout(dragTimer); dragTimer = null; }
-            }
+            const endMove = (e) => {
+                if (!dragBlock) return;
+                container.querySelectorAll(".is-block-drop-target").forEach(b => b.classList.remove("is-block-drop-target"));
+                dragBlock.classList.remove("is-block-dragging");
+                window.saveWorkLayout();
+                // 이동 후 패널 다시 표시
+                showPanel(dragBlock, dragBlock);
+                dragBlock = null;
+            };
+
+            moveBtn.addEventListener("touchstart", startMove, { passive: false });
+            moveBtn.addEventListener("mousedown", startMove);
+            window.addEventListener("touchmove", moveBlock, { passive: false });
+            window.addEventListener("mousemove", moveBlock);
+            window.addEventListener("touchend", endMove);
+            window.addEventListener("mouseup", endMove);
         };
 
-        const onEnd = () => {
-            clearTimeout(dragTimer);
-            dragTimer = null;
-            container.querySelectorAll(".is-block-drop-target").forEach(b => b.classList.remove("is-block-drop-target"));
-            if (dragBlock) dragBlock.classList.remove("is-block-dragging");
-            if (dragBlock || resizeBlock) window.saveWorkLayout();
-            dragBlock = null;
-            resizeBlock = null;
-            resizeStart = null;
-            pressOrigin = null;
-            activeHandle = null;
+        // ─── 리사이즈: 패널 [/] 버튼 드래그 ───
+        const initResizeBtn = () => {
+            const panel = getOrCreatePanel();
+            const resizeBtn = panel.querySelector("#panelResizeBtn");
+            if (!resizeBtn || resizeBtn._bound) return;
+            resizeBtn._bound = true;
+
+            const startResize = (e) => {
+                if (!selectedBlock) return;
+                e.preventDefault();
+                resizeBlock = selectedBlock;
+                const containerWidth = container.getBoundingClientRect().width;
+                const point = getPoint(e);
+                resizeStart = {
+                    x: point.clientX,
+                    y: point.clientY,
+                    cols: Number(resizeBlock.dataset.cols) || GRID_COLS,
+                    rows: Number(resizeBlock.dataset.rows) || 1,
+                    colWidth: Math.max(1, (containerWidth - (GRID_COLS - 1) * 2) / GRID_COLS),
+                    rowHeight: 40
+                };
+                if (navigator.vibrate) navigator.vibrate(15);
+            };
+
+            const doResize = (e) => {
+                if (!resizeBlock || !resizeStart) return;
+                if (e.cancelable) e.preventDefault();
+                const point = getPoint(e);
+                const dCols = Math.round((point.clientX - resizeStart.x) / resizeStart.colWidth);
+                const dRows = Math.round((point.clientY - resizeStart.y) / resizeStart.rowHeight);
+                const newCols = resizeStart.cols + dCols;
+                const newRows = resizeStart.rows + dRows;
+                setBlockSize(resizeBlock, newCols, newRows);
+                // 크기 표시 업데이트
+                const sizeEl = panel.querySelector("#panelSizeDisplay");
+                if (sizeEl) sizeEl.textContent = `${Math.max(1, Math.min(GRID_COLS, newCols))}칸 × ${Math.max(1, newRows)}줄`;
+            };
+
+            const endResize = (e) => {
+                if (!resizeBlock) return;
+                window.saveWorkLayout();
+                // 리사이즈 후 패널 위치 갱신
+                showPanel(resizeBlock, resizeBlock);
+                resizeBlock = null;
+                resizeStart = null;
+            };
+
+            resizeBtn.addEventListener("touchstart", startResize, { passive: false });
+            resizeBtn.addEventListener("mousedown", startResize);
+            window.addEventListener("touchmove", doResize, { passive: false });
+            window.addEventListener("mousemove", doResize);
+            window.addEventListener("touchend", endResize);
+            window.addEventListener("mouseup", endResize);
         };
 
-        // 이벤트 바인딩
+        // 컨테이너 탭 이벤트
         const modal = document.getElementById("workModal");
         if (modal) {
-            modal.addEventListener("touchstart", onStart, { passive: false });
-            modal.addEventListener("touchmove", onMove, { passive: false });
-            modal.addEventListener("touchend", onEnd);
-            modal.addEventListener("touchcancel", onEnd);
-            modal.addEventListener("mousedown", onStart);
+            modal.addEventListener("touchstart", onContainerTap, { passive: false });
+            modal.addEventListener("click", onContainerTap);
         }
-        window.addEventListener("mousemove", onMove);
-        window.addEventListener("mouseup", onEnd);
+
+        // 패널 버튼 초기화 (패널 생성 후)
+        getOrCreatePanel();
+        initMoveBtn();
+        initResizeBtn();
 
         window.hasInitDragListeners = true;
     };
