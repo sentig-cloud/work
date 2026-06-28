@@ -172,23 +172,65 @@
     const getAllSections = (c) => [...(c || getContainer())?.querySelectorAll(":scope > .drag-item") || []];
 
     // ─── 객체 타입 판별 ───
+    // work-obj-wrap: drag-item 안의 개별 input/button 래퍼
+    // tag-btn: 선택태그 버튼
+    // section: drag-item 블록 전체
+    // group: 그룹 블록
     const getObjType = (el) => {
         if (!el) return null;
-        if (el.classList.contains("drag-item") && el.closest("#workDragContainer")) {
-            if (el.classList.contains("is-group-block")) return "group";
-            return "section";
-        }
-        // inner-layout-cell (위젯: input, button, textarea 래퍼)
-        if (el.classList.contains("inner-layout-cell")) return "widget";
-        // 선택태그 버튼
+        // 1. work-obj-wrap (개별 input/button)
+        if (el.classList.contains("work-obj-wrap")) return "obj";
+        const wrap = el.closest(".work-obj-wrap");
+        if (wrap) return "obj";
+        // 2. 태그 버튼
         if (el.classList.contains("layout-tag-button")) return "tag-btn";
+        const tagBtn = el.closest(".layout-tag-button");
+        if (tagBtn) return "tag-btn";
+        // 3. 그룹 블록
+        if (el.classList.contains("is-group-block")) return "group";
+        const grp = el.closest(".is-group-block");
+        if (grp && !el.closest(".group-block-inner")) return "group";
+        // 4. drag-item 섹션
+        if (el.classList.contains("drag-item")) return "section";
+        const sec = el.closest("#workDragContainer > .drag-item");
+        if (sec) return "section";
         return null;
+    };
+
+    // 실제 대상 요소 반환
+    const getObjEl = (el) => {
+        if (!el) return null;
+        if (el.classList.contains("work-obj-wrap")) return el;
+        const wrap = el.closest(".work-obj-wrap");
+        if (wrap) return wrap;
+        if (el.classList.contains("layout-tag-button")) return el;
+        const tagBtn = el.closest(".layout-tag-button");
+        if (tagBtn) return tagBtn;
+        if (el.classList.contains("is-group-block")) return el;
+        const grp = el.closest(".is-group-block");
+        if (grp && !el.closest(".group-block-inner")) return grp;
+        if (el.classList.contains("drag-item")) return el;
+        return el.closest("#workDragContainer > .drag-item");
     };
 
     // 리사이즈 가능 여부
     const isResizable = (el, type) => {
-        if (type === "tag-btn") return false; // 태그 버튼은 글자 수로 결정
+        if (type === "tag-btn") return false;
+        if (type === "obj") {
+            // 태그 영역(btn-tag-area)은 리사이즈 없음
+            if (el.querySelector(".btn-tag-area")) return false;
+            return true;
+        }
         return true;
+    };
+
+    // obj 레이블
+    const getObjLabel = (el, type) => {
+        if (type === "obj") return el.dataset.objLabel || el.dataset.objId || "객체";
+        if (type === "tag-btn") return `태그: ${el.dataset.tagName || el.textContent.trim().slice(0,10)}`;
+        if (type === "group") return el.querySelector(".group-title-text")?.textContent || "그룹";
+        if (type === "section") return el.querySelector(".box-title")?.textContent || `블록 ${el.dataset.id||""}`;
+        return "객체";
     };
 
     // ─── 선택 표시 ───
@@ -220,11 +262,8 @@
         const isTagBtn = type === "tag-btn";
 
         // 제목
-        let title = "객체";
-        if (isGroup) title = el.querySelector(".group-title-text")?.textContent || "그룹";
-        else if (type === "section") title = el.querySelector(".box-title")?.textContent || `블록 ${el.dataset.id || ""}`;
-        else if (type === "widget") title = el.dataset.innerId || "위젯";
-        else if (isTagBtn) title = `태그: ${el.dataset.tagName || el.textContent.trim().slice(0, 12)}`;
+        let title = getObjLabel(el, type);
+        if (type === "obj") title = el.dataset.objLabel || el.dataset.objId || "객체";
 
         // 그룹 목록 (이동 대상)
         const groups = getAllSections().filter(s => s.classList.contains("is-group-block"));
@@ -382,6 +421,10 @@
     };
 
     const closeObjPanel = () => {
+        if (objPanel) {
+            objPanel.classList.remove("is-visible");
+            objPanel.classList.remove("is-obj-panel-open");
+        }
         removePanel();
         clearSelected();
     };
@@ -391,31 +434,42 @@
         if (!window.isWorkLayoutMode) return;
         if (objPanel && objPanel.contains(e.target)) return;
 
-        // 패널 외부 탭 → 닫기
-        if (objPanel) { closeObjPanel(); return; }
+        // 패널이 열려있으면 닫기
+        if (objPanel && objPanel.classList.contains("is-obj-panel-open")) {
+            closeObjPanel();
+            return;
+        }
 
-        // 탭한 요소 분류
+        const modal = document.getElementById("workModal");
+        if (!modal || !modal.contains(e.target)) return;
+
         let el = null, type = null;
 
-        // 1. 태그 버튼
-        const tagBtn = e.target.closest(".layout-tag-button");
-        if (tagBtn && document.getElementById("workModal")?.contains(tagBtn)) {
-            el = tagBtn; type = "tag-btn";
+        // 우선순위: work-obj-wrap > tag-btn > group titlebar > section
+        // 1. work-obj-wrap (개별 input/button 래퍼) - 최우선
+        const wrap = e.target.closest(".work-obj-wrap");
+        if (wrap && modal.contains(wrap)) {
+            el = wrap; type = "obj";
         }
-        // 2. inner-layout-cell (위젯)
+        // 2. 태그 버튼
         if (!el) {
-            const cell = e.target.closest(".inner-layout-cell");
-            if (cell) { el = cell; type = "widget"; }
+            const tagBtn = e.target.closest(".layout-tag-button");
+            if (tagBtn && modal.contains(tagBtn)) { el = tagBtn; type = "tag-btn"; }
         }
-        // 3. 그룹 블록
+        // 3. 그룹 타이틀바 탭 → 그룹 선택
         if (!el) {
-            const grp = e.target.closest(".is-group-block");
-            if (grp && !e.target.closest(".group-block-inner")) { el = grp; type = "group"; }
+            const grpTitle = e.target.closest(".group-block-titlebar");
+            if (grpTitle) {
+                const grp = grpTitle.closest(".is-group-block");
+                if (grp) { el = grp; type = "group"; }
+            }
         }
-        // 4. 일반 섹션
+        // 4. drag-item 섹션 배경 탭 (위 해당 없을 때)
         if (!el) {
             const sec = e.target.closest("#workDragContainer > .drag-item");
-            if (sec) { el = sec; type = "section"; }
+            if (sec && !e.target.closest(".work-obj-wrap") && !e.target.closest(".btn-tag-area")) {
+                el = sec; type = "section";
+            }
         }
 
         if (!el || !type) return;
@@ -437,13 +491,14 @@
             const idx = siblings.indexOf(el);
             if (dir === "up" && idx > 0) container.insertBefore(el, siblings[idx - 1]);
             else if (dir === "down" && idx < siblings.length - 1) container.insertBefore(el, siblings[idx + 2] || null);
-        } else if (type === "widget") {
-            const group = el.parentElement;
-            if (!group) return;
-            const cells = [...group.querySelectorAll(":scope > .inner-layout-cell")];
-            const idx = cells.indexOf(el);
-            if (dir === "up" && idx > 0) group.insertBefore(el, cells[idx - 1]);
-            else if (dir === "down" && idx < cells.length - 1) group.insertBefore(el, cells[idx + 2] || null);
+        } else if (type === "obj") {
+            // work-obj-wrap: 같은 drag-item 안에서 이동
+            const parent = el.parentElement;
+            if (!parent) return;
+            const siblings = [...parent.querySelectorAll(":scope > .work-obj-wrap")];
+            const idx = siblings.indexOf(el);
+            if (dir === "up" && idx > 0) parent.insertBefore(el, siblings[idx - 1]);
+            else if (dir === "down" && idx < siblings.length - 1) parent.insertBefore(el, siblings[idx + 2] || null);
         } else if (type === "tag-btn") {
             const area = el.parentElement;
             if (!area) return;
@@ -461,14 +516,22 @@
         const container = getContainer();
         const groupBlock = container?.querySelector(`.drag-item[data-id="${groupId}"]`);
         if (!groupBlock) return;
-
         const inner = groupBlock.querySelector(".group-block-inner");
         if (!inner) return;
 
         if (type === "section") {
             inner.appendChild(el);
-        } else if (type === "widget") {
-            // inner-layout-cell을 그룹 내 섹션으로 이동
+        } else if (type === "obj") {
+            // work-obj-wrap을 그룹 내로 이동
+            // 먼저 임시 섹션 블록을 만들어서 감싸기
+            const secId = "moved_" + Date.now();
+            let wrapper = document.createElement("div");
+            wrapper.className = "drag-item w95-out";
+            wrapper.dataset.id = secId;
+            wrapper.style.cssText = "--item-cols:4;--item-rows:1;";
+            wrapper.appendChild(el);
+            inner.appendChild(wrapper);
+        } else if (type === "tag-btn") {
             inner.appendChild(el);
         }
 
@@ -486,14 +549,26 @@
             else if (action === "rows+") r = Math.min(20, r + 1);
             else if (action === "rows-") r = Math.max(1, r - 1);
             setBlockSize(el, c, r);
-        } else if (type === "widget") {
-            let c = Number(el.dataset.widgetCols || 1);
-            let r = Number(el.dataset.widgetRows || 1);
-            if (action === "cols+") c = Math.min(6, c + 1);
-            else if (action === "cols-") c = Math.max(1, c - 1);
-            else if (action === "rows+") r = Math.min(6, r + 1);
-            else if (action === "rows-") r = Math.max(1, r - 1);
-            setWidgetSize(el, c, r);
+        } else if (type === "obj") {
+            // work-obj-wrap: flex-grow / height 조절
+            let cols = Number(el.dataset.objCols || 1);
+            let rows = Number(el.dataset.objRows || 1);
+            const parent = el.closest(".drag-item");
+            const totalCols = parent ? GRID_COLS : 4;
+            if (action === "cols+") cols = Math.min(totalCols, cols + 1);
+            else if (action === "cols-") cols = Math.max(1, cols - 1);
+            else if (action === "rows+") rows = Math.min(6, rows + 1);
+            else if (action === "rows-") rows = Math.max(1, rows - 1);
+            el.dataset.objCols = cols;
+            el.dataset.objRows = rows;
+            el.style.setProperty("--obj-cols", cols);
+            el.style.setProperty("--obj-rows", rows);
+            // 높이 적용
+            const baseH = 30;
+            el.style.minHeight = rows > 1 ? `${rows * baseH + (rows-1)*2}px` : "";
+            // 내부 input/textarea 높이도 조절
+            const inner = el.querySelector("input, textarea");
+            if (inner && rows > 1) inner.style.height = `${rows * baseH}px`;
         }
         window.saveWorkLayout();
     };
@@ -604,11 +679,24 @@
         const order = [], blocks = {};
         getAllSections(container).forEach(block => {
             order.push(block.dataset.id);
+            // obj-wrap 순서도 저장
+            const objOrder = [...block.querySelectorAll(":scope > .work-obj-wrap")].map(w => w.dataset.objId);
+            const objSizes = {};
+            block.querySelectorAll(":scope > .work-obj-wrap").forEach(w => {
+                if (w.dataset.objCols || w.dataset.objRows) {
+                    objSizes[w.dataset.objId] = {
+                        cols: Number(w.dataset.objCols || 1),
+                        rows: Number(w.dataset.objRows || 1)
+                    };
+                }
+            });
             blocks[block.dataset.id] = {
                 cols: Number(block.dataset.cols || GRID_COLS),
                 rows: Number(block.dataset.rows || 1),
                 isGroup: block.classList.contains("is-group-block"),
-                groupEnabled: !block.classList.contains("is-group-disabled")
+                groupEnabled: !block.classList.contains("is-group-disabled"),
+                objOrder: objOrder.length ? objOrder : undefined,
+                objSizes: Object.keys(objSizes).length ? objSizes : undefined
             };
         });
         const innerOrder = {}, widgets = {};
@@ -645,6 +733,34 @@
             const saved = layout.blocks?.[block.dataset.id];
             setBlockSize(block, saved?.cols ?? GRID_COLS, saved?.rows ?? 1);
         });
+        // obj-wrap 순서/크기 복원
+        getAllSections(container).forEach(block => {
+            const saved = layout.blocks?.[block.dataset.id];
+            if (!saved) return;
+            // 순서 복원
+            if (Array.isArray(saved.objOrder)) {
+                saved.objOrder.forEach(objId => {
+                    const wrap = block.querySelector(`:scope > .work-obj-wrap[data-obj-id="${objId}"]`);
+                    if (wrap) block.appendChild(wrap);
+                });
+            }
+            // 크기 복원
+            if (saved.objSizes) {
+                Object.entries(saved.objSizes).forEach(([objId, size]) => {
+                    const wrap = block.querySelector(`:scope > .work-obj-wrap[data-obj-id="${objId}"]`);
+                    if (!wrap) return;
+                    wrap.dataset.objCols = size.cols;
+                    wrap.dataset.objRows = size.rows;
+                    wrap.style.setProperty("--obj-cols", size.cols);
+                    if (size.rows > 1) {
+                        wrap.style.minHeight = `${size.rows * 30 + (size.rows-1)*2}px`;
+                        const inner = wrap.querySelector("input, textarea");
+                        if (inner) inner.style.height = `${size.rows * 30}px`;
+                    }
+                });
+            }
+        });
+
         // inner widget 크기/순서 복원
         document.querySelectorAll(".inner-layout-group").forEach(group => {
             const key = group.dataset.innerGroup;

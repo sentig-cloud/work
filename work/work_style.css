@@ -557,101 +557,71 @@ input, textarea, [contenteditable="true"] {
     touch-action: none; opacity: 0.34;
 }
 
-/* ─── 블록 조작 패널 (탭 시 오버레이로 표시) ─── */
-.block-action-panel {
-    display: none;
-    position: fixed;
-    z-index: 9000;
-    background: rgba(30, 30, 30, 0.95);
-    border: 2px solid #f59e0b;
-    border-radius: 10px;
-    padding: 8px 6px;
-    gap: 8px;
-    flex-direction: column;
-    align-items: stretch;
-    min-width: 120px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-    touch-action: none;
-}
-.block-action-panel.is-visible {
-    display: flex;
-}
-/* 패널 제목 */
-.block-action-panel-title {
-    font-size: 0.7rem;
-    color: #f59e0b;
-    font-weight: bold;
-    text-align: center;
-    padding-bottom: 4px;
-    border-bottom: 1px solid rgba(245,158,11,0.3);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 160px;
-}
-/* 패널 버튼 행 */
-.block-action-row {
-    display: flex;
-    gap: 6px;
-}
-/* [O] 이동 버튼 */
-.panel-move-btn {
-    flex: 1;
-    height: 44px;
-    background: #f59e0b;
-    color: #1c0a00;
-    border: none;
-    border-radius: 6px;
-    font-size: 1.1rem;
-    font-weight: 900;
-    cursor: grab;
-    touch-action: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    user-select: none;
-}
-.panel-move-btn:active { background: #d97706; cursor: grabbing; }
-/* [/] 리사이즈 버튼 */
-.panel-resize-btn {
-    flex: 1;
-    height: 44px;
-    background: #2563eb;
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    font-size: 1.1rem;
-    font-weight: 900;
-    cursor: nwse-resize;
-    touch-action: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    user-select: none;
-}
-.panel-resize-btn:active { background: #1d4ed8; }
-/* [✕] 닫기 */
-.panel-close-btn {
-    width: 100%;
-    height: 30px;
-    background: rgba(255,255,255,0.1);
-    color: #aaa;
-    border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 6px;
-    font-size: 0.75rem;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    user-select: none;
-}
-.panel-close-btn:active { background: rgba(255,255,255,0.2); }
+/* 블록 조작 패널: JS에서 w95 스타일로 동적 생성 */
 
 /* 크기 표시 */
 .panel-size-display {
     font-size: 0.72rem;
     color: #94a3b8;
     text-align: center;
+}
+
+/* ═══════════════════════════════════════════
+   work-obj-wrap: 개별 객체 래퍼 (input/button 각각)
+   ═══════════════════════════════════════════ */
+.work-obj-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 1px;
+    box-sizing: border-box;
+    min-height: 30px;
+    /* 기본: drag-item 안에서 세로 나열 */
+    width: 100%;
+    /* 그리드 칸 수 지원 */
+    grid-column: span var(--obj-cols, 1);
+}
+.work-obj-wrap > input,
+.work-obj-wrap > textarea,
+.work-obj-wrap > button,
+.work-obj-wrap > div {
+    width: 100%;
+    flex: 1;
+    min-width: 0;
+}
+
+/* drag-item 내부를 그리드로 배치 */
+.drag-item > .work-obj-wrap {
+    /* 기본: 세로 스택 */
+}
+
+/* 레이아웃 모드: obj-wrap 호버/선택 표시 */
+.layout-edit-mode .work-obj-wrap {
+    outline: 1px dashed rgba(245, 158, 11, 0.35);
+    cursor: pointer;
+    border-radius: 2px;
+}
+.layout-edit-mode .work-obj-wrap:hover {
+    outline: 1px solid rgba(245, 158, 11, 0.7);
+    background: rgba(245, 158, 11, 0.05);
+}
+.work-obj-wrap.is-obj-selected {
+    outline: 2px solid #f59e0b !important;
+    outline-offset: 1px;
+    background: rgba(245, 158, 11, 0.1) !important;
+    z-index: 15;
+}
+
+/* 패널 열림 표시 */
+#layoutObjPanel.is-obj-panel-open {
+    display: flex !important;
+}
+
+/* drag-item 내부 그리드 모드 (obj-wrap들을 그리드로 배치) */
+.drag-item.use-obj-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-rows: minmax(30px, auto);
+    gap: 2px;
+    align-items: start;
 }

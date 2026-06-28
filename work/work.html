@@ -85,9 +85,9 @@
                 <span>작업 일지 작성</span>
                 <div class="work-layout-title-actions">
                     <button type="button" id="workLayoutGroupBtn" class="w95-btn work-layout-group-btn"
-                        title="선택한 블록 그룹화" onclick="window.groupSelectedBlocks()">그룹화</button>
+                        title="그룹 추가" onclick="window.groupSelectedBlocks()">그룹+</button>
                     <button type="button" id="workLayoutUngroupBtn" class="w95-btn work-layout-ungroup-btn"
-                        title="선택한 그룹 해제" onclick="window.ungroupSelectedBlock()">그룹해제</button>
+                        title="그룹해제" onclick="window.ungroupSelectedBlock()">그룹-</button>
                     <button type="button" id="workLayoutResetBtn" class="w95-btn work-layout-reset-btn"
                         title="기본 배치 복원" onclick="window.resetWorkLayout()">초기화</button>
                     <button type="button" id="workLayoutModeBtn" class="w95-btn" style="padding:0 6px;"
@@ -102,33 +102,61 @@
             <div class="modal-content-scroll" style="padding:4px; display:flex; flex-direction:column;">
                 <div id="workDragContainer" style="display:flex; flex-direction:column; gap:2px;">
 
-                    <div class="drag-item w95-out" data-id="1" style="display:flex; flex-direction:column; gap:2px;">
-                        <div style="display:flex; gap:2px; align-items:center;">
-                            <div style="position:relative; flex:2; min-width:80px; display:flex; align-items:center; justify-content:center; background:#fff; border: 2px solid; border-color: #808080 #fff #fff #808080; height:28px;">
-                                <span id="workDayLabel" style="font-weight:bold; font-size:0.8rem; color:var(--w-blue);"></span>
+                    <div class="drag-item w95-out" data-id="1" style="display:flex; flex-direction:column; gap:2px; padding:2px;">
+                        <!-- 날짜 -->
+                        <div class="work-obj-wrap" data-obj-id="date" data-obj-label="날짜" style="display:flex; align-items:center; position:relative;">
+                            <div style="position:relative; flex:1; display:flex; align-items:center; justify-content:center; background:#fff; border: 2px solid; border-color: #808080 #fff #fff #808080; height:28px; min-width:80px;">
+                                <span id="workDayLabel" style="font-weight:bold; font-size:0.8rem; color:var(--w-blue); pointer-events:none;"></span>
                                 <input type="date" id="workDateInput" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;" onchange="window.updateWorkDateLabel()">
                             </div>
-                            <input type="text" id="workTime" inputmode="numeric" class="m-input w95-in" style="flex:1; min-width:42px; text-align:center; height:28px;" placeholder="시간" onblur="window.formatTimeInput(this)">
-                            <button type="button" id="workDutyBtn" class="w95-btn" style="padding:0 4px; height:28px;" onclick="window.toggleDuty()">당직</button>
-                            <input type="text" id="workOT" inputmode="numeric" class="m-input w95-in" style="flex:1; min-width:48px; text-align:center; height:28px;" placeholder="OT(00:00)" onblur="window.formatOTInput(this)">
-                            <button type="button" id="workUndoBtn" class="w95-btn work-undo-btn" title="방금 작업 취소" onclick="window.undoWorkDraft()">↶</button>
                         </div>
-                        <div style="display:flex; gap:2px;">
-                            <input type="text" id="taskNo" inputmode="numeric" class="m-input w95-in" style="flex:1; height:28px;" placeholder="Task 번호">
-                            <button type="button" id="workCopyBtn" class="w95-btn icon-btn" style="height:28px; padding:0 8px;" title="작업일지 내용 복사" onclick="window.copyWorkDraft()"><i class="fa-solid fa-copy"></i></button>
-                            <input type="text" id="customerName" class="m-input w95-in" style="flex:1; height:28px;" placeholder="고객명">
+                        <!-- 시간 -->
+                        <div class="work-obj-wrap" data-obj-id="time" data-obj-label="시간">
+                            <input type="text" id="workTime" inputmode="numeric" class="m-input w95-in" style="width:100%; text-align:center; height:28px;" placeholder="시간" onblur="window.formatTimeInput(this)">
                         </div>
-                        <div style="display:flex; gap:2px;">
-                            <input type="text" id="workAddress" class="m-input w95-in" style="flex:1; height:28px;" placeholder="주소 입력">
-                            <button type="button" class="w95-btn icon-btn" style="height:28px; padding:0 8px;" onmousedown="window.startMapPress(event)" onmouseup="window.endMapPress(event)" ontouchstart="window.startMapPress(event)" ontouchend="window.endMapPress(event)"><i class="fa-solid fa-map-location-dot"></i></button>
+                        <!-- 당직 -->
+                        <div class="work-obj-wrap" data-obj-id="duty" data-obj-label="당직">
+                            <button type="button" id="workDutyBtn" class="w95-btn" style="width:100%; height:28px;" onclick="window.toggleDuty()">당직</button>
                         </div>
-                        <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>
+                        <!-- OT -->
+                        <div class="work-obj-wrap" data-obj-id="ot" data-obj-label="OT">
+                            <input type="text" id="workOT" inputmode="numeric" class="m-input w95-in" style="width:100%; text-align:center; height:28px;" placeholder="OT(00:00)" onblur="window.formatOTInput(this)">
+                        </div>
+                        <!-- 되돌리기 -->
+                        <div class="work-obj-wrap" data-obj-id="undo" data-obj-label="되돌리기">
+                            <button type="button" id="workUndoBtn" class="w95-btn work-undo-btn" style="width:100%;" title="방금 작업 취소" onclick="window.undoWorkDraft()">↶</button>
+                        </div>
+                        <!-- Task번호 -->
+                        <div class="work-obj-wrap" data-obj-id="taskNo" data-obj-label="Task번호">
+                            <input type="text" id="taskNo" inputmode="numeric" class="m-input w95-in" style="width:100%; height:28px;" placeholder="Task 번호">
+                        </div>
+                        <!-- 복사 -->
+                        <div class="work-obj-wrap" data-obj-id="copy" data-obj-label="복사">
+                            <button type="button" id="workCopyBtn" class="w95-btn icon-btn" style="width:100%; height:28px;" title="작업일지 내용 복사" onclick="window.copyWorkDraft()"><i class="fa-solid fa-copy"></i></button>
+                        </div>
+                        <!-- 고객명 -->
+                        <div class="work-obj-wrap" data-obj-id="customer" data-obj-label="고객명">
+                            <input type="text" id="customerName" class="m-input w95-in" style="width:100%; height:28px;" placeholder="고객명">
+                        </div>
+                        <!-- 주소 -->
+                        <div class="work-obj-wrap" data-obj-id="address" data-obj-label="주소">
+                            <input type="text" id="workAddress" class="m-input w95-in" style="width:100%; height:28px;" placeholder="주소 입력">
+                        </div>
+                        <!-- 지도 -->
+                        <div class="work-obj-wrap" data-obj-id="map" data-obj-label="지도">
+                            <button type="button" class="w95-btn icon-btn" style="width:100%; height:28px;" onmousedown="window.startMapPress(event)" onmouseup="window.endMapPress(event)" ontouchstart="window.startMapPress(event)" ontouchend="window.endMapPress(event)"><i class="fa-solid fa-map-location-dot"></i></button>
+                        </div>
                     </div>
 
-                    <div class="drag-item w95-out" data-id="2" style="display:flex; flex-direction:column; gap:2px;">
-                        <textarea id="workContent" class="m-input w95-in" rows="1" style="height:28px; padding-top:4px; resize:none;" placeholder="작업 내용"></textarea>
-                        <input type="text" id="workNote" class="m-input w95-in" style="height:28px;" placeholder="특이사항">
-                        <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>
+                    <div class="drag-item w95-out" data-id="2" style="display:flex; flex-direction:column; gap:2px; padding:2px;">
+                        <!-- 작업내용 -->
+                        <div class="work-obj-wrap" data-obj-id="content" data-obj-label="작업내용">
+                            <textarea id="workContent" class="m-input w95-in" rows="1" style="width:100%; height:28px; padding-top:4px; resize:none;" placeholder="작업 내용"></textarea>
+                        </div>
+                        <!-- 특이사항 -->
+                        <div class="work-obj-wrap" data-obj-id="note" data-obj-label="특이사항">
+                            <input type="text" id="workNote" class="m-input w95-in" style="width:100%; height:28px;" placeholder="특이사항">
+                        </div>
                     </div>
 
                     <div class="drag-item w95-in" data-id="3">
@@ -155,17 +183,21 @@
                         <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>
                     </div>
 
-                    <div class="drag-item w95-in" data-id="7">
-                        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:6px; padding: 4px;">
-                            <div id="workPhotoGrid" class="photo-edit-grid" style="flex:1; display:flex; gap:4px; overflow-x:auto;"></div>
-                            <div style="display:flex; flex-direction:column; gap:4px; flex-shrink:0;">
-                                <button type="button" class="w95-btn icon-btn" style="height:28px; padding:0 8px;" onclick="document.getElementById('workPhotoInput').click()"><i class="fa-solid fa-image"></i></button>
-                                <button type="button" class="w95-btn icon-btn" style="height:28px; padding:0 8px;" onclick="document.getElementById('workCamInput').click()"><i class="fa-solid fa-camera"></i></button>
-                            </div>
+                    <div class="drag-item w95-in" data-id="7" style="padding:2px;">
+                        <!-- 사진 그리드 -->
+                        <div class="work-obj-wrap" data-obj-id="photoGrid" data-obj-label="사진">
+                            <div id="workPhotoGrid" class="photo-edit-grid" style="display:flex; gap:4px; overflow-x:auto; min-height:32px; width:100%;"></div>
+                        </div>
+                        <!-- 앨범 -->
+                        <div class="work-obj-wrap" data-obj-id="photoAlbum" data-obj-label="앨범">
+                            <button type="button" class="w95-btn icon-btn" style="width:100%; height:28px;" onclick="document.getElementById('workPhotoInput').click()"><i class="fa-solid fa-image"></i></button>
+                        </div>
+                        <!-- 카메라 -->
+                        <div class="work-obj-wrap" data-obj-id="photoCamera" data-obj-label="카메라">
+                            <button type="button" class="w95-btn icon-btn" style="width:100%; height:28px;" onclick="document.getElementById('workCamInput').click()"><i class="fa-solid fa-camera"></i></button>
                         </div>
                         <input type="file" id="workPhotoInput" hidden multiple accept="image/*, .heic" onchange="window.handleWorkFiles(this)">
                         <input type="file" id="workCamInput" hidden accept="image/*" capture="environment" onchange="window.handleWorkFiles(this)">
-                        <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>
                     </div>
 
                 </div>
