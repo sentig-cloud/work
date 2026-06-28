@@ -100,6 +100,12 @@ window.WorkExport = {
                     else if (col.id === "outNote") {
                         value = log.cat === "commute_out" ? (log.commuteNote || "") : "";
                     }
+                    // v2: 커스텀 그룹 컬럼 처리
+                    else if (col.isCustomGroup && col.groupId) {
+                        const grpVal = log.customGroups && log.customGroups[col.groupId];
+                        if (Array.isArray(grpVal)) value = grpVal.join(", ");
+                        else value = grpVal || "";
+                    }
 
                     const textLength = value && (value.type === "image" || value.type === "over")
                         ? 6

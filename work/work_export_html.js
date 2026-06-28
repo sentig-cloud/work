@@ -1,21 +1,16 @@
+// work_export_html.js (v2 - 커스텀 그룹 섹션 추가)
 window.WorkExportHTML = `
 <style>
-    /* 글자 크기 축소 및 줄바꿈 유지 */
     .exp-tag-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; justify-content: center; }
     .exp-tag { display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 4px 6px; font-size: 0.7rem; min-height: 26px; cursor: pointer; user-select: none; border-radius: 4px; transition: 0.1s; text-align: center; white-space: normal; word-break: keep-all; line-height: 1.2; }
-    
     .exp-tag.on { background: #e0e7ff; color: #3730a3; border: 1px solid #6366f1; font-weight: bold; box-shadow: inset 1px 1px #fff, inset -1px -1px #808080; }
     .exp-tag.off { background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; box-shadow: inset 1px 1px #fff, inset -1px -1px #cbd5e1; }
     .exp-tag.disabled { opacity: 0.4; pointer-events: none; background: #e5e7eb; color: #9ca3af; border: 1px solid #d1d5db; }
-    
     .exp-tag-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
     .exp-col-tag { justify-content: flex-start; padding: 4px; min-height: 30px; height: auto; display: flex; align-items: center; box-shadow: 1px 1px 2px rgba(0,0,0,0.05); }
     .exp-col-num { background: #3730a3; color: white; width: 16px; height: 16px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: bold; flex-shrink: 0; }
     .exp-col-tag.off .exp-col-num { background: transparent; color: transparent; border: 1px solid #94a3b8; }
-    
     .exp-section { background: #ffffff; border: 1px solid #cbd5e1; padding: 8px; border-radius: 6px; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
-    
-    /* 🌟 두 번째 칸: 좌우 2줄 분리용 그리드 설정 */
     .exp-grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .col-left { justify-content: flex-start; }
     .col-right { justify-content: flex-end; }
@@ -27,7 +22,7 @@ window.WorkExportHTML = `
             <button type="button" class="w95-btn" style="padding:0 8px; font-size: 0.8rem;" onclick="window.WorkExportUI.close()">X</button>
         </div>
         <div class="modal-content-scroll" style="background:#f8fafc; padding:8px; display:flex; flex-direction:column; gap:6px;">
-            
+
             <div class="exp-section">
                 <div class="exp-tag-row" id="expMonthArea"></div>
             </div>
@@ -40,11 +35,22 @@ window.WorkExportHTML = `
             </div>
 
             <div class="exp-section">
+                <div style="font-size:0.7rem; color:#64748b; font-weight:bold; margin-bottom:2px;">일반 항목</div>
                 <div class="exp-tag-grid" id="expColGridGeneral"></div>
             </div>
 
             <div class="exp-section">
+                <div style="font-size:0.7rem; color:#64748b; font-weight:bold; margin-bottom:2px;">출퇴근 항목</div>
                 <div class="exp-tag-grid" id="expColGridCommute"></div>
+            </div>
+
+            <!-- v2: 커스텀 그룹 항목 (동적, 없으면 숨김) -->
+            <div class="exp-section" id="expCustomGroupSection" style="display:none;">
+                <div style="font-size:0.7rem; color:#7c3aed; font-weight:bold; margin-bottom:2px;">
+                    <i class="fa-solid fa-tag"></i> 커스텀 그룹
+                    <span style="color:#94a3b8; font-size:0.65rem; margin-left:4px;">(회색=비활성 그룹)</span>
+                </div>
+                <div class="exp-tag-grid" id="expColGridCustom"></div>
             </div>
 
         </div>
@@ -71,3 +77,17 @@ window.WorkExportHTML = `
     </div>
 </div>
 `;
+
+// render() 후 커스텀 그룹 섹션 노출 여부 처리
+const _origRender = window.WorkExportUI && window.WorkExportUI.render;
+if (window.WorkExportUI) {
+    const originalRender = window.WorkExportUI.render.bind(window.WorkExportUI);
+    window.WorkExportUI.render = function () {
+        originalRender();
+        const customSection = document.getElementById('expCustomGroupSection');
+        const customGrid = document.getElementById('expColGridCustom');
+        if (customSection && customGrid) {
+            customSection.style.display = customGrid.innerHTML.trim() ? 'flex' : 'none';
+        }
+    };
+}

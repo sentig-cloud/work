@@ -369,7 +369,11 @@ window.saveWorkLog = async () => {
             imgs: [...window.workImgs],
             time: originalTime,
             isDuty: window.isWorkDuty,
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
+            // v2: 커스텀 그룹 선택값 저장
+            customGroups: window.activeCustomGroupSelections
+                ? { ...window.activeCustomGroupSelections }
+                : undefined
         };
 
         const index = window.logs.findIndex((log) => log.id === id);
