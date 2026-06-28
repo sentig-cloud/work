@@ -265,6 +265,8 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
 }
 .block-move-handle:active { cursor: grabbing; }
 .drag-item.is-block-selected .block-move-handle { display: flex; }
+/* 레이아웃 모드에서는 항상 표시 */
+.layout-edit-mode .drag-item .block-move-handle { display: flex; }
 
 /* 리사이즈 핸들 [/] - 블록 우측 하단 */
 .block-resize-handle {
@@ -289,6 +291,7 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
     user-select: none;
 }
 .drag-item.is-block-selected .block-resize-handle { display: flex; }
+.layout-edit-mode .drag-item .block-resize-handle { display: flex; }
 
 /* 선택 해제 버튼 - 블록 우측 상단 */
 .block-deselect-btn {
@@ -311,6 +314,7 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
     user-select: none;
 }
 .drag-item.is-block-selected .block-deselect-btn { display: flex; }
+.layout-edit-mode .drag-item .block-deselect-btn { display: flex; }
 
 /* ─── 그룹 컨테이너 블록 ─── */
 .drag-item.is-group-block {
@@ -408,9 +412,27 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
 .layout-edit-mode .work-layout-group-btn { display: inline-flex; }
 .layout-edit-mode .work-layout-ungroup-btn { display: inline-flex; }
 
+/* ─── 레이아웃 편집 모드: 입력/버튼 완전 잠금 ─── */
+/* 컨테이너 내 모든 input/textarea/button 비활성화 */
+.layout-edit-mode #workDragContainer input,
+.layout-edit-mode #workDragContainer textarea,
+.layout-edit-mode #workDragContainer select {
+    pointer-events: none !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    opacity: 0.6;
+    cursor: not-allowed !important;
+}
+.layout-edit-mode #workDragContainer button:not(.block-move-handle):not(.block-resize-handle):not(.block-deselect-btn):not(.group-add-btn) {
+    pointer-events: none !important;
+    opacity: 0.5;
+    cursor: not-allowed !important;
+}
+
 /* 레이아웃 편집 모드에서 블록 외곽선 */
 .layout-edit-mode .drag-item {
     outline: 1px dashed rgba(217, 119, 6, 0.4);
+    cursor: default;
 }
 
 /* ─── 내부 그리드 (위젯 레이아웃) ─── */

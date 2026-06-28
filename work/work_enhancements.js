@@ -329,8 +329,34 @@
         window.isWorkLayoutMode = !!enabled;
         const modal = document.getElementById("workModal");
         const titlebar = document.getElementById("workModalTitlebar");
+
+        if (window.isWorkLayoutMode) {
+            // ── 진입 시: 포커스 강제 해제, 키보드 내리기
+            if (document.activeElement && document.activeElement.blur) {
+                document.activeElement.blur();
+            }
+            // 모든 input readonly 설정 (CSS pointer-events 보완)
+            const container = document.getElementById("workDragContainer");
+            if (container) {
+                container.querySelectorAll("input, textarea").forEach(el => {
+                    el.dataset.layoutPrevReadonly = el.readOnly ? "1" : "0";
+                    el.readOnly = true;
+                });
+            }
+        } else {
+            // ── 해제 시: readonly 복원
+            const container = document.getElementById("workDragContainer");
+            if (container) {
+                container.querySelectorAll("input, textarea").forEach(el => {
+                    el.readOnly = el.dataset.layoutPrevReadonly === "1";
+                    delete el.dataset.layoutPrevReadonly;
+                });
+            }
+        }
+
         if (modal) modal.classList.toggle("layout-edit-mode", window.isWorkLayoutMode);
         if (titlebar) titlebar.classList.toggle("is-layout-edit", window.isWorkLayoutMode);
+
         if (!window.isWorkLayoutMode) {
             deselectBlock();
             groupCandidates.clear();
