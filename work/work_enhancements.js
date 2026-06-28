@@ -1,15 +1,13 @@
-// work_enhancements.js
-// 임시 2, 3 보강 모듈: 기존 데이터 형식은 유지하고 필요한 UI 동작만 교체한다.
+// work_enhancements.js (v2 - 그리드 레이아웃 + 그룹화)
 (function () {
     "use strict";
 
-    const deepCopy = (value) => JSON.parse(JSON.stringify(value));
-    const esc = (value) => String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
+    // ─────────────────────────────────────────
+    // 유틸
+    // ─────────────────────────────────────────
+    const esc = (v) => String(v ?? "")
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
     const getTagArray = (type) => {
         if (type === "task") return window.taskTypes || [];
@@ -19,37 +17,35 @@
         return window.statuses || [];
     };
 
-    const getTag = (type, name) => getTagArray(type).find((tag) => tag.name === name);
+    const getTag = (type, name) => getTagArray(type).find((t) => t.name === name);
     const showsNumber = (tag) => !tag || tag.showNumber !== false;
     const includesMonthly = (tag) => !tag || tag.includeMonthly !== false;
     const getSortCount = (tag) => Number(tag && tag.count) || 0;
 
-    const replaceInList = (list, oldName, newName) => {
-        if (!Array.isArray(list)) return list;
-        return list.map((name) => name === oldName ? newName : name);
-    };
+    const replaceInList = (list, oldName, newName) =>
+        Array.isArray(list) ? list.map((n) => n === oldName ? newName : n) : list;
 
     const updateLogTagName = (log, type, oldName, newName) => {
         if (!log) return;
-        if (type === "task" && log.taskType) {
+        if (type === "task" && log.taskType)
             log.taskType = replaceInList(String(log.taskType).split(", "), oldName, newName).join(", ");
-        } else if (type === "coworker" && log.coworkers) {
+        else if (type === "coworker" && log.coworkers)
             log.coworkers = replaceInList(log.coworkers, oldName, newName);
-        } else if (type === "status" && log.status === oldName) {
+        else if (type === "status" && log.status === oldName)
             log.status = newName;
-        } else if (type === "memoTag" && log.tags) {
+        else if (type === "memoTag" && log.tags)
             log.tags = replaceInList(log.tags, oldName, newName);
-        } else if (type === "equip" && log.equips && Object.prototype.hasOwnProperty.call(log.equips, oldName)) {
+        else if (type === "equip" && log.equips && Object.prototype.hasOwnProperty.call(log.equips, oldName)) {
             log.equips[newName] = log.equips[oldName];
             delete log.equips[oldName];
         }
     };
 
     const removeCurrentSelection = (type, name) => {
-        if (type === "task") window.activeTaskTypes = (window.activeTaskTypes || []).filter((item) => item !== name);
-        if (type === "coworker") window.selectedCoworkers = (window.selectedCoworkers || []).filter((item) => item !== name);
+        if (type === "task") window.activeTaskTypes = (window.activeTaskTypes || []).filter((i) => i !== name);
+        if (type === "coworker") window.selectedCoworkers = (window.selectedCoworkers || []).filter((i) => i !== name);
         if (type === "status" && window.activeStatus === name) window.activeStatus = null;
-        if (type === "memoTag") window.activeEditTags = (window.activeEditTags || []).filter((item) => item !== name);
+        if (type === "memoTag") window.activeEditTags = (window.activeEditTags || []).filter((i) => i !== name);
         if (type === "equip" && window.activeEquips) delete window.activeEquips[name];
     };
 
@@ -64,18 +60,14 @@
     const getMonthlyCount = (type, name) => {
         const tag = getTag(type, name);
         if (!includesMonthly(tag)) return 0;
-        const logs = (window.logs || []).filter((log) =>
-            log && log.y === window.currentYear && log.m === window.curMonth
-        );
-        if (type === "equip") {
-            return logs.reduce((sum, log) => sum + Number(log.equips && log.equips[name] || 0), 0);
-        }
-        return logs.reduce((sum, log) => {
-            if (type === "task") return sum + (log.taskType && String(log.taskType).split(", ").includes(name) ? 1 : 0);
-            if (type === "coworker") return sum + (log.coworkers && log.coworkers.includes(name) ? 1 : 0);
-            if (type === "status") return sum + (log.status === name ? 1 : 0);
-            if (type === "memoTag") return sum + (log.tags && log.tags.includes(name) ? 1 : 0);
-            return sum;
+        const logs = (window.logs || []).filter((l) => l && l.y === window.currentYear && l.m === window.curMonth);
+        if (type === "equip") return logs.reduce((s, l) => s + Number(l.equips && l.equips[name] || 0), 0);
+        return logs.reduce((s, l) => {
+            if (type === "task") return s + (l.taskType && String(l.taskType).split(", ").includes(name) ? 1 : 0);
+            if (type === "coworker") return s + (l.coworkers && l.coworkers.includes(name) ? 1 : 0);
+            if (type === "status") return s + (l.status === name ? 1 : 0);
+            if (type === "memoTag") return s + (l.tags && l.tags.includes(name) ? 1 : 0);
+            return s;
         }, 0);
     };
 
@@ -95,309 +87,113 @@
             ontouchend="window.endPress(event, '${type}', ${index})"
             ontouchcancel="window.cancelPress()">${esc(getTagLabel(type, tag))}</button>`;
 
+    // ─────────────────────────────────────────
+    // 태그 렌더링
+    // ─────────────────────────────────────────
     window.renderTaskTypes = () => {
         window.taskTypes = window.taskTypes || [];
         window.taskTypes.sort((a, b) => getSortCount(b) - getSortCount(a));
-        document.getElementById("taskTypeArea").innerHTML =
-            window.taskTypes.map((tag, index) => tagButton("task", tag, index, (window.activeTaskTypes || []).includes(tag.name))).join(" ") +
-            `<button type="button" class="w95-btn" onclick="window.addNewType('task')"><b>+</b></button>`;
+        const el = document.getElementById("taskTypeArea");
+        if (!el) return;
+        el.innerHTML = window.taskTypes.map((t, i) =>
+            tagButton("task", t, i, (window.activeTaskTypes || []).includes(t.name))
+        ).join("") + `<button type="button" class="w95-btn" onclick="window.addNewType('task')"><b>+</b></button>`;
     };
 
     window.renderCoworkers = () => {
         window.coworkers = window.coworkers || [];
         window.coworkers.sort((a, b) => getSortCount(b) - getSortCount(a));
-        document.getElementById("coworkerArea").innerHTML =
-            window.coworkers.map((tag, index) => tagButton("coworker", tag, index, (window.selectedCoworkers || []).includes(tag.name))).join(" ") +
-            `<button type="button" class="w95-btn" onclick="window.addNewType('coworker')"><b>+</b></button>`;
-    };
-
-    window.renderEquips = () => {
-        window.equipments = window.equipments || [];
-        window.equipments.sort((a, b) => getSortCount(b) - getSortCount(a));
-        document.getElementById("equipArea").innerHTML =
-            window.equipments.map((tag, index) => tagButton("equip", tag, index, Number(window.activeEquips && window.activeEquips[tag.name] || 0) > 0)).join(" ") +
-            `<button type="button" class="w95-btn" onclick="window.addNewType('equip')"><b>+</b></button>`;
+        const el = document.getElementById("coworkerArea");
+        if (!el) return;
+        el.innerHTML = window.coworkers.map((c, i) =>
+            tagButton("coworker", c, i, (window.selectedCoworkers || []).includes(c.name))
+        ).join("") + `<button type="button" class="w95-btn" onclick="window.addNewType('coworker')"><b>+</b></button>`;
     };
 
     window.renderStatuses = () => {
         window.statuses = window.statuses || [];
         window.statuses.sort((a, b) => getSortCount(b) - getSortCount(a));
-        document.getElementById("statusArea").innerHTML =
-            window.statuses.map((tag, index) => tagButton("status", tag, index, window.activeStatus === tag.name)).join(" ") +
-            `<button type="button" class="w95-btn" onclick="window.addNewType('status')"><b>+</b></button>`;
+        const el = document.getElementById("statusArea");
+        if (!el) return;
+        el.innerHTML = window.statuses.map((s, i) =>
+            tagButton("status", s, i, window.activeStatus === s.name)
+        ).join("") + `<button type="button" class="w95-btn" onclick="window.addNewType('status')"><b>+</b></button>`;
+    };
+
+    window.renderEquips = () => {
+        window.equipments = window.equipments || [];
+        const el = document.getElementById("equipArea");
+        if (!el) return;
+        el.innerHTML = window.equipments.map((eq, i) => {
+            const count = window.activeEquips && window.activeEquips[eq.name] || 0;
+            return tagButton("equip", { ...eq, name: count > 0 ? `${eq.name} (${count})` : eq.name, _name: eq.name }, i, count > 0);
+        }).join("") + `<button type="button" class="w95-btn" onclick="window.addNewType('equip')"><b>+</b></button>`;
+        // 실제 태그 이름 복원
+        el.querySelectorAll("[data-tag-name]").forEach((btn, i) => {
+            if (window.equipments[i]) btn.dataset.tagName = window.equipments[i].name;
+        });
     };
 
     window.renderMemoTags = () => {
         window.memoTags = window.memoTags || [];
         window.memoTags.sort((a, b) => getSortCount(b) - getSortCount(a));
-        window.activeEditTags = window.activeEditTags || [];
-        const area = document.getElementById("editTagArea");
-        if (!area) return;
-        area.innerHTML = window.memoTags.map((tag, index) =>
-            tagButton("memoTag", tag, index, window.activeEditTags.includes(tag.name))
-        ).join(" ") + (window.memoTags.length < 5
-            ? `<button type="button" class="w95-btn" onclick="window.addNewType('memoTag')"><b>+</b></button>`
+        const el = document.getElementById("editTagArea");
+        if (!el) return;
+        el.innerHTML = window.memoTags.map((t, i) => {
+            const active = (window.activeEditTags || []).includes(t.name);
+            return `<button type="button" class="w95-btn layout-tag-button ${active ? "active-btn" : ""}"
+                style="height:30px; white-space:nowrap;"
+                onclick="window.toggleTagSelection('memoTag', '${esc(t.name)}')"
+                oncontextmenu="event.preventDefault(); window.openTagEditBox('memoTag', ${i});"
+                data-tag-type="memoTag" data-tag-name="${esc(t.name)}">${esc(t.name)}</button>`;
+        }).join("") + (window.memoTags.length < 5
+            ? `<button type="button" class="w95-btn" style="height:30px; width:36px;" onclick="window.addNewType('memoTag')"><b>+</b></button>`
             : "");
     };
 
-    window.handleLongPress = (type, index) => window.openTagEditBox(type, index);
-
-    window.handleClick = (type, index) => {
-        if (window.isWorkEditLocked) return;
-        const tag = getTagArray(type)[index];
-        if (!tag) return;
-        if (document.activeElement && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) document.activeElement.blur();
-        if (window.pushWorkUndo && type !== "memoTag") window.pushWorkUndo();
-        if (type === "task") {
-            const indexOf = (window.activeTaskTypes || []).indexOf(tag.name);
-            if (indexOf > -1) window.activeTaskTypes.splice(indexOf, 1); else window.activeTaskTypes.push(tag.name);
-        } else if (type === "coworker") {
-            const indexOf = (window.selectedCoworkers || []).indexOf(tag.name);
-            if (indexOf > -1) window.selectedCoworkers.splice(indexOf, 1); else window.selectedCoworkers.push(tag.name);
-        } else if (type === "status") {
-            window.activeStatus = window.activeStatus === tag.name ? null : tag.name;
-        } else if (type === "equip") {
-            if (Number(window.activeEquips[tag.name] || 0) > 0) delete window.activeEquips[tag.name];
-            else window.activeEquips[tag.name] = 1;
-        } else if (type === "memoTag") {
-            window.toggleTagSelection("memoTag", tag.name);
-        }
-        renderTagType(type);
-    };
-
-    window.openTagEditBox = (type, index) => {
-        const tag = getTagArray(type)[index];
-        if (!tag) return;
-        window.editingTagType = type;
-        window.editingTagIndex = index;
-        window.tempTagQty = type === "equip"
-            ? Number(window.activeEquips && window.activeEquips[tag.name] || tag.count || 0)
-            : Number(tag.count || 0);
-        window.tempTagShowCount = tag.showNumber !== false;
-        window.tempTagMonthly = tag.includeMonthly !== false;
-        document.getElementById("tagEditInput").value = tag.name;
-        document.getElementById("tagEditModal").style.display = "flex";
-        window.refreshTagEditControls();
-        setTimeout(() => document.getElementById("tagEditInput").select(), 80);
-    };
-
-    window.refreshTagEditControls = () => {
-        const qty = document.getElementById("tagQtyDisplay");
-        const numberBtn = document.getElementById("tagShowCountBtn");
-        const monthlyBtn = document.getElementById("tagMonthlyBtn");
-        if (qty) qty.innerText = String(window.tempTagQty || 0);
-        if (numberBtn) numberBtn.className = `w95-btn tag-toggle-btn ${window.tempTagShowCount ? "is-on" : "is-off"}`;
-        if (monthlyBtn) monthlyBtn.className = `w95-btn tag-toggle-btn ${window.tempTagMonthly ? "is-on" : "is-off"}`;
-    };
-
-    window.changeTagQty = (delta) => {
-        window.tempTagQty = Math.max(0, Number(window.tempTagQty || 0) + delta);
-        window.refreshTagEditControls();
-    };
-    window.toggleTagShowCount = () => { window.tempTagShowCount = !window.tempTagShowCount; window.refreshTagEditControls(); };
-    window.toggleTagMonthly = () => { window.tempTagMonthly = !window.tempTagMonthly; window.refreshTagEditControls(); };
-
-    window.saveTagEdit = () => {
-        const type = window.editingTagType;
-        const arr = getTagArray(type);
-        const tag = arr[window.editingTagIndex];
-        if (!tag) return;
-        const newName = document.getElementById("tagEditInput").value.trim();
-        if (!newName) return alert("이름을 입력하세요.");
-        if (arr.some((item, index) => index !== window.editingTagIndex && item.name === newName)) {
-            return alert("같은 이름의 항목이 이미 있습니다.");
-        }
-        const oldName = tag.name;
-        if (window.pushWorkUndo) window.pushWorkUndo();
-        if (newName !== oldName) {
-            window.activeTaskTypes = replaceInList(window.activeTaskTypes, oldName, newName);
-            window.selectedCoworkers = replaceInList(window.selectedCoworkers, oldName, newName);
-            window.activeEditTags = replaceInList(window.activeEditTags, oldName, newName);
-            if (window.activeStatus === oldName) window.activeStatus = newName;
-            if (window.activeEquips && Object.prototype.hasOwnProperty.call(window.activeEquips, oldName)) {
-                window.activeEquips[newName] = window.activeEquips[oldName];
-                delete window.activeEquips[oldName];
-            }
-            (window.logs || []).forEach((log) => updateLogTagName(log, type, oldName, newName));
-            (window.trash || []).forEach((log) => updateLogTagName(log, type, oldName, newName));
-        }
-        tag.name = newName;
-        tag.count = Number(window.tempTagQty || 0);
-        tag.showNumber = window.tempTagShowCount !== false;
-        tag.includeMonthly = window.tempTagMonthly !== false;
-        if (type === "equip") {
-            if (tag.count > 0) window.activeEquips[newName] = tag.count;
-            else delete window.activeEquips[newName];
-        }
-        if (window.saveLocal) window.saveLocal();
-        renderTagType(type);
-        if (window.renderMain) window.renderMain();
-        window.closeTagEditModal();
-    };
-
-    window.deleteTagEdit = () => {
-        const type = window.editingTagType;
-        const arr = getTagArray(type);
-        const tag = arr[window.editingTagIndex];
-        if (!tag) return;
-        if (window.pushWorkUndo) window.pushWorkUndo();
-        removeCurrentSelection(type, tag.name);
-        // 과거 logs와 trash는 의도적으로 건드리지 않는다.
-        arr.splice(window.editingTagIndex, 1);
-        if (window.saveLocal) window.saveLocal();
-        renderTagType(type);
-        if (window.renderMain) window.renderMain();
-        window.closeTagEditModal();
-    };
-
-    window.addNewType = (type) => {
-        const titles = { task: "작업유형", coworker: "매니저", equip: "장비/기타", memoTag: "메모 태그", status: "상태" };
-        let name = prompt(`새로운 ${titles[type] || "항목"}을 입력하세요.`);
-        if (!name) return;
-        name = name.trim();
-        const arr = getTagArray(type);
-        if (!name || arr.some((item) => item.name === name)) return;
-        window.activeTaskTypes = window.activeTaskTypes || [];
-        window.selectedCoworkers = window.selectedCoworkers || [];
-        window.activeEquips = window.activeEquips || {};
-        window.activeEditTags = window.activeEditTags || [];
-        arr.push({ name, count: 0, showNumber: true, includeMonthly: true });
-        if (type === "task" && !(window.activeTaskTypes || []).includes(name)) window.activeTaskTypes.push(name);
-        else if (type === "coworker" && !(window.selectedCoworkers || []).includes(name)) window.selectedCoworkers.push(name);
-        else if (type === "equip") window.activeEquips[name] = 1;
-        else if (type === "memoTag" && !(window.activeEditTags || []).includes(name)) window.activeEditTags.push(name);
-        else if (type === "status") window.activeStatus = name;
-        if (window.saveLocal) window.saveLocal();
-        renderTagType(type);
-    };
-
-    window.startTagSaveDelete = (event) => {
-        if (event) event.preventDefault();
-        window.tagDeleteTriggered = false;
-        const button = document.getElementById("tagSaveDeleteBtn");
-        window.tagDeleteTimer = setTimeout(() => {
-            window.tagDeleteTriggered = true;
-            if (button) button.classList.add("is-arming-delete");
-            if (navigator.vibrate) navigator.vibrate(40);
-            window.deleteTagEdit();
-        }, 3000);
-    };
-    window.cancelTagSaveDelete = () => {
-        clearTimeout(window.tagDeleteTimer);
-        const button = document.getElementById("tagSaveDeleteBtn");
-        if (button) button.classList.remove("is-arming-delete");
-    };
-    window.endTagSaveDelete = (event) => {
-        if (event) event.preventDefault();
-        clearTimeout(window.tagDeleteTimer);
-        if (!window.tagDeleteTriggered) window.saveTagEdit();
-        window.cancelTagSaveDelete();
-    };
-
-    const snapshotWorkDraft = () => {
-        const ids = ["workDateInput", "workTime", "taskNo", "customerName", "workAddress", "workContent", "workNote", "workOT"];
-        const fields = {};
-        ids.forEach((id) => { const el = document.getElementById(id); if (el) fields[id] = el.value; });
-        return {
-            fields,
-            isWorkDuty: !!window.isWorkDuty,
-            activeTaskTypes: deepCopy(window.activeTaskTypes || []),
-            selectedCoworkers: deepCopy(window.selectedCoworkers || []),
-            activeStatus: window.activeStatus || null,
-            activeEquips: deepCopy(window.activeEquips || {}),
-            workImgs: deepCopy(window.workImgs || []),
-            taskTypes: deepCopy(window.taskTypes || []),
-            coworkers: deepCopy(window.coworkers || []),
-            equipments: deepCopy(window.equipments || []),
-            statuses: deepCopy(window.statuses || [])
-        };
-    };
-
+    // ─────────────────────────────────────────
+    // Undo 스택
+    // ─────────────────────────────────────────
     window.workUndoStack = [];
+    const snapshotWorkDraft = () => ({
+        taskNo: document.getElementById("taskNo")?.value ?? "",
+        customerName: document.getElementById("customerName")?.value ?? "",
+        address: document.getElementById("workAddress")?.value ?? "",
+        content: document.getElementById("workContent")?.value ?? "",
+        note: document.getElementById("workNote")?.value ?? "",
+        ot: document.getElementById("workOT")?.value ?? "",
+        time: document.getElementById("workTime")?.value ?? "",
+        date: document.getElementById("workDateInput")?.value ?? ""
+    });
+
     window.updateWorkUndoButton = () => {
-        const button = document.getElementById("workUndoBtn");
-        if (button) button.disabled = window.workUndoStack.length === 0;
-    };
-    window.pushWorkUndo = () => {
-        const modal = document.getElementById("workModal");
-        if (!modal || modal.style.display !== "flex") return;
-        const snapshot = snapshotWorkDraft();
-        const last = window.workUndoStack[window.workUndoStack.length - 1];
-        if (!last || JSON.stringify(last) !== JSON.stringify(snapshot)) {
-            window.workUndoStack.push(snapshot);
-            if (window.workUndoStack.length > 30) window.workUndoStack.shift();
-        }
-        window.updateWorkUndoButton();
-    };
-    window.undoWorkDraft = () => {
-        const snapshot = window.workUndoStack.pop();
-        if (!snapshot) return;
-        const masterBefore = JSON.stringify([window.taskTypes, window.coworkers, window.equipments, window.statuses]);
-        Object.entries(snapshot.fields).forEach(([id, value]) => {
-            const el = document.getElementById(id);
-            if (el) el.value = value;
-        });
-        window.isWorkDuty = snapshot.isWorkDuty;
-        window.activeTaskTypes = snapshot.activeTaskTypes;
-        window.selectedCoworkers = snapshot.selectedCoworkers;
-        window.activeStatus = snapshot.activeStatus;
-        window.activeEquips = snapshot.activeEquips;
-        window.workImgs = snapshot.workImgs;
-        window.taskTypes = snapshot.taskTypes;
-        window.coworkers = snapshot.coworkers;
-        window.equipments = snapshot.equipments;
-        window.statuses = snapshot.statuses;
-        if (window.updateWorkDateLabel) window.updateWorkDateLabel();
-        const duty = document.getElementById("workDutyBtn");
-        if (duty) {
-            duty.style.color = window.isWorkDuty ? "red" : "var(--w-black)";
-            duty.classList.toggle("active-btn", window.isWorkDuty);
-        }
-        window.renderTaskTypes(); window.renderCoworkers(); window.renderEquips(); window.renderStatuses(); window.renderWorkPhotoGrid();
-        if (masterBefore !== JSON.stringify([window.taskTypes, window.coworkers, window.equipments, window.statuses]) && window.saveLocal) window.saveLocal();
-        window.updateWorkUndoButton();
+        const btn = document.getElementById("workUndoBtn");
+        if (btn) btn.disabled = window.workUndoStack.length === 0;
     };
 
-    const originalOpenWorkModal = window.openWorkModal;
-    window.openWorkModal = (...args) => {
-        window.workUndoStack = [];
-        const result = originalOpenWorkModal(...args);
-        window.applyWorkLayout();
-        window.ensureWorkResizeHandles();
-        window.setWorkLayoutMode(false);
+    window.undoWorkDraft = () => {
+        if (!window.workUndoStack.length) return;
+        const prev = window.workUndoStack.pop();
+        if (prev.taskNo !== undefined && document.getElementById("taskNo")) document.getElementById("taskNo").value = prev.taskNo;
+        if (prev.customerName !== undefined && document.getElementById("customerName")) document.getElementById("customerName").value = prev.customerName;
+        if (prev.address !== undefined && document.getElementById("workAddress")) document.getElementById("workAddress").value = prev.address;
+        if (prev.content !== undefined && document.getElementById("workContent")) document.getElementById("workContent").value = prev.content;
+        if (prev.note !== undefined && document.getElementById("workNote")) document.getElementById("workNote").value = prev.note;
+        if (prev.ot !== undefined && document.getElementById("workOT")) document.getElementById("workOT").value = prev.ot;
+        if (prev.time !== undefined && document.getElementById("workTime")) document.getElementById("workTime").value = prev.time;
+        if (prev.date !== undefined && document.getElementById("workDateInput")) {
+            document.getElementById("workDateInput").value = prev.date;
+            if (window.updateWorkDateLabel) window.updateWorkDateLabel();
+        }
         window.updateWorkUndoButton();
-        return result;
-    };
-    const originalCloseWorkModal = window.closeWorkModal;
-    window.closeWorkModal = (...args) => {
-        window.workUndoStack = [];
-        if (window.isWorkLayoutMode) window.setWorkLayoutMode(false);
-        window.updateWorkUndoButton();
-        return originalCloseWorkModal(...args);
-    };
-    const originalToggleDuty = window.toggleDuty;
-    window.toggleDuty = (...args) => {
-        window.pushWorkUndo();
-        return originalToggleDuty(...args);
-    };
-    const originalHandleWorkFiles = window.handleWorkFiles;
-    window.handleWorkFiles = (...args) => {
-        window.pushWorkUndo();
-        return originalHandleWorkFiles(...args);
-    };
-    window.removeWorkPhoto = (index) => {
-        window.pushWorkUndo();
-        window.workImgs.splice(index, 1);
-        window.renderWorkPhotoGrid();
     };
 
     const bindDraftFieldUndo = () => {
         const modal = document.getElementById("workModal");
-        if (!modal || modal.dataset.undoBound) return;
-        modal.dataset.undoBound = "1";
+        if (!modal) return;
         let beforeFocus = null;
-        modal.addEventListener("focusin", (event) => {
-            if (/^(INPUT|TEXTAREA)$/.test(event.target.tagName)) beforeFocus = snapshotWorkDraft();
+        modal.addEventListener("focusin", () => {
+            if (/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName)) beforeFocus = snapshotWorkDraft();
         });
         modal.addEventListener("change", () => {
             if (!beforeFocus) return;
@@ -411,219 +207,133 @@
         });
     };
 
-    const WORK_LAYOUT_KEY = "wm_work_layout_v2";
-    const WORK_LAYOUT_VERSION = 3;
-    const DEFAULT_WORK_LAYOUT_HEIGHT = 0;
-    const MAX_WORK_LAYOUT_HEIGHT = 150;
+    // ═══════════════════════════════════════════
+    // 레이아웃 엔진 v2
+    // ═══════════════════════════════════════════
+    const LAYOUT_KEY = "wm_work_layout_v3";
+    const GRID_COLS = 4; // 기본 그리드 칸 수
+
     window.isWorkLayoutMode = false;
     window.workLayoutLongPressed = false;
     window.workLayoutPressTimer = null;
 
-    const getWorkLayoutContainer = () => document.getElementById("workDragContainer");
-    const getLayoutViewportHeight = () => {
-        const scroll = document.querySelector("#workModal .modal-content-scroll");
-        return Math.max(1, scroll ? scroll.clientHeight : window.innerHeight);
-    };
-    const getMinLayoutHeight = (item) => item && item.dataset.id === "2" ? 18 : 10;
-    const clampLayoutHeight = (item, value) => {
-        if (!value) return DEFAULT_WORK_LAYOUT_HEIGHT;
-        return Math.max(getMinLayoutHeight(item), Math.min(MAX_WORK_LAYOUT_HEIGHT, Number(value) || DEFAULT_WORK_LAYOUT_HEIGHT));
-    };
-    const getWorkLayoutItems = () => {
-        const container = getWorkLayoutContainer();
-        return container ? [...container.querySelectorAll(".drag-item")] : [];
-    };
+    // 현재 선택된 블록
+    let selectedBlock = null;
+    // 현재 그룹화 작업에 선택된 블록들
+    let groupCandidates = new Set();
 
-    const getInnerLayoutSpecs = () => {
-        const date = document.getElementById("workDateInput");
-        const address = document.getElementById("workAddress");
-        const photoGrid = document.getElementById("workPhotoGrid");
-        return [
-            {
-                key: "1-top",
-                items: [
-                    ["date", date && date.parentElement, 2, 1],
-                    ["time", document.getElementById("workTime"), 1, 1],
-                    ["duty", document.getElementById("workDutyBtn"), 1, 1],
-                    ["ot", document.getElementById("workOT"), 1, 1],
-                    ["undo", document.getElementById("workUndoBtn"), 1, 1]
-                ]
-            },
-            {
-                key: "1-info",
-                items: [
-                    ["taskNo", document.getElementById("taskNo"), 2, 1],
-                    ["copy", document.getElementById("workCopyBtn"), 1, 1],
-                    ["customer", document.getElementById("customerName"), 3, 1]
-                ]
-            },
-            {
-                key: "1-address",
-                items: [
-                    ["address", address, 5, 1],
-                    ["map", document.querySelector('.inner-layout-cell[data-inner-id="map"] > button') || (address && address.parentElement.querySelector("button")), 1, 1]
-                ]
-            },
-            {
-                key: "2-text",
-                items: [
-                    ["content", document.getElementById("workContent"), 6, 3],
-                    ["note", document.getElementById("workNote"), 6, 1]
-                ]
-            },
-            {
-                key: "7-photo",
-                items: [
-                    ["photoGrid", photoGrid, 4, 2],
-                    ["photoAlbum", document.querySelector('.inner-layout-cell[data-inner-id="photoAlbum"] > button') || document.querySelector('button[onclick*="workPhotoInput"]'), 2, 1],
-                    ["photoCamera", document.querySelector('.inner-layout-cell[data-inner-id="photoCamera"] > button') || document.querySelector('button[onclick*="workCamInput"]'), 2, 1]
-                ]
-            }
-        ];
-    };
+    const getContainer = () => document.getElementById("workDragContainer");
+    const getAllBlocks = (container) => [...(container || getContainer())?.querySelectorAll(":scope > .drag-item") || []];
 
-    const clampWidgetSpan = (value, max) => Math.max(1, Math.min(max, Number(value) || 1));
-    const setWidgetSize = (cell, colSpan, rowSpan) => {
-        const cols = clampWidgetSpan(colSpan, 6);
-        const rows = clampWidgetSpan(rowSpan, 6);
-        cell.dataset.widgetCols = String(cols);
-        cell.dataset.widgetRows = String(rows);
-        cell.style.setProperty("--widget-cols", cols);
-        cell.style.setProperty("--widget-rows", rows);
-        cell.style.minHeight = `calc((${rows} * 32px) + ((${rows} - 1) * 2px))`;
-    };
+    // ─── 레이아웃 저장/복원 ───
 
-    window.ensureInnerLayoutObjects = () => {
-        getInnerLayoutSpecs().forEach((spec) => {
-            const validItems = spec.items.filter((item) => item[1]);
-            if (validItems.length === 0) return;
-            const firstElement = validItems[0][1];
-            let group = firstElement.closest(".inner-layout-group");
-            if (!group) group = firstElement.parentElement;
-            group.classList.add("inner-layout-group");
-            group.dataset.innerGroup = spec.key;
-            group.style.display = "grid";
-            group.style.gridTemplateColumns = "repeat(6, minmax(0, 1fr))";
-            validItems.forEach(([id, element, colSpan, rowSpan]) => {
-                let cell = element.closest(".inner-layout-cell");
-                if (!cell || cell.parentElement !== group) {
-                    cell = document.createElement("div");
-                    cell.className = "inner-layout-cell";
-                    if (element.parentElement === group) group.insertBefore(cell, element);
-                    else group.appendChild(cell);
-                    cell.appendChild(element);
-                }
-                cell.dataset.innerId = id;
-                if (!cell.dataset.widgetCols) setWidgetSize(cell, colSpan, rowSpan);
-                if (!cell.querySelector(":scope > .widget-resize-handle")) {
-                    const handle = document.createElement("div");
-                    handle.className = "widget-resize-handle";
-                    handle.title = "오른쪽 삼각점을 상하좌우로 끌어 칸 크기 조절";
-                    cell.appendChild(handle);
-                }
-            });
+    const getBlockLayout = (block) => ({
+        cols: Number(block.style.getPropertyValue("--item-cols") || block.dataset.cols || GRID_COLS),
+        rows: Number(block.style.getPropertyValue("--item-rows") || block.dataset.rows || 1),
+        isGroup: block.classList.contains("is-group-block"),
+        groupEnabled: !block.classList.contains("is-group-disabled"),
+        groupTitle: block.querySelector(".group-block-titlebar span")?.textContent || "",
+        innerOrder: block.classList.contains("is-group-block")
+            ? [...block.querySelectorAll(":scope > .group-block-inner > .drag-item")].map(b => b.dataset.id)
+            : null
+    });
+
+    window.saveWorkLayout = () => {
+        const container = getContainer();
+        if (!container) return;
+        const order = [];
+        const blocks = {};
+        getAllBlocks(container).forEach(block => {
+            const id = block.dataset.id;
+            order.push(id);
+            blocks[id] = getBlockLayout(block);
         });
+        localStorage.setItem(LAYOUT_KEY, JSON.stringify({ version: 3, order, blocks }));
+        localStorage.setItem("wm_work_drag_order", JSON.stringify(order));
     };
 
     window.readWorkLayout = () => {
-        try {
-            return JSON.parse(localStorage.getItem(WORK_LAYOUT_KEY) || "{}");
-        } catch (error) {
-            console.warn("레이아웃 설정 읽기 실패:", error);
-            return {};
-        }
+        try { return JSON.parse(localStorage.getItem(LAYOUT_KEY) || "{}"); } catch { return {}; }
     };
 
-    window.saveWorkLayout = () => {
-        const items = getWorkLayoutItems();
-        const heights = {};
-        const innerOrder = {};
-        const widgets = {};
-        items.forEach((item) => {
-            heights[item.dataset.id] = clampLayoutHeight(item, parseFloat(item.dataset.layoutHeight || DEFAULT_WORK_LAYOUT_HEIGHT));
-        });
-        document.querySelectorAll(".inner-layout-group").forEach((group) => {
-            const groupKey = group.dataset.innerGroup;
-            widgets[groupKey] = {};
-            innerOrder[groupKey] = [...group.querySelectorAll(":scope > .inner-layout-cell")]
-                .map((cell) => {
-                    widgets[groupKey][cell.dataset.innerId] = {
-                        colSpan: clampWidgetSpan(cell.dataset.widgetCols, 6),
-                        rowSpan: clampWidgetSpan(cell.dataset.widgetRows, 6)
-                    };
-                    return cell.dataset.innerId;
-                });
-        });
-        const layout = { version: WORK_LAYOUT_VERSION, order: items.map((item) => item.dataset.id), heights, innerOrder, widgets };
-        localStorage.setItem(WORK_LAYOUT_KEY, JSON.stringify(layout));
-        // 예전 순서 설정과도 호환한다.
-        localStorage.setItem("wm_work_drag_order", JSON.stringify(layout.order));
+    const setBlockSize = (block, cols, rows) => {
+        const c = Math.max(1, Math.min(GRID_COLS, Number(cols) || GRID_COLS));
+        const r = Math.max(1, Math.min(20, Number(rows) || 1));
+        block.dataset.cols = String(c);
+        block.dataset.rows = String(r);
+        block.style.setProperty("--item-cols", c);
+        block.style.setProperty("--item-rows", r);
     };
 
     window.applyWorkLayout = () => {
-        const container = getWorkLayoutContainer();
+        const container = getContainer();
         if (!container) return;
-        window.ensureInnerLayoutObjects();
         const layout = window.readWorkLayout();
-        const shouldMigratePhotoButtons = layout.version !== WORK_LAYOUT_VERSION;
         if (Array.isArray(layout.order)) {
-            layout.order.forEach((id) => {
-                const item = container.querySelector(`.drag-item[data-id="${id}"]`);
-                if (item) container.appendChild(item);
+            layout.order.forEach(id => {
+                const block = container.querySelector(`.drag-item[data-id="${id}"]`);
+                if (block) container.appendChild(block);
             });
         }
-        getWorkLayoutItems().forEach((item) => {
-            const height = clampLayoutHeight(item, layout.heights && layout.heights[item.dataset.id]);
-            item.dataset.layoutHeight = String(height);
-            item.style.width = "100%";
-            item.style.maxWidth = "100%";
-            item.style.alignSelf = "flex-start";
-            item.style.height = height ? `${Math.round(getLayoutViewportHeight() * height / 100)}px` : "";
-            item.style.overflow = height ? "auto" : "";
+        getAllBlocks(container).forEach(block => {
+            const id = block.dataset.id;
+            const saved = layout.blocks && layout.blocks[id];
+            setBlockSize(block, saved?.cols ?? GRID_COLS, saved?.rows ?? 1);
         });
-        document.querySelectorAll(".inner-layout-group").forEach((group) => {
-            const order = shouldMigratePhotoButtons && group.dataset.innerGroup === "7-photo"
-                ? ["photoGrid", "photoAlbum", "photoCamera"]
-                : layout.innerOrder && layout.innerOrder[group.dataset.innerGroup];
-            if (Array.isArray(order)) {
-                order.forEach((id) => {
-                    const cell = group.querySelector(`:scope > .inner-layout-cell[data-inner-id="${id}"]`);
-                    if (cell) group.appendChild(cell);
-                });
-            }
-            const widgetSizes = layout.widgets && layout.widgets[group.dataset.innerGroup];
-            [...group.querySelectorAll(":scope > .inner-layout-cell")].forEach((cell) => {
-                if (
-                    shouldMigratePhotoButtons &&
-                    group.dataset.innerGroup === "7-photo" &&
-                    (cell.dataset.innerId === "photoAlbum" || cell.dataset.innerId === "photoCamera")
-                ) {
-                    setWidgetSize(cell, 2, 1);
-                    return;
-                }
-                const size = widgetSizes && widgetSizes[cell.dataset.innerId];
-                setWidgetSize(cell, size && size.colSpan || cell.dataset.widgetCols, size && size.rowSpan || cell.dataset.widgetRows);
-            });
+        window.ensureBlockHandles();
+    };
+
+    // ─── 블록 핸들 주입 ───
+    window.ensureBlockHandles = () => {
+        const container = getContainer();
+        if (!container) return;
+        getAllBlocks(container).forEach(block => {
+            if (block.querySelector(":scope > .block-move-handle")) return;
+            // 이동 핸들
+            const moveH = document.createElement("div");
+            moveH.className = "block-move-handle";
+            moveH.textContent = "O";
+            moveH.title = "눌러서 이동";
+            block.appendChild(moveH);
+            // 리사이즈 핸들
+            const resizeH = document.createElement("div");
+            resizeH.className = "block-resize-handle";
+            resizeH.textContent = "/";
+            resizeH.title = "눌러서 크기 조절";
+            block.appendChild(resizeH);
+            // 선택해제
+            const deselBtn = document.createElement("div");
+            deselBtn.className = "block-deselect-btn";
+            deselBtn.textContent = "✕";
+            deselBtn.title = "선택 해제";
+            block.appendChild(deselBtn);
         });
     };
 
-    window.ensureWorkResizeHandles = () => {
-        getWorkLayoutItems().forEach((item) => {
-            item.querySelector(":scope > .work-resize-handle")?.remove();
-        });
+    // ─── 블록 선택 ───
+    const selectBlock = (block) => {
+        if (selectedBlock && selectedBlock !== block) {
+            selectedBlock.classList.remove("is-block-selected");
+        }
+        selectedBlock = block || null;
+        if (selectedBlock) selectedBlock.classList.add("is-block-selected");
     };
 
+    const deselectBlock = () => {
+        if (selectedBlock) selectedBlock.classList.remove("is-block-selected");
+        selectedBlock = null;
+    };
+
+    // ─── 레이아웃 모드 진입/해제 ───
     window.setWorkLayoutMode = (enabled) => {
         window.isWorkLayoutMode = !!enabled;
         const modal = document.getElementById("workModal");
         const titlebar = document.getElementById("workModalTitlebar");
         if (modal) modal.classList.toggle("layout-edit-mode", window.isWorkLayoutMode);
         if (titlebar) titlebar.classList.toggle("is-layout-edit", window.isWorkLayoutMode);
-        window.ensureWorkResizeHandles();
         if (!window.isWorkLayoutMode) {
-            document.querySelectorAll(".is-widget-selected, .is-section-selected").forEach((item) => {
-                item.classList.remove("is-widget-selected", "is-section-selected");
-            });
+            deselectBlock();
+            groupCandidates.clear();
             window.saveWorkLayout();
             window.applyWorkLayout();
         }
@@ -651,163 +361,428 @@
         if (!window.workLayoutLongPressed && window.isWorkLayoutMode) window.setWorkLayoutMode(false);
         window.workLayoutLongPressed = false;
     };
+
     window.cancelWorkLayoutPress = () => {
         clearTimeout(window.workLayoutPressTimer);
         const button = document.getElementById("workLayoutModeBtn");
         if (button) button.classList.remove("is-layout-pressing");
     };
 
+    // ─── 초기화 ───
     window.resetWorkLayout = () => {
         if (!window.isWorkLayoutMode) return;
-        localStorage.removeItem(WORK_LAYOUT_KEY);
+        localStorage.removeItem(LAYOUT_KEY);
         localStorage.removeItem("wm_work_drag_order");
-        const container = getWorkLayoutContainer();
+        const container = getContainer();
         if (!container) return;
-        [...getWorkLayoutItems()].sort((a, b) => Number(a.dataset.id) - Number(b.dataset.id)).forEach((item) => {
-            item.dataset.layoutHeight = String(DEFAULT_WORK_LAYOUT_HEIGHT);
-            item.style.width = "100%";
-            item.style.height = "";
-            item.style.overflow = "";
-            container.appendChild(item);
-        });
-        document.querySelectorAll(".inner-layout-group").forEach((group) => {
-            [...group.querySelectorAll(":scope > .inner-layout-cell")]
-                .sort((a, b) => a.dataset.innerId.localeCompare(b.dataset.innerId))
-                .forEach((cell) => group.appendChild(cell));
-        });
-        // 기본 순서는 객체화 정의 순서로 다시 적용한다.
-        getInnerLayoutSpecs().forEach((spec) => {
-            const group = document.querySelector(`.inner-layout-group[data-inner-group="${spec.key}"]`);
-            if (!group) return;
-            spec.items.forEach(([id, , colSpan, rowSpan]) => {
-                const cell = group.querySelector(`:scope > .inner-layout-cell[data-inner-id="${id}"]`);
-                if (cell) {
-                    group.appendChild(cell);
-                    setWidgetSize(cell, colSpan, rowSpan);
-                }
+        [...getAllBlocks(container)]
+            .sort((a, b) => Number(a.dataset.id) - Number(b.dataset.id))
+            .forEach(block => {
+                setBlockSize(block, GRID_COLS, 1);
+                container.appendChild(block);
             });
+    };
+
+    // ═══════════════════════════════════════════
+    // 그룹화 / 그룹해제
+    // ═══════════════════════════════════════════
+
+    // 그룹 블록 생성
+    const createGroupBlock = (title, childBlocks) => {
+        const groupId = "grp_" + Date.now();
+        const groupBlock = document.createElement("div");
+        groupBlock.className = "drag-item is-group-block";
+        groupBlock.dataset.id = groupId;
+        setBlockSize(groupBlock, GRID_COLS, Math.max(childBlocks.length, 2));
+
+        const titlebar = document.createElement("div");
+        titlebar.className = "group-block-titlebar";
+        titlebar.innerHTML = `
+            <span>${esc(title)}</span>
+            <button type="button" class="group-add-btn" onclick="window.addBlockToGroup('${groupId}')">+ 태그</button>
+        `;
+        groupBlock.appendChild(titlebar);
+
+        const inner = document.createElement("div");
+        inner.className = "group-block-inner";
+        inner.style.setProperty("--group-cols", GRID_COLS);
+        groupBlock.appendChild(inner);
+
+        childBlocks.forEach(block => {
+            setBlockSize(block, GRID_COLS, Number(block.dataset.rows) || 1);
+            inner.appendChild(block);
         });
+
+        // 핸들 추가
+        const moveH = document.createElement("div");
+        moveH.className = "block-move-handle";
+        moveH.textContent = "O";
+        groupBlock.appendChild(moveH);
+
+        const resizeH = document.createElement("div");
+        resizeH.className = "block-resize-handle";
+        resizeH.textContent = "/";
+        groupBlock.appendChild(resizeH);
+
+        const deselBtn = document.createElement("div");
+        deselBtn.className = "block-deselect-btn";
+        deselBtn.textContent = "✕";
+        groupBlock.appendChild(deselBtn);
+
+        return groupBlock;
+    };
+
+    // 그룹화 실행
+    window.groupSelectedBlocks = () => {
+        if (!window.isWorkLayoutMode) return;
+        const container = getContainer();
+        if (!container) return;
+
+        // 선택된 블록들 수집
+        const selected = getAllBlocks(container).filter(b =>
+            b.classList.contains("is-block-selected") || groupCandidates.has(b.dataset.id)
+        );
+
+        if (selected.length < 1) {
+            alert("그룹화할 블록을 먼저 선택해주세요.\n블록을 탭하면 선택됩니다.');");
+            return;
+        }
+
+        const title = prompt("그룹 이름을 입력하세요.", "새 그룹");
+        if (!title) return;
+
+        // v2 groups에도 등록
+        if (window.addCustomGroup) {
+            window.addCustomGroup(title.trim());
+            window.markDirty && window.markDirty("master", "groups", "upsert");
+        }
+
+        const groupBlock = createGroupBlock(title.trim(), selected);
+        // 첫 번째 선택 블록 위치에 삽입
+        if (selected[0].parentElement === container) {
+            container.insertBefore(groupBlock, selected[0]);
+        } else {
+            container.appendChild(groupBlock);
+        }
+
+        deselectBlock();
+        groupCandidates.clear();
+        window.ensureBlockHandles();
         window.saveWorkLayout();
     };
 
+    // 그룹해제 실행
+    window.ungroupSelectedBlock = () => {
+        if (!window.isWorkLayoutMode) return;
+        const container = getContainer();
+        if (!container) return;
+
+        const groupBlock = selectedBlock || getAllBlocks(container).find(b => b.classList.contains("is-group-block") && b.classList.contains("is-block-selected"));
+        if (!groupBlock || !groupBlock.classList.contains("is-group-block")) {
+            alert("그룹 블록을 선택 후 그룹해제를 눌러주세요.");
+            return;
+        }
+
+        const inner = groupBlock.querySelector(".group-block-inner");
+        const childBlocks = inner ? [...inner.querySelectorAll(":scope > .drag-item")] : [];
+
+        // 선택태그 상자 블록은 비활성화, 기본 블록은 독립 유지
+        const builtInIds = ["1", "2", "7"]; // 날짜/내용/사진
+        childBlocks.forEach(block => {
+            const isBuiltIn = builtInIds.includes(block.dataset.id) || !block.dataset.id?.startsWith("grp_tag_");
+            if (!isBuiltIn) {
+                // 커스텀 태그 블록 → 비활성화
+                block.classList.add("is-group-disabled");
+                // groups에서도 비활성화
+                const groupId = block.dataset.groupId;
+                if (groupId && window.getGroupById) {
+                    const g = window.getGroupById(groupId);
+                    if (g) {
+                        g.enabled = false;
+                        window.markDirty && window.markDirty("master", "groups", "upsert");
+                    }
+                }
+            }
+            setBlockSize(block, GRID_COLS, Number(block.dataset.rows) || 1);
+            container.insertBefore(block, groupBlock);
+        });
+
+        groupBlock.remove();
+        deselectBlock();
+        window.ensureBlockHandles();
+        window.saveWorkLayout();
+    };
+
+    // 그룹에 태그 블록 추가
+    window.addBlockToGroup = (groupId) => {
+        const groupBlock = getContainer()?.querySelector(`.drag-item[data-id="${groupId}"]`);
+        if (!groupBlock) return;
+
+        const name = prompt("새 태그 그룹 이름을 입력하세요.");
+        if (!name || !name.trim()) return;
+
+        // v2 groups에 추가
+        let newGroup = null;
+        if (window.addCustomGroup) {
+            newGroup = window.addCustomGroup(name.trim());
+            window.markDirty && window.markDirty("master", "groups", "upsert");
+            window.saveLocal && window.saveLocal("group-add");
+        }
+
+        // 태그 블록 DOM 생성
+        const tagBlock = document.createElement("div");
+        tagBlock.className = "drag-item w95-in";
+        tagBlock.dataset.id = "grp_tag_" + (newGroup ? newGroup.id : Date.now());
+        tagBlock.dataset.groupId = newGroup ? newGroup.id : "";
+        setBlockSize(tagBlock, GRID_COLS, 1);
+        tagBlock.innerHTML = `
+            <div class="box-title">${esc(name.trim())}</div>
+            <div id="customGroupArea_${newGroup ? newGroup.id : 'tmp'}" class="btn-tag-area"></div>
+        `;
+
+        const inner = groupBlock.querySelector(".group-block-inner");
+        if (inner) inner.appendChild(tagBlock);
+
+        window.ensureBlockHandles();
+        if (newGroup && window.renderCustomGroup) window.renderCustomGroup(newGroup.id);
+        window.saveWorkLayout();
+    };
+
+    // ═══════════════════════════════════════════
+    // 드래그 이동 + 리사이즈 엔진
+    // ═══════════════════════════════════════════
     window.hasInitDragListeners = false;
     window.initWorkDragListeners = () => {
         if (window.hasInitDragListeners) return;
-        const container = getWorkLayoutContainer();
+        const container = getContainer();
         if (!container) return;
-        let dragEl = null;
-        let dragTimer = null;
-        let dragOrigin = null;
 
-        const start = (event) => {
-            if (!window.isWorkLayoutMode) return;
-            const dragHandle = event.target.closest(".drag-handle");
-            if (!dragHandle) return;
-            container.querySelectorAll(".drag-item.is-section-selected").forEach((item) => {
-                item.classList.remove("is-section-selected");
-            });
-            const selectedSection = dragHandle.closest(".drag-item");
-            if (selectedSection) selectedSection.classList.add("is-section-selected");
-            if (event.cancelable) event.preventDefault();
-            const point = event.touches ? event.touches[0] : event;
-            dragOrigin = { x: point.clientX, y: point.clientY };
+        let dragBlock = null;
+        let resizeBlock = null;
+        let resizeStart = null;
+        let dragTimer = null;
+        let pressOrigin = null;
+        let activeHandle = null; // 'move' | 'resize'
+
+        const getPoint = (e) => e.touches ? e.touches[0] : e;
+
+        const startMove = (block, point) => {
             dragTimer = setTimeout(() => {
-                dragEl = dragHandle.closest(".drag-item");
-                if (dragEl) dragEl.classList.add("dragging");
-            }, 300);
+                dragBlock = block;
+                dragBlock.classList.add("is-block-dragging");
+                if (navigator.vibrate) navigator.vibrate(25);
+            }, 250);
         };
 
-        const move = (event) => {
-            if (!window.isWorkLayoutMode) return;
-            const point = event.touches ? event.touches[0] : event;
-            if (!dragEl) {
-                if (dragOrigin && Math.hypot(point.clientX - dragOrigin.x, point.clientY - dragOrigin.y) > 12) {
-                    clearTimeout(dragTimer);
+        const startResize = (block, point) => {
+            resizeBlock = block;
+            const containerWidth = container.getBoundingClientRect().width;
+            resizeStart = {
+                x: point.clientX,
+                y: point.clientY,
+                cols: Number(block.dataset.cols) || GRID_COLS,
+                rows: Number(block.dataset.rows) || 1,
+                colWidth: Math.max(1, (containerWidth - (GRID_COLS - 1) * 2) / GRID_COLS),
+                rowHeight: 38
+            };
+            if (navigator.vibrate) navigator.vibrate(15);
+        };
+
+        const onStart = (e) => {
+            const point = getPoint(e);
+            const moveHandle = e.target.closest(".block-move-handle");
+            const resizeHandle = e.target.closest(".block-resize-handle");
+            const deselBtn = e.target.closest(".block-deselect-btn");
+
+            if (deselBtn) {
+                e.preventDefault();
+                deselectBlock();
+                return;
+            }
+
+            if (moveHandle) {
+                e.preventDefault();
+                const block = moveHandle.closest(".drag-item");
+                if (!block) return;
+                activeHandle = "move";
+                pressOrigin = { x: point.clientX, y: point.clientY };
+                selectBlock(block);
+                startMove(block, point);
+                return;
+            }
+
+            if (resizeHandle) {
+                e.preventDefault();
+                const block = resizeHandle.closest(".drag-item");
+                if (!block) return;
+                activeHandle = "resize";
+                selectBlock(block);
+                startResize(block, point);
+                return;
+            }
+
+            // 레이아웃 모드에서 블록 탭 → 선택
+            if (window.isWorkLayoutMode) {
+                const block = e.target.closest("#workDragContainer > .drag-item");
+                if (block) {
+                    pressOrigin = { x: point.clientX, y: point.clientY };
+                    // 짧은 탭이면 선택
+                    dragTimer = setTimeout(() => {
+                        selectBlock(block);
+                        dragTimer = null;
+                    }, 150);
+                }
+            }
+        };
+
+        const onMove = (e) => {
+            const point = getPoint(e);
+
+            if (resizeBlock && resizeStart) {
+                if (e.cancelable) e.preventDefault();
+                const dCols = Math.round((point.clientX - resizeStart.x) / resizeStart.colWidth);
+                const dRows = Math.round((point.clientY - resizeStart.y) / resizeStart.rowHeight);
+                setBlockSize(resizeBlock, resizeStart.cols + dCols, resizeStart.rows + dRows);
+                return;
+            }
+
+            if (dragBlock) {
+                if (e.cancelable) e.preventDefault();
+                // 드롭 타겟 찾기
+                const el = document.elementFromPoint(point.clientX, point.clientY);
+                const target = el && el.closest("#workDragContainer > .drag-item:not(.is-block-dragging)");
+                container.querySelectorAll(".is-block-drop-target").forEach(b => b.classList.remove("is-block-drop-target"));
+                if (target) {
+                    target.classList.add("is-block-drop-target");
+                    const rect = target.getBoundingClientRect();
+                    const before = point.clientY < rect.top + rect.height / 2;
+                    container.insertBefore(dragBlock, before ? target : target.nextSibling);
                 }
                 return;
             }
-            if (event.cancelable) event.preventDefault();
-            const next = [...container.querySelectorAll(".drag-item:not(.dragging)")].find((item) => {
-                const rect = item.getBoundingClientRect();
-                return point.clientY < rect.top + rect.height / 2;
-            });
-            if (next) container.insertBefore(dragEl, next); else container.appendChild(dragEl);
+
+            // 이동 거리가 크면 탭 취소
+            if (pressOrigin && dragTimer) {
+                const d = Math.hypot(point.clientX - pressOrigin.x, point.clientY - pressOrigin.y);
+                if (d > 8) { clearTimeout(dragTimer); dragTimer = null; }
+            }
         };
 
-        const end = () => {
+        const onEnd = () => {
             clearTimeout(dragTimer);
-            if (dragEl) dragEl.classList.remove("dragging");
-            if (dragEl) window.saveWorkLayout();
-            dragEl = null;
-            dragOrigin = null;
+            dragTimer = null;
+            container.querySelectorAll(".is-block-drop-target").forEach(b => b.classList.remove("is-block-drop-target"));
+            if (dragBlock) dragBlock.classList.remove("is-block-dragging");
+            if (dragBlock || resizeBlock) window.saveWorkLayout();
+            dragBlock = null;
+            resizeBlock = null;
+            resizeStart = null;
+            pressOrigin = null;
+            activeHandle = null;
         };
 
-        container.addEventListener("touchstart", start, { passive: false });
-        container.addEventListener("touchmove", move, { passive: false });
-        container.addEventListener("touchend", end);
-        container.addEventListener("touchcancel", end);
-        container.addEventListener("mousedown", start);
-        window.addEventListener("mousemove", move);
-        window.addEventListener("mouseup", end);
+        // 이벤트 바인딩
+        const modal = document.getElementById("workModal");
+        if (modal) {
+            modal.addEventListener("touchstart", onStart, { passive: false });
+            modal.addEventListener("touchmove", onMove, { passive: false });
+            modal.addEventListener("touchend", onEnd);
+            modal.addEventListener("touchcancel", onEnd);
+            modal.addEventListener("mousedown", onStart);
+        }
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", onEnd);
+
         window.hasInitDragListeners = true;
     };
 
-    const isTextEditingTarget = (target) => !!target && (
-        target.matches("input, textarea, [contenteditable='true']") ||
-        !!target.closest("input, textarea, [contenteditable='true']")
-    );
-
-    document.addEventListener("contextmenu", (event) => {
-        if (!isTextEditingTarget(event.target)) event.preventDefault();
-    });
-    document.addEventListener("selectstart", (event) => {
-        if (!isTextEditingTarget(event.target)) event.preventDefault();
-    });
-    document.addEventListener("dragstart", (event) => {
-        if (!isTextEditingTarget(event.target)) event.preventDefault();
-    });
-
-    const originalStartPress = window.startPress;
-    const originalEndPress = window.endPress;
-    const originalCancelPress = window.cancelPress;
-    window.startPress = (...args) => {
-        if (window.isWorkEditLocked) return;
-        if (window.isWorkLayoutMode) return;
-        return originalStartPress(...args);
-    };
-    window.endPress = (...args) => {
-        if (window.isWorkEditLocked) return;
-        if (window.isWorkLayoutMode) return;
-        return originalEndPress(...args);
-    };
-    window.cancelPress = (...args) => {
-        if (window.isWorkLayoutMode) return;
-        return originalCancelPress(...args);
+    // ═══════════════════════════════════════════
+    // 내부 위젯 레이아웃 (기존 inner-layout 유지)
+    // ═══════════════════════════════════════════
+    const clampWidgetSpan = (v, max) => Math.max(1, Math.min(max, Number(v) || 1));
+    const setWidgetSize = (cell, colSpan, rowSpan) => {
+        const cols = clampWidgetSpan(colSpan, 6);
+        const rows = clampWidgetSpan(rowSpan, 6);
+        cell.dataset.widgetCols = String(cols);
+        cell.dataset.widgetRows = String(rows);
+        cell.style.setProperty("--widget-cols", cols);
+        cell.style.setProperty("--widget-rows", rows);
+        cell.style.minHeight = `calc((${rows} * 32px) + ((${rows} - 1) * 2px))`;
     };
 
-    window.hasInitTagReorderListeners = false;
-    window.initTagReorderListeners = () => {
-        if (window.hasInitTagReorderListeners) return;
-        const modal = document.getElementById("workModal");
-        if (!modal) return;
-        modal.addEventListener("click", (event) => {
-            if (!window.isWorkLayoutMode) return;
-            const button = event.target.closest(".layout-tag-button");
-            if (!button || !modal.contains(button)) return;
-            event.preventDefault();
-            event.stopPropagation();
-            const type = button.dataset.tagType;
-            const index = getTagArray(type).findIndex((tag) => tag.name === button.dataset.tagName);
-            if (index > -1) window.openTagEditBox(type, index);
-        }, true);
-        window.hasInitTagReorderListeners = true;
+    const getInnerLayoutSpecs = () => {
+        const date = document.getElementById("workDateInput");
+        const address = document.getElementById("workAddress");
+        const photoGrid = document.getElementById("workPhotoGrid");
+        return [
+            { key: "1-top", items: [
+                ["date", date && date.parentElement, 2, 1],
+                ["time", document.getElementById("workTime"), 1, 1],
+                ["duty", document.getElementById("workDutyBtn"), 1, 1],
+                ["ot", document.getElementById("workOT"), 1, 1],
+                ["undo", document.getElementById("workUndoBtn"), 1, 1]
+            ]},
+            { key: "1-info", items: [
+                ["taskNo", document.getElementById("taskNo"), 2, 1],
+                ["copy", document.getElementById("workCopyBtn"), 1, 1],
+                ["customer", document.getElementById("customerName"), 3, 1]
+            ]},
+            { key: "1-address", items: [
+                ["address", address, 5, 1],
+                ["map", address && address.parentElement.querySelector("button"), 1, 1]
+            ]},
+            { key: "2-text", items: [
+                ["content", document.getElementById("workContent"), 6, 3],
+                ["note", document.getElementById("workNote"), 6, 1]
+            ]},
+            { key: "7-photo", items: [
+                ["photoGrid", photoGrid, 4, 2],
+                ["photoAlbum", document.querySelector('button[onclick*="workPhotoInput"]'), 2, 1],
+                ["photoCamera", document.querySelector('button[onclick*="workCamInput"]'), 2, 1]
+            ]}
+        ];
     };
 
+    window.ensureInnerLayoutObjects = () => {
+        getInnerLayoutSpecs().forEach((spec) => {
+            const validItems = spec.items.filter((item) => item[1]);
+            if (!validItems.length) return;
+            const firstEl = validItems[0][1];
+            let group = firstEl.closest(".inner-layout-group");
+            if (!group) group = firstEl.parentElement;
+            group.classList.add("inner-layout-group");
+            group.dataset.innerGroup = spec.key;
+            group.style.display = "grid";
+            group.style.gridTemplateColumns = "repeat(6, minmax(0, 1fr))";
+            validItems.forEach(([id, element, colSpan, rowSpan]) => {
+                if (!element) return;
+                let cell = element.closest(".inner-layout-cell");
+                if (!cell || cell.parentElement !== group) {
+                    cell = document.createElement("div");
+                    cell.className = "inner-layout-cell";
+                    if (element.parentElement === group) group.insertBefore(cell, element);
+                    else group.appendChild(cell);
+                    cell.appendChild(element);
+                }
+                cell.dataset.innerId = id;
+                if (!cell.dataset.widgetCols) setWidgetSize(cell, colSpan, rowSpan);
+                if (!cell.querySelector(":scope > .widget-resize-handle")) {
+                    const handle = document.createElement("div");
+                    handle.className = "widget-resize-handle";
+                    handle.title = "끌어서 크기 조절";
+                    cell.appendChild(handle);
+                }
+            });
+        });
+    };
+
+    // ─── 내부 위젯 드래그/리사이즈 ───
     window.hasInitInnerReorderListeners = false;
     window.initInnerReorderListeners = () => {
         if (window.hasInitInnerReorderListeners) return;
         const modal = document.getElementById("workModal");
         if (!modal) return;
+
         let selectedCell = null;
         let dragCell = null;
         let dragGroup = null;
@@ -829,11 +804,10 @@
 
         const start = (event) => {
             if (!window.isWorkLayoutMode) return;
-            clearTimeout(timer);
-            clearTimeout(resizeModeTimer);
+            clearTimeout(timer); clearTimeout(resizeModeTimer);
             resizeHandleLongPressed = false;
-            pendingResizeCell = null;
-            pendingResizeStart = null;
+            pendingResizeCell = null; pendingResizeStart = null;
+
             const resizeHandle = event.target.closest(".widget-resize-handle");
             if (resizeHandle && modal.contains(resizeHandle)) {
                 pendingSelectCell = null;
@@ -842,8 +816,7 @@
                 const point = event.touches ? event.touches[0] : event;
                 const groupRect = pendingResizeCell.parentElement.getBoundingClientRect();
                 pendingResizeStart = {
-                    x: point.clientX,
-                    y: point.clientY,
+                    x: point.clientX, y: point.clientY,
                     cols: Number(pendingResizeCell.dataset.widgetCols) || 1,
                     rows: Number(pendingResizeCell.dataset.widgetRows) || 1,
                     colWidth: Math.max(1, groupRect.width / 6),
@@ -853,17 +826,14 @@
                     resizeHandleLongPressed = true;
                     dragCell = pendingResizeCell;
                     dragGroup = pendingResizeCell && pendingResizeCell.parentElement;
-                    if (dragCell) {
-                        selectCell(dragCell);
-                        dragCell.classList.add("is-widget-dragging");
-                    }
-                    pendingResizeCell = null;
-                    pendingResizeStart = null;
+                    if (dragCell) { selectCell(dragCell); dragCell.classList.add("is-widget-dragging"); }
+                    pendingResizeCell = null; pendingResizeStart = null;
                     if (navigator.vibrate) navigator.vibrate(50);
                 }, 1500);
                 if (event.cancelable) event.preventDefault();
                 return;
             }
+
             const cell = event.target.closest(".inner-layout-cell");
             if (!cell || !modal.contains(cell)) return;
             pendingSelectCell = cell;
@@ -871,10 +841,8 @@
             const point = event.touches ? event.touches[0] : event;
             pressOrigin = { x: point.clientX, y: point.clientY };
             timer = setTimeout(() => {
-                dragCell = cell;
-                dragGroup = cell.parentElement;
-                selectCell(cell);
-                dragCell.classList.add("is-widget-dragging");
+                dragCell = cell; dragGroup = cell.parentElement;
+                selectCell(cell); dragCell.classList.add("is-widget-dragging");
                 if (navigator.vibrate) navigator.vibrate(25);
             }, 700);
         };
@@ -884,18 +852,12 @@
             if (pendingResizeCell && pendingResizeStart) {
                 if (event.cancelable) event.preventDefault();
                 const distance = Math.hypot(point.clientX - pendingResizeStart.x, point.clientY - pendingResizeStart.y);
-                if (resizeHandleLongPressed) {
-                    pendingResizeCell = null;
-                    pendingResizeStart = null;
-                } else if (distance > 10) {
+                if (resizeHandleLongPressed) { pendingResizeCell = null; pendingResizeStart = null; }
+                else if (distance > 10) {
                     clearTimeout(resizeModeTimer);
-                    resizeCell = pendingResizeCell;
-                    resizeStart = pendingResizeStart;
-                    pendingResizeCell = null;
-                    pendingResizeStart = null;
-                } else {
-                    return;
-                }
+                    resizeCell = pendingResizeCell; resizeStart = pendingResizeStart;
+                    pendingResizeCell = null; pendingResizeStart = null;
+                } else return;
             }
             if (resizeCell && resizeStart) {
                 if (event.cancelable) event.preventDefault();
@@ -905,42 +867,32 @@
                 return;
             }
             if (!dragCell || !dragGroup) {
-                if (pressOrigin && Math.hypot(point.clientX - pressOrigin.x, point.clientY - pressOrigin.y) > 12) {
-                    clearTimeout(timer);
-                }
+                if (pressOrigin && Math.hypot(point.clientX - pressOrigin.x, point.clientY - pressOrigin.y) > 12) clearTimeout(timer);
                 return;
             }
             if (event.cancelable) event.preventDefault();
             const over = document.elementFromPoint(point.clientX, point.clientY);
             const target = over && over.closest(".inner-layout-cell");
-            modal.querySelectorAll(".is-widget-drop-target").forEach((item) => item.classList.remove("is-widget-drop-target"));
+            modal.querySelectorAll(".is-widget-drop-target").forEach(i => i.classList.remove("is-widget-drop-target"));
             if (!target || target === dragCell || target.parentElement !== dragGroup) return;
             const rect = target.getBoundingClientRect();
             target.classList.add("is-widget-drop-target");
             const before = point.clientY < rect.top + rect.height / 2 ||
-                (Math.abs(point.clientY - (rect.top + rect.height / 2)) < rect.height / 3 &&
-                    point.clientX < rect.left + rect.width / 2);
+                (Math.abs(point.clientY - (rect.top + rect.height / 2)) < rect.height / 3 && point.clientX < rect.left + rect.width / 2);
             dragGroup.insertBefore(dragCell, before ? target : target.nextSibling);
         };
 
         const end = () => {
-            clearTimeout(timer);
-            clearTimeout(resizeModeTimer);
-            modal.querySelectorAll(".is-widget-drop-target").forEach((item) => item.classList.remove("is-widget-drop-target"));
-            const movedWidget = !!dragCell;
-            const resizedWidget = !!resizeCell || resizeHandleLongPressed;
+            clearTimeout(timer); clearTimeout(resizeModeTimer);
+            modal.querySelectorAll(".is-widget-drop-target").forEach(i => i.classList.remove("is-widget-drop-target"));
+            const moved = !!dragCell; const resized = !!resizeCell || resizeHandleLongPressed;
             if (dragCell) dragCell.classList.remove("is-widget-dragging");
             if (dragCell || resizeCell) window.saveWorkLayout();
-            if (pendingSelectCell && !movedWidget && !resizedWidget) selectCell(pendingSelectCell);
-            dragCell = null;
-            dragGroup = null;
-            resizeCell = null;
-            resizeStart = null;
-            pendingResizeCell = null;
-            pendingResizeStart = null;
-            resizeHandleLongPressed = false;
-            pendingSelectCell = null;
-            pressOrigin = null;
+            if (pendingSelectCell && !moved && !resized) selectCell(pendingSelectCell);
+            dragCell = null; dragGroup = null;
+            resizeCell = null; resizeStart = null;
+            pendingResizeCell = null; pendingResizeStart = null;
+            resizeHandleLongPressed = false; pendingSelectCell = null; pressOrigin = null;
         };
 
         modal.addEventListener("touchstart", start, { passive: false });
@@ -948,17 +900,56 @@
         modal.addEventListener("touchend", end);
         modal.addEventListener("touchcancel", end);
         modal.addEventListener("mousedown", start);
-        modal.addEventListener("click", (event) => {
-            if (!window.isWorkLayoutMode) return;
-            if (!event.target.closest(".inner-layout-cell")) return;
-            event.preventDefault();
-            event.stopPropagation();
-        }, true);
         window.addEventListener("mousemove", move);
         window.addEventListener("mouseup", end);
         window.hasInitInnerReorderListeners = true;
     };
 
+    // ─── 태그 버튼 클릭 (레이아웃 모드에서 편집) ───
+    window.hasInitTagReorderListeners = false;
+    window.initTagReorderListeners = () => {
+        if (window.hasInitTagReorderListeners) return;
+        const modal = document.getElementById("workModal");
+        if (!modal) return;
+        modal.addEventListener("click", (event) => {
+            if (!window.isWorkLayoutMode) return;
+            const button = event.target.closest(".layout-tag-button");
+            if (!button || !modal.contains(button)) return;
+            event.preventDefault(); event.stopPropagation();
+            const type = button.dataset.tagType;
+            const index = getTagArray(type).findIndex(tag => tag.name === button.dataset.tagName);
+            if (index > -1) window.openTagEditBox(type, index);
+        }, true);
+        window.hasInitTagReorderListeners = true;
+    };
+
+    // ─── startPress / endPress / cancelPress 오버라이드 ───
+    const originalStartPress = window.startPress;
+    const originalEndPress = window.endPress;
+    const originalCancelPress = window.cancelPress;
+    window.startPress = (...args) => {
+        if (window.isWorkEditLocked || window.isWorkLayoutMode) return;
+        return originalStartPress && originalStartPress(...args);
+    };
+    window.endPress = (...args) => {
+        if (window.isWorkEditLocked || window.isWorkLayoutMode) return;
+        return originalEndPress && originalEndPress(...args);
+    };
+    window.cancelPress = (...args) => {
+        if (window.isWorkLayoutMode) return;
+        return originalCancelPress && originalCancelPress(...args);
+    };
+
+    // ─── 이벤트 방어 ───
+    const isTextEditingTarget = (target) => !!target && (
+        target.matches("input, textarea, [contenteditable='true']") ||
+        !!target.closest("input, textarea, [contenteditable='true']")
+    );
+    document.addEventListener("contextmenu", (e) => { if (!isTextEditingTarget(e.target)) e.preventDefault(); });
+    document.addEventListener("selectstart", (e) => { if (!isTextEditingTarget(e.target)) e.preventDefault(); });
+    document.addEventListener("dragstart", (e) => { if (!isTextEditingTarget(e.target)) e.preventDefault(); });
+
+    // ─── 대시보드 통계 (includeMonthly 필터) ───
     const countAllowed = (type, name) => includesMonthly(getTag(type, name));
     const oldUpdateDashboardStats = window.updateDashboardStats;
     window.updateDashboardStats = () => {
@@ -966,31 +957,32 @@
         window.logs = (window.logs || []).map((log) => {
             if (!log || log.cat !== "work") return log;
             const copy = { ...log };
-            if (copy.taskType) copy.taskType = String(copy.taskType).split(", ").filter((name) => countAllowed("task", name)).join(", ");
-            if (copy.coworkers) copy.coworkers = copy.coworkers.filter((name) => countAllowed("coworker", name));
+            if (copy.taskType) copy.taskType = String(copy.taskType).split(", ").filter(n => countAllowed("task", n)).join(", ");
+            if (copy.coworkers) copy.coworkers = copy.coworkers.filter(n => countAllowed("coworker", n));
             if (copy.status && !countAllowed("status", copy.status)) copy.status = null;
             return copy;
         });
-        oldUpdateDashboardStats();
+        oldUpdateDashboardStats && oldUpdateDashboardStats();
         window.logs = originalLogs;
     };
 
     const oldRenderMain = window.renderMain;
     window.renderMain = () => {
         const originalLogs = window.logs;
-        window.logs = (window.logs || []).filter((log) => log && (log.y || 2026) === window.currentYear).map((log) => {
+        window.logs = (window.logs || []).filter(log => log && (log.y || 2026) === window.currentYear).map(log => {
             if (!log.status || countAllowed("status", log.status)) return log;
             return { ...log, status: null };
         });
-        oldRenderMain();
+        oldRenderMain && oldRenderMain();
         window.logs = originalLogs;
     };
 
+    // ─── 검색 필터 ───
     const optionLabel = (type, tag, logs) => {
         if (!showsNumber(tag)) return tag.name;
         if (!includesMonthly(tag)) return `[0] ${tag.name}`;
         let count = 0;
-        logs.forEach((log) => {
+        logs.forEach(log => {
             if (type === "task" && log.taskType && String(log.taskType).split(", ").includes(tag.name)) count++;
             if (type === "coworker" && log.coworkers && log.coworkers.includes(tag.name)) count++;
             if (type === "equip" && log.equips) count += Number(log.equips[tag.name] || 0);
@@ -1001,14 +993,13 @@
     };
 
     window.updateSearchFilters = (targetMonth = null) => {
-        const logs = targetMonth ? (window.logs || []).filter((log) => log.m === targetMonth) : (window.logs || []);
+        const logs = targetMonth ? (window.logs || []).filter(l => l.m === targetMonth) : (window.logs || []);
         const fill = (id, title, type, tags) => {
             const select = document.getElementById(id);
             if (!select) return;
             const selected = select.value;
-            select.innerHTML = `<option value="">[ ${title} ]</option>` + (tags || []).map((tag) =>
-                `<option value="${esc(tag.name)}" ${tag.name === selected ? "selected" : ""}>${esc(optionLabel(type, tag, logs))}</option>`
-            ).join("");
+            select.innerHTML = `<option value="">[ ${title} ]</option>` +
+                (tags || []).map(tag => `<option value="${esc(tag.name)}" ${tag.name === selected ? "selected" : ""}>${esc(optionLabel(type, tag, logs))}</option>`).join("");
         };
         fill("searchType", "작업유형", "task", window.taskTypes);
         fill("searchManager", "매니저", "coworker", window.coworkers);
@@ -1017,6 +1008,7 @@
         fill("searchMemoTag", "태그", "memoTag", window.memoTags);
     };
 
+    // ─── 초기화 ───
     bindDraftFieldUndo();
     window.initTagReorderListeners();
     window.initInnerReorderListeners();
