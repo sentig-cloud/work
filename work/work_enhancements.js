@@ -538,7 +538,8 @@
             // 개별 속성으로 직접 지정해 항상 grid가 적용되도록 함.
             group.style.display = "grid";
             group.style.gridTemplateColumns = "repeat(6, minmax(0, 1fr))";
-            group.style.gridAutoFlow = "row dense";
+            // dense는 한 칸을 줄이면 뒤의 다른 칸이 앞으로 당겨져 같이 움직이는 것처럼 보임 — 사용 안 함
+            group.style.gridAutoFlow = "row";
             validItems.forEach(([id, el, cs, rs]) => {
                 if (!el) return;
                 let cell = el.closest(".inner-layout-cell");
@@ -672,7 +673,7 @@
                     ontouchstart="window.startTitlePress(event, '${esc(groupId)}')" ontouchend="window.endTitlePress()" ontouchcancel="window.endTitlePress()"
                     >${esc(title.trim())}</span>
             </div>
-            <div class="group-block-inner" style="--group-cols:${GRID_COLS};padding:2px;display:grid;grid-template-columns:repeat(${GRID_COLS},minmax(0,1fr));grid-auto-flow:row dense;gap:2px;"></div>
+            <div class="group-block-inner" style="--group-cols:${GRID_COLS};padding:2px;display:grid;grid-template-columns:repeat(${GRID_COLS},minmax(0,1fr));grid-auto-flow:row;gap:2px;"></div>
         `;
 
         // 선택된 섹션이 있으면 그 위치에, 없으면 맨 아래
