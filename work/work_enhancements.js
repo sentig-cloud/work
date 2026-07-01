@@ -434,6 +434,11 @@
         if (!window.isWorkLayoutMode) return;
         if (objPanel && objPanel.contains(e.target)) return;
 
+        // 날짜/시간/주소 등은 별도의 inner-layout 드래그 시스템(실제 이동·리사이즈 핸들)이
+        // 전담한다. 여기서 또 반응하면 이미 다른 곳으로 옮겨진 빈 래퍼가 선택되어
+        // "이동해도 변화 없음 / 크기만 이상하게 늘어남" 현상이 발생하므로 건너뛴다.
+        if (e.target.closest(".inner-layout-cell")) return;
+
         // 패널이 열려있으면 닫기
         if (objPanel && objPanel.classList.contains("is-obj-panel-open")) {
             closeObjPanel();

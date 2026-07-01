@@ -158,6 +158,8 @@ window.downloadTextLog = async function (title, lines) {
 
 window.getMasterBackupData = function () {
   return {
+    groups: window.groups || [],
+    // v1 하위 호환 (구버전 복원 파일과의 호환을 위해 유지)
     taskTypes: window.taskTypes || [],
     coworkers: window.coworkers || [],
     statuses: window.statuses || [],
@@ -423,16 +425,42 @@ window.mergeMasterList = function (localList, backupList) {
   return Array.from(map.values());
 };
 
+window.mergeMasterGroups = function (localGroups, backupGroups) {
+  const merged = (localGroups || []).filter(Boolean).map((g) => ({ ...g }));
+  const byId = new Map(merged.map((g) => [g.id, g]));
+
+  for (const incoming of (backupGroups || []).filter(Boolean)) {
+    const existing = byId.get(incoming.id);
+
+    if (!existing) {
+      const clone = { ...incoming };
+      merged.push(clone);
+      byId.set(clone.id, clone);
+    } else {
+      existing.tags = window.mergeMasterList(existing.tags, incoming.tags);
+    }
+  }
+
+  return merged;
+};
+
 window.applyRestoredData = function (data, mode) {
   const incomingLogs = (data.logs || []).filter(Boolean);
+  const hasGroups = Array.isArray(data.groups) && data.groups.length > 0;
 
   if (mode === "replace") {
     window.logs = incomingLogs;
-    window.taskTypes = data.taskTypes || window.taskTypes || [];
-    window.coworkers = data.coworkers || window.coworkers || [];
-    window.statuses = data.statuses || window.statuses || [];
-    window.equipments = data.equipments || window.equipments || [];
-    window.memoTags = data.memoTags || window.memoTags || [];
+
+    if (hasGroups) {
+      window.groups = data.groups.filter(Boolean);
+    } else {
+      // v1 백업(구버전) 호환: groups가 없으면 개별 필드로 복원
+      window.taskTypes = data.taskTypes || window.taskTypes || [];
+      window.coworkers = data.coworkers || window.coworkers || [];
+      window.statuses = data.statuses || window.statuses || [];
+      window.equipments = data.equipments || window.equipments || [];
+      window.memoTags = data.memoTags || window.memoTags || [];
+    }
   } else {
     const logMap = new Map();
 
@@ -446,30 +474,35 @@ window.applyRestoredData = function (data, mode) {
 
     window.logs = Array.from(logMap.values());
 
-    window.taskTypes = window.mergeMasterList(
-      window.taskTypes,
-      data.taskTypes
-    );
+    if (hasGroups) {
+      window.groups = window.mergeMasterGroups(window.groups, data.groups);
+    } else {
+      // v1 백업(구버전) 호환: groups가 없으면 개별 필드로 병합
+      window.taskTypes = window.mergeMasterList(
+        window.taskTypes,
+        data.taskTypes
+      );
 
-    window.coworkers = window.mergeMasterList(
-      window.coworkers,
-      data.coworkers
-    );
+      window.coworkers = window.mergeMasterList(
+        window.coworkers,
+        data.coworkers
+      );
 
-    window.statuses = window.mergeMasterList(
-      window.statuses,
-      data.statuses
-    );
+      window.statuses = window.mergeMasterList(
+        window.statuses,
+        data.statuses
+      );
 
-    window.equipments = window.mergeMasterList(
-      window.equipments,
-      data.equipments
-    );
+      window.equipments = window.mergeMasterList(
+        window.equipments,
+        data.equipments
+      );
 
-    window.memoTags = window.mergeMasterList(
-      window.memoTags,
-      data.memoTags
-    );
+      window.memoTags = window.mergeMasterList(
+        window.memoTags,
+        data.memoTags
+      );
+    }
   }
 
   const activeIds = new Set(
