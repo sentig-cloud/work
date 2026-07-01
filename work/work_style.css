@@ -443,7 +443,7 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
     opacity: 0.6;
     cursor: not-allowed !important;
 }
-.layout-edit-mode #workDragContainer button:not(.block-move-handle):not(.block-resize-handle):not(.block-deselect-btn):not(.group-add-btn) {
+.layout-edit-mode #workDragContainer button:not(.block-move-handle):not(.block-deselect-btn):not(.group-add-btn) {
     pointer-events: none !important;
     opacity: 0.5;
     cursor: not-allowed !important;
@@ -470,63 +470,37 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
     display: flex;
     min-width: 0;
     min-height: calc((var(--widget-rows, 1) * 32px) + ((var(--widget-rows, 1) - 1) * 2px));
-    grid-column: span var(--widget-cols, 1);
-    grid-row: span var(--widget-rows, 1);
+    /* 자동 정렬(auto-flow) 대신 좌측상단 (1,1) 기준 명시 좌표를 직접 사용 —
+       각 객체가 그룹 안 어디로든(1,1 / 2,1 / 2,2 ...) 자유롭게 배치될 수 있다 */
+    grid-column: var(--obj-col, auto) / span var(--widget-cols, 1);
+    grid-row: var(--obj-row, auto) / span var(--widget-rows, 1);
 }
 .inner-layout-cell > input,
 .inner-layout-cell > textarea,
 .inner-layout-cell > button,
-.inner-layout-cell > div:not(.inner-move-handle):not(.widget-resize-handle) {
+.inner-layout-cell > div:not(.widget-resize-handle) {
     flex: 1; width: 100%; min-height: 100%;
 }
 
-/* 내부 이동 핸들 */
-.inner-move-handle {
-    display: none;
-    position: absolute;
-    top: 50%; left: 50%;
-    width: 30px; height: 18px;
-    transform: translate(-50%, -50%);
-    z-index: 25;
-    cursor: grab;
-    touch-action: none;
-    background: rgba(255, 224, 138, 0.82);
-    border: 1px solid #d97706;
-}
-.inner-move-handle::after {
-    content: "···";
-    position: absolute; inset: 0;
-    display: flex; align-items: center; justify-content: center;
-    color: #8a4300; font-weight: bold; line-height: 1;
-}
-/* 선택된 객체에만 이동 손잡이 표시 — 나머지 칸은 평상시 색/모양 그대로 유지 */
-.layout-edit-mode .inner-layout-cell.is-widget-selected > .inner-move-handle { display: block; }
-.inner-layout-cell.is-inner-dragging {
-    opacity: 0.58;
-    outline: 2px dashed #d97706;
-}
-
-/* 내부 리사이즈 핸들 — 셀 경계 안쪽에만 위치(이전엔 52x58로 커서 옆 칸까지 덮어버렸음) */
+/* 손잡이 하나만 사용: 탭하면 선택되고 가운데 점이 뜬다.
+   그 점을 바로 드래그하면 크기 조절(우측=늘어남, 좌측=줄어듦, 아래=늘어남, 위=줄어듦),
+   1.5초 눌렀다 드래그하면 이동. */
 .widget-resize-handle {
     display: none;
     position: absolute;
-    right: 0; bottom: 0;
-    width: 18px; height: 18px;
+    top: 50%; left: 50%;
+    width: 20px; height: 20px;
+    transform: translate(-50%, -50%);
     z-index: 25;
-    cursor: nwse-resize;
+    cursor: pointer;
     touch-action: none;
+    background: rgba(37, 99, 235, 0.9);
+    border: 1px solid #1d4ed8;
+    border-radius: 50%;
 }
-.widget-resize-handle::after {
-    content: "";
-    position: absolute;
-    right: 2px; bottom: 2px;
-    width: 0; height: 0;
-    border-bottom: 11px solid #2563eb;
-    border-left: 11px solid transparent;
-}
+/* 선택된 객체에만 점 표시 — 나머지 칸은 평상시 색/모양 그대로 유지 */
 .layout-edit-mode .inner-layout-cell.is-widget-selected > .widget-resize-handle { display: block; }
-.inner-layout-cell.is-widget-dragging { opacity: 0.58; outline: 2px dashed #d97706; }
-.inner-layout-cell.is-widget-drop-target { outline: 2px dashed #d97706; background: rgba(255, 248, 223, 0.72); }
+.inner-layout-cell.is-widget-dragging { opacity: 0.58; outline: 2px dashed #d97706; z-index: 20; }
 
 /* ─── 잠금 모드 ─── */
 .work-edit-locked #workDragContainer { filter: saturate(0.82); }

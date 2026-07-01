@@ -85,7 +85,7 @@
                 <span>작업 일지 작성</span>
                 <div class="work-layout-title-actions">
                     <button type="button" id="workLayoutOrderBtn" class="w95-btn work-layout-order-btn"
-                        title="선택한 그룹의 순서 변경" onclick="window.reorderSelectedBlock()">순서</button>
+                        title="켜면 그룹 단위로만 선택·이동 가능" onclick="window.toggleOrderMode()">순서</button>
                     <button type="button" id="workLayoutGroupBtn" class="w95-btn work-layout-group-btn"
                         title="그룹 추가" onclick="window.groupSelectedBlocks()">그룹+</button>
                     <button type="button" id="workLayoutUngroupBtn" class="w95-btn work-layout-ungroup-btn"
@@ -158,25 +158,25 @@
                         </div>
                     </div>
 
-                    <div class="drag-item w95-in" data-id="3">
+                    <div class="drag-item w95-in" data-id="3" data-group-ref="taskTypes">
                         <div id="boxTitle_taskType" class="box-title" onmousedown="window.startTitlePress(event, 'taskType')" onmouseup="window.endTitlePress()" onmouseleave="window.endTitlePress()" ontouchstart="window.startTitlePress(event, 'taskType')" ontouchend="window.endTitlePress()" ontouchcancel="window.endTitlePress()">작업 유형</div>
                         <div id="taskTypeArea" class="btn-tag-area"></div>
                         <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>
                     </div>
 
-                    <div class="drag-item w95-in" data-id="4">
+                    <div class="drag-item w95-in" data-id="4" data-group-ref="coworkers">
                         <div id="boxTitle_coworkers" class="box-title" onmousedown="window.startTitlePress(event, 'coworkers')" onmouseup="window.endTitlePress()" onmouseleave="window.endTitlePress()" ontouchstart="window.startTitlePress(event, 'coworkers')" ontouchend="window.endTitlePress()" ontouchcancel="window.endTitlePress()">매니저</div>
                         <div id="coworkerArea" class="btn-tag-area"></div>
                         <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>
                     </div>
 
-                    <div class="drag-item w95-in" data-id="5">
+                    <div class="drag-item w95-in" data-id="5" data-group-ref="equipments">
                         <div id="boxTitle_equips" class="box-title" onmousedown="window.startTitlePress(event, 'equips')" onmouseup="window.endTitlePress()" onmouseleave="window.endTitlePress()" ontouchstart="window.startTitlePress(event, 'equips')" ontouchend="window.endTitlePress()" ontouchcancel="window.endTitlePress()">사용 장비</div>
                         <div id="equipArea" class="btn-tag-area"></div>
                         <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>
                     </div>
 
-                    <div class="drag-item w95-in" data-id="6">
+                    <div class="drag-item w95-in" data-id="6" data-group-ref="statuses">
                         <div id="boxTitle_status" class="box-title" onmousedown="window.startTitlePress(event, 'status')" onmouseup="window.endTitlePress()" onmouseleave="window.endTitlePress()" ontouchstart="window.startTitlePress(event, 'status')" ontouchend="window.endTitlePress()" ontouchcancel="window.endTitlePress()">상태</div>
                         <div id="statusArea" class="btn-tag-area"></div>
                         <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>

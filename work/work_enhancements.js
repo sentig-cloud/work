@@ -184,7 +184,6 @@
         overlay.innerHTML = `
             <button type="button" class="block-move-handle" title="눌러서 이동">⠿</button>
             <button type="button" class="block-deselect-btn" title="선택 해제">✕</button>
-            <button type="button" class="block-resize-handle" title="눌러서 크기 조절">⤡</button>
         `;
         el.appendChild(overlay);
         return overlay;
@@ -243,54 +242,37 @@
         blockDragParent.insertBefore(blockDragEl, before ? target : target.nextSibling);
     };
 
+    // 블록(그룹) 이동 종료 후, groups[] 배열 순서도 화면 순서에 맞춰 동기화 —
+    // 내보내기(엑셀/CSV)의 커스텀 그룹 컬럼 순서가 이 배열 순서를 그대로 따라간다.
+    window.syncGroupOrderFromLayout = () => {
+        const container = getContainer();
+        if (!container || !window.groups) return;
+        const domGroupIds = [...container.querySelectorAll(":scope > .drag-item[data-group-ref]")]
+            .map(el => el.dataset.groupRef);
+        if (!domGroupIds.length) return;
+        const domIndex = new Map(domGroupIds.map((id, i) => [id, i]));
+        window.groups.sort((a, b) => {
+            const ai = domIndex.has(a.id) ? domIndex.get(a.id) : Infinity;
+            const bi = domIndex.has(b.id) ? domIndex.get(b.id) : Infinity;
+            return ai - bi;
+        });
+        window.groups.forEach((g, i) => { if (domIndex.has(g.id)) g.order = domIndex.get(g.id); });
+        window.markDirty?.("master", "groups", "upsert");
+    };
+
     const endBlockMove = () => {
         document.querySelectorAll(".is-block-drop-target").forEach(i => i.classList.remove("is-block-drop-target"));
         if (blockDragEl) {
             blockDragEl.classList.remove("is-block-dragging");
+            window.syncGroupOrderFromLayout();
             window.saveWorkLayout();
+            if (window.saveLocal) window.saveLocal("group-reorder");
         }
         blockDragEl = null; blockDragParent = null;
     };
 
     // ═══════════════════════════════════════════
-    // 리사이즈 핸들 드래그 (⤡) — 눌러서 끌면 가로/세로 크기 조절
-    // ═══════════════════════════════════════════
-    let blockResizeEl = null, blockResizeStart = null;
-
-    const startBlockResize = (e) => {
-        const handle = e.target.closest(".block-resize-handle");
-        if (!handle || !window.isWorkLayoutMode) return;
-        const el = handle.closest(".drag-item");
-        if (!el) return;
-        e.preventDefault();
-        e.stopPropagation();
-        const scope = getDragScope(el);
-        const scopeRect = scope.getBoundingClientRect();
-        const point = e.touches ? e.touches[0] : e;
-        blockResizeEl = el;
-        blockResizeStart = {
-            x: point.clientX, y: point.clientY,
-            cols: Number(el.dataset.cols || GRID_COLS),
-            rows: Number(el.dataset.rows || 1),
-            colWidth: Math.max(1, scopeRect.width / GRID_COLS),
-            rowHeight: 36
-        };
-    };
-
-    const moveBlockResize = (e) => {
-        if (!blockResizeEl || !blockResizeStart) return;
-        e.preventDefault();
-        const point = e.touches ? e.touches[0] : e;
-        const dCols = Math.round((point.clientX - blockResizeStart.x) / blockResizeStart.colWidth);
-        const dRows = Math.round((point.clientY - blockResizeStart.y) / blockResizeStart.rowHeight);
-        setBlockSize(blockResizeEl, blockResizeStart.cols + dCols, blockResizeStart.rows + dRows);
-    };
-
-    const endBlockResize = () => {
-        if (blockResizeEl) window.saveWorkLayout();
-        blockResizeEl = null; blockResizeStart = null;
-    };
-
+    // 그룹(블록) 크기는 자동 — 리사이즈 핸들 없음(위 이동 핸들만 존재)
     // ═══════════════════════════════════════════
     // 탭 → 선택(핸들 표시) / 배경·✕ 탭 → 선택 해제
     // ═══════════════════════════════════════════
@@ -302,8 +284,9 @@
         if (e.target.closest(".block-move-handle") || e.target.closest(".block-resize-handle")) return;
 
         // 날짜/시간/주소/작업내용 등 개별 필드는 별도의 inner-layout 드래그 시스템이 전담
-        // (그룹 배경을 탭해도 상위 섹션 전체가 선택되지 않도록 그룹 범위 전체를 제외)
-        if (e.target.closest(".inner-layout-cell") || e.target.closest(".inner-layout-group")) return;
+        // (그룹 배경을 탭해도 상위 섹션 전체가 선택되지 않도록 그룹 범위 전체를 제외) —
+        // 단, "순서" 모드일 때는 객체 선택을 막고 그룹(블록) 전체 선택만 허용해야 하므로 이 예외를 건너뛴다.
+        if (!window.isOrderMode && (e.target.closest(".inner-layout-cell") || e.target.closest(".inner-layout-group"))) return;
 
         const deselectBtn = e.target.closest(".block-deselect-btn");
         if (deselectBtn) {
@@ -380,6 +363,41 @@
         cell.style.setProperty("--widget-rows", r);
         cell.style.minHeight = `calc((${r} * 32px) + ((${r} - 1) * 2px))`;
     };
+    // 좌측상단 (1,1) 기준 명시적 좌표 — grid-auto-flow에 맡기지 않고 직접 위치를 고정한다
+    const setObjPos = (cell, row, col) => {
+        const r = Math.max(1, Math.min(200, Number(row) || 1));
+        const c = Math.max(1, Math.min(6, Number(col) || 1));
+        cell.dataset.objRow = String(r);
+        cell.dataset.objCol = String(c);
+        cell.style.setProperty("--obj-row", r);
+        cell.style.setProperty("--obj-col", c);
+    };
+    // 그룹 안의 다른 칸들이 차지한 좌표 집합(예외 칸 제외)
+    const getGroupOccupancy = (group, exceptCell) => {
+        const occ = new Set();
+        [...group.querySelectorAll(":scope > .inner-layout-cell")].forEach(c => {
+            if (c === exceptCell) return;
+            const r = Number(c.dataset.objRow) || 1, col = Number(c.dataset.objCol) || 1;
+            const cs = Number(c.dataset.widgetCols) || 1, rs = Number(c.dataset.widgetRows) || 1;
+            for (let rr = r; rr < r + rs; rr++) for (let cc = col; cc < col + cs; cc++) occ.add(`${rr},${cc}`);
+        });
+        return occ;
+    };
+    const footprintFree = (occ, row, col, cs, rs) => {
+        for (let rr = row; rr < row + rs; rr++) for (let cc = col; cc < col + cs; cc++) {
+            if (cc > 6 || occ.has(`${rr},${cc}`)) return false;
+        }
+        return true;
+    };
+    // 겹치지 않는 첫 빈 자리를 찾아 배치(최초 생성 시 기본 배치용)
+    const findFreeSlot = (occ, cs, rs) => {
+        for (let r = 1; r <= 200; r++) {
+            for (let c = 1; c <= 6 - cs + 1; c++) {
+                if (footprintFree(occ, r, c, cs, rs)) return { row: r, col: c };
+            }
+        }
+        return { row: 1, col: 1 };
+    };
 
     window.saveWorkLayout = () => {
         const container = getContainer(); if (!container) return;
@@ -413,7 +431,9 @@
             innerOrder[key] = [...group.querySelectorAll(":scope > .inner-layout-cell")].map(cell => {
                 widgets[key][cell.dataset.innerId] = {
                     colSpan: clampWidgetSpan(cell.dataset.widgetCols, 6),
-                    rowSpan: clampWidgetSpan(cell.dataset.widgetRows, 6)
+                    rowSpan: clampWidgetSpan(cell.dataset.widgetRows, 6),
+                    row: Number(cell.dataset.objRow) || 1,
+                    col: Number(cell.dataset.objCol) || 1
                 };
                 return cell.dataset.innerId;
             });
@@ -482,6 +502,7 @@
             [...group.querySelectorAll(":scope > .inner-layout-cell")].forEach(cell => {
                 const s = ws?.[cell.dataset.innerId];
                 setWidgetSize(cell, s?.colSpan || cell.dataset.widgetCols, s?.rowSpan || cell.dataset.widgetRows);
+                if (s && s.row && s.col) setObjPos(cell, s.row, s.col);
             });
         });
     };
@@ -501,8 +522,10 @@
                 ["copy", document.getElementById("workCopyBtn"), 1, 1],
                 ["customer", document.getElementById("customerName"), 3, 1],
                 ["address", document.getElementById("workAddress"), 4, 1],
-                // 이전 selector가 주소 래퍼 안에서 button을 찾아 항상 null이었음(지도 버튼은 별도 래퍼) — 직접 지정
-                ["map", document.querySelector('.work-obj-wrap[data-obj-id="map"] button'), 1, 1],
+                // 이전 selector(주소 래퍼 안에서 button 검색)는 항상 null이었음(지도 버튼은 별도 래퍼).
+                // 버튼 자신의 속성으로 직접 찾아야 이 함수가 여러 번 호출돼 버튼이 이미 칸 안으로
+                // 옮겨진 뒤에도(부모가 바뀐 뒤에도) 계속 같은 버튼을 다시 찾을 수 있다.
+                ["map", document.querySelector('button[onmousedown*="startMapPress"]'), 1, 1],
                 ["undo", document.getElementById("workUndoBtn"), 1, 1],
                 // 작업내용/특이사항: 날짜·Task 블록과 같은 그룹에 고정 — 항상 붙어서 표시
                 ["content", document.getElementById("workContent"), 6, 3],
@@ -529,6 +552,7 @@
             group.style.gridTemplateColumns = "repeat(6, minmax(0, 1fr))";
             // dense는 한 칸을 줄이면 뒤의 다른 칸이 앞으로 당겨져 같이 움직이는 것처럼 보임 — 사용 안 함
             group.style.gridAutoFlow = "row";
+            const cellsInSpec = [];
             validItems.forEach(([id, el, cs, rs]) => {
                 if (!el) return;
                 let cell = el.closest(".inner-layout-cell");
@@ -541,17 +565,29 @@
                 }
                 cell.dataset.innerId = id;
                 if (!cell.dataset.widgetCols) setWidgetSize(cell, cs, rs);
+                // 손잡이 하나만 사용: 탭하면 선택되고, 그 위 점을 롱탭하면 이동, 바로 드래그하면 크기 조절
                 if (!cell.querySelector(":scope > .widget-resize-handle")) {
                     const h = document.createElement("div");
                     h.className = "widget-resize-handle";
+                    h.title = "드래그=크기 조절 / 길게 눌렀다 드래그=이동";
                     cell.appendChild(h);
                 }
-                // 이동 핸들: 눌러서 그대로 끌면 이동 (CSS는 이미 준비돼 있었으나 미사용 상태였음)
-                if (!cell.querySelector(":scope > .inner-move-handle")) {
-                    const m = document.createElement("div");
-                    m.className = "inner-move-handle";
-                    cell.appendChild(m);
-                }
+                cellsInSpec.push(cell);
+            });
+
+            // 자동 정렬(auto-flow) 대신 명시적 좌표(row,col)를 사용 —
+            // 저장된 좌표가 없는 칸만 처음 한 번 빈 자리에 배치하고, 이후로는 사용자가 옮긴 위치를 그대로 유지한다.
+            const occ = new Set();
+            cellsInSpec.filter(c => c.dataset.objRow).forEach(c => {
+                const r = Number(c.dataset.objRow), col = Number(c.dataset.objCol);
+                const cs = Number(c.dataset.widgetCols) || 1, rs = Number(c.dataset.widgetRows) || 1;
+                for (let rr = r; rr < r + rs; rr++) for (let cc = col; cc < col + cs; cc++) occ.add(`${rr},${cc}`);
+            });
+            cellsInSpec.filter(c => !c.dataset.objRow).forEach(c => {
+                const cs = Number(c.dataset.widgetCols) || 1, rs = Number(c.dataset.widgetRows) || 1;
+                const slot = findFreeSlot(occ, cs, rs);
+                for (let rr = slot.row; rr < slot.row + rs; rr++) for (let cc = slot.col; cc < slot.col + cs; cc++) occ.add(`${rr},${cc}`);
+                setObjPos(c, slot.row, slot.col);
             });
         });
 
@@ -630,6 +666,11 @@
         [...getAllSections(container)]
             .sort((a, b) => Number(a.dataset.id) - Number(b.dataset.id))
             .forEach(block => { setBlockSize(block, GRID_COLS, 1); container.appendChild(block); });
+        // 이미 배치된 칸의 좌표/크기 데이터도 지워야 새로고침 없이 바로 기본 배치로 되돌아간다
+        container.querySelectorAll(".inner-layout-cell").forEach(cell => {
+            delete cell.dataset.objRow; delete cell.dataset.objCol;
+            delete cell.dataset.widgetCols; delete cell.dataset.widgetRows;
+        });
         window.ensureInnerLayoutObjects();
     };
 
@@ -694,27 +735,19 @@
         deleteGroupBlock(selectedBlock.el);
     };
 
-    // ─── 그룹(블록) 순서 변경 ───
-    window.reorderSelectedBlock = () => {
+    // ─── 순서 모드 토글 ───
+    // 켜면: 객체(칸) 선택은 막히고 그룹(블록) 전체만 선택 가능 — 그 상태에서 이동(⠿)만 허용.
+    // 꺼지면: 원래대로 객체 단위 선택/이동/리사이즈로 복귀.
+    window.isOrderMode = false;
+    window.toggleOrderMode = () => {
         if (!window.isWorkLayoutMode) {
             alert("레이아웃 편집 모드에서 사용하세요.");
             return;
         }
-        if (!selectedBlock) {
-            alert("순서를 바꿀 그룹(블록)을 먼저 탭해서 선택하세요.");
-            return;
-        }
-        const el = selectedBlock.el;
-        const parent = el.parentElement;
-        const siblings = [...parent.querySelectorAll(":scope > .drag-item")];
-        const currentPos = siblings.indexOf(el) + 1;
-        const input = prompt(`몇 번째 순서로 옮길까요? (1~${siblings.length})`, String(currentPos));
-        if (!input) return;
-        const targetPos = Math.max(1, Math.min(siblings.length, parseInt(input, 10) || currentPos));
-        const others = siblings.filter(s => s !== el);
-        others.splice(targetPos - 1, 0, el);
-        others.forEach(s => parent.appendChild(s));
-        window.saveWorkLayout();
+        window.isOrderMode = !window.isOrderMode;
+        deselectBlock();
+        document.getElementById("workLayoutOrderBtn")?.classList.toggle("active-btn", window.isOrderMode);
+        document.getElementById("workModal")?.classList.toggle("order-mode", window.isOrderMode);
     };
 
     // ═══════════════════════════════════════════
@@ -726,19 +759,15 @@
         const modal = document.getElementById("workModal");
         if (!modal) return;
 
-        // 이동 핸들(⠿) / 리사이즈 핸들(⤡) 누르기 시작
+        // 이동 핸들(⠿) 누르기 시작 — 그룹(블록) 크기는 자동이라 리사이즈 핸들 없음
         modal.addEventListener("touchstart", startBlockMove, { passive: false });
         modal.addEventListener("mousedown", startBlockMove);
-        modal.addEventListener("touchstart", startBlockResize, { passive: false });
-        modal.addEventListener("mousedown", startBlockResize);
 
         const onBlockPointerMove = (e) => {
             if (blockDragEl) { moveBlockMove(e); return; }
-            if (blockResizeEl) { moveBlockResize(e); return; }
         };
         const onBlockPointerEnd = () => {
             if (blockDragEl) { blockJustDragged = true; endBlockMove(); }
-            if (blockResizeEl) { blockJustDragged = true; endBlockResize(); }
         };
 
         modal.addEventListener("touchmove", onBlockPointerMove, { passive: false });
@@ -1167,11 +1196,10 @@
         const modal = document.getElementById("workModal");
         if (!modal) return;
 
-        let selectedCell = null, dragCell = null, dragGroup = null;
+        let selectedCell = null, dragCell = null, dragGroup = null, dragOrigPos = null;
         let resizeCell = null, resizeStart = null;
         let pendingResizeCell = null, pendingResizeStart = null;
-        let pendingSelectCell = null, pressOrigin = null;
-        let timer = null, resizeModeTimer = null, resizeHandleLongPressed = false;
+        let resizeHandleLongPressed = false, resizeModeTimer = null;
 
         const selectCell = (cell) => {
             if (selectedCell && selectedCell !== cell) selectedCell.classList.remove("is-widget-selected");
@@ -1187,13 +1215,15 @@
             cell.style.minHeight = `calc((${r} * 32px) + ((${r} - 1) * 2px))`;
         };
 
+        // 손잡이 없이 칸 몸체를 탭하면 그냥 선택만 한다(이동/크기조절은 반드시 가운데 점에서만).
         const start = (event) => {
             if (!window.isWorkLayoutMode) return;
-            clearTimeout(timer); clearTimeout(resizeModeTimer);
+            // 순서 모드에서는 객체(칸) 단위 선택/이동/리사이즈를 막고 그룹(블록) 선택만 허용
+            if (window.isOrderMode) return;
+            clearTimeout(resizeModeTimer);
             resizeHandleLongPressed = false; pendingResizeCell = null; pendingResizeStart = null;
             const resizeHandle = event.target.closest(".widget-resize-handle");
             if (resizeHandle && modal.contains(resizeHandle)) {
-                pendingSelectCell = null;
                 pendingResizeCell = resizeHandle.closest(".inner-layout-cell");
                 selectCell(pendingResizeCell);
                 const point = event.touches ? event.touches[0] : event;
@@ -1202,11 +1232,15 @@
                     x: point.clientX, y: point.clientY,
                     cols: Number(pendingResizeCell.dataset.widgetCols) || 1,
                     rows: Number(pendingResizeCell.dataset.widgetRows) || 1,
-                    colWidth: Math.max(1, groupRect.width / 6), rowHeight: 32
+                    row: Number(pendingResizeCell.dataset.objRow) || 1,
+                    col: Number(pendingResizeCell.dataset.objCol) || 1,
+                    colWidth: Math.max(1, groupRect.width / 6), rowHeight: 32,
+                    groupLeft: groupRect.left, groupTop: groupRect.top
                 };
                 resizeModeTimer = setTimeout(() => {
                     resizeHandleLongPressed = true;
                     dragCell = pendingResizeCell; dragGroup = pendingResizeCell && pendingResizeCell.parentElement;
+                    dragOrigPos = { row: pendingResizeStart.row, col: pendingResizeStart.col };
                     if (dragCell) { selectCell(dragCell); dragCell.classList.add("is-widget-dragging"); }
                     pendingResizeCell = null; pendingResizeStart = null;
                     if (navigator.vibrate) navigator.vibrate(50);
@@ -1214,17 +1248,11 @@
                 if (event.cancelable) event.preventDefault();
                 return;
             }
+            // 손잡이가 아닌 칸 본문 탭 → 선택만(이동/리사이즈 없음)
             const cell = event.target.closest(".inner-layout-cell");
             if (!cell || !modal.contains(cell)) return;
-            pendingSelectCell = cell;
             if (event.cancelable) event.preventDefault();
-            const point = event.touches ? event.touches[0] : event;
-            pressOrigin = { x: point.clientX, y: point.clientY };
-            timer = setTimeout(() => {
-                dragCell = cell; dragGroup = cell.parentElement;
-                selectCell(cell); dragCell.classList.add("is-widget-dragging");
-                if (navigator.vibrate) navigator.vibrate(25);
-            }, 700);
+            selectCell(cell);
         };
 
         const move = (event) => {
@@ -1241,57 +1269,52 @@
             }
             if (resizeCell && resizeStart) {
                 if (event.cancelable) event.preventDefault();
-                setWSize(resizeCell,
-                    resizeStart.cols + Math.round((point.clientX - resizeStart.x) / resizeStart.colWidth),
-                    resizeStart.rows + Math.round((point.clientY - resizeStart.y) / resizeStart.rowHeight));
+                // 좌측상단(row,col)은 고정, 우측/아래로 늘어나고 좌측/위로 줄어든다
+                const group = resizeCell.parentElement;
+                const occ = getGroupOccupancy(group, resizeCell);
+                let cols = clampW(resizeStart.cols + Math.round((point.clientX - resizeStart.x) / resizeStart.colWidth), 6 - resizeStart.col + 1);
+                let rows = Math.max(1, resizeStart.rows + Math.round((point.clientY - resizeStart.y) / resizeStart.rowHeight));
+                // 다른 칸과 겹치면 그 방향으로는 더 못 늘어나게 줄인다
+                while (cols > 1 && !footprintFree(occ, resizeStart.row, resizeStart.col, cols, rows)) cols--;
+                while (rows > 1 && !footprintFree(occ, resizeStart.row, resizeStart.col, cols, rows)) rows--;
+                setWSize(resizeCell, cols, rows);
                 return;
             }
-            if (!dragCell || !dragGroup) {
-                if (pressOrigin && Math.hypot(point.clientX - pressOrigin.x, point.clientY - pressOrigin.y) > 12) clearTimeout(timer);
-                return;
-            }
+            if (!dragCell || !dragGroup) return;
             if (event.cancelable) event.preventDefault();
-            const over = document.elementFromPoint(point.clientX, point.clientY);
-            let target = over && over.closest(".inner-layout-cell");
-            if (target && (target === dragCell || target.parentElement !== dragGroup)) target = null;
-            // 커서 아래에 칸이 없는 빈 공간(줄 사이 여백 등)에 놓아도 "안 움직인다"고 느끼지 않도록,
-            // 그룹 안의 가장 가까운 칸을 찾아 그 앞/뒤로 이동시킨다 — 자유 이동 보장
-            if (!target) {
-                const groupRect = dragGroup.getBoundingClientRect();
-                if (point.clientX < groupRect.left || point.clientX > groupRect.right ||
-                    point.clientY < groupRect.top - 40 || point.clientY > groupRect.bottom + 40) {
-                    modal.querySelectorAll(".is-widget-drop-target").forEach((i) => i.classList.remove("is-widget-drop-target"));
-                    return;
-                }
-                let nearest = null, nearestDist = Infinity;
-                [...dragGroup.querySelectorAll(":scope > .inner-layout-cell")].forEach((cell) => {
-                    if (cell === dragCell) return;
-                    const r = cell.getBoundingClientRect();
-                    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-                    const dist = Math.hypot(point.clientX - cx, point.clientY - cy);
-                    if (dist < nearestDist) { nearestDist = dist; nearest = cell; }
-                });
-                target = nearest;
-            }
-            modal.querySelectorAll(".is-widget-drop-target").forEach((i) => i.classList.remove("is-widget-drop-target"));
-            if (!target || target === dragCell || target.parentElement !== dragGroup) return;
-            const rect = target.getBoundingClientRect();
-            target.classList.add("is-widget-drop-target");
-            const before = point.clientY < rect.top + rect.height / 2 ||
-                (Math.abs(point.clientY - (rect.top + rect.height / 2)) < rect.height / 3 && point.clientX < rect.left + rect.width / 2);
-            dragGroup.insertBefore(dragCell, before ? target : target.nextSibling);
+            const groupRect = dragGroup.getBoundingClientRect();
+            const cs = Number(dragCell.dataset.widgetCols) || 1;
+            const colWidth = Math.max(1, groupRect.width / 6);
+            let col = Math.floor((point.clientX - groupRect.left) / colWidth) + 1;
+            let row = Math.floor((point.clientY - groupRect.top) / 32) + 1;
+            col = Math.max(1, Math.min(6 - cs + 1, col));
+            row = Math.max(1, row);
+            // 드래그 중엔 목표 좌표로 바로 옮겨서 미리보기(최종 겹침 처리는 놓는 순간에)
+            setObjPos(dragCell, row, col);
         };
 
         const end = () => {
-            clearTimeout(timer); clearTimeout(resizeModeTimer);
-            modal.querySelectorAll(".is-widget-drop-target").forEach((i) => i.classList.remove("is-widget-drop-target"));
-            const moved = !!dragCell, resized = !!resizeCell || resizeHandleLongPressed;
-            if (dragCell) dragCell.classList.remove("is-widget-dragging");
+            clearTimeout(resizeModeTimer);
+            if (dragCell && dragGroup) {
+                dragCell.classList.remove("is-widget-dragging");
+                const row = Number(dragCell.dataset.objRow), col = Number(dragCell.dataset.objCol);
+                const cs = Number(dragCell.dataset.widgetCols) || 1, rs = Number(dragCell.dataset.widgetRows) || 1;
+                // 놓은 자리에 다른 칸이 있으면 그 칸과 자리를 맞바꾼다(직관적이고 예측 가능한 규칙)
+                const collided = [...dragGroup.querySelectorAll(":scope > .inner-layout-cell")].find(c => {
+                    if (c === dragCell) return false;
+                    const r = Number(c.dataset.objRow) || 1, cc = Number(c.dataset.objCol) || 1;
+                    const ccs = Number(c.dataset.widgetCols) || 1, crs = Number(c.dataset.widgetRows) || 1;
+                    for (let rr = row; rr < row + rs; rr++) for (let col2 = col; col2 < col + cs; col2++) {
+                        if (rr >= r && rr < r + crs && col2 >= cc && col2 < cc + ccs) return true;
+                    }
+                    return false;
+                });
+                if (collided && dragOrigPos) setObjPos(collided, dragOrigPos.row, dragOrigPos.col);
+            }
             if (dragCell || resizeCell) window.saveWorkLayout && window.saveWorkLayout();
-            if (pendingSelectCell && !moved && !resized) selectCell(pendingSelectCell);
-            dragCell = null; dragGroup = null; resizeCell = null; resizeStart = null;
+            dragCell = null; dragGroup = null; dragOrigPos = null; resizeCell = null; resizeStart = null;
             pendingResizeCell = null; pendingResizeStart = null;
-            resizeHandleLongPressed = false; pendingSelectCell = null; pressOrigin = null;
+            resizeHandleLongPressed = false;
         };
 
         modal.addEventListener("touchstart", start, { passive: false });
