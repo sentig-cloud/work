@@ -492,13 +492,12 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
     outline: 2px dashed #d97706;
 }
 
-/* 내부 리사이즈 핸들 */
+/* 내부 리사이즈 핸들 — 셀 경계 안쪽에만 위치(이전엔 52x58로 커서 옆 칸까지 덮어버렸음) */
 .widget-resize-handle {
     display: none;
     position: absolute;
-    right: 0; top: 50%;
-    width: 52px; height: 58px;
-    transform: translateY(-50%);
+    right: 0; bottom: 0;
+    width: 18px; height: 18px;
     z-index: 25;
     cursor: nwse-resize;
     touch-action: none;
@@ -506,12 +505,10 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
 .widget-resize-handle::after {
     content: "";
     position: absolute;
-    right: 8px; top: 50%;
+    right: 2px; bottom: 2px;
     width: 0; height: 0;
-    transform: translateY(-50%);
-    border-top: 13px solid transparent;
-    border-bottom: 13px solid transparent;
-    border-left: 18px solid #2563eb;
+    border-bottom: 11px solid #2563eb;
+    border-left: 11px solid transparent;
 }
 .layout-edit-mode .inner-layout-cell.is-widget-selected > .widget-resize-handle { display: block; }
 .inner-layout-cell.is-widget-dragging { opacity: 0.58; outline: 2px dashed #d97706; }

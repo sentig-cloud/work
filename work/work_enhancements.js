@@ -301,8 +301,9 @@
         if (blockJustDragged) { blockJustDragged = false; return; }
         if (e.target.closest(".block-move-handle") || e.target.closest(".block-resize-handle")) return;
 
-        // 날짜/시간/주소 등 개별 필드는 별도의 inner-layout 드래그 시스템이 전담
-        if (e.target.closest(".inner-layout-cell")) return;
+        // 날짜/시간/주소/작업내용 등 개별 필드는 별도의 inner-layout 드래그 시스템이 전담
+        // (그룹 배경을 탭해도 상위 섹션 전체가 선택되지 않도록 그룹 범위 전체를 제외)
+        if (e.target.closest(".inner-layout-cell") || e.target.closest(".inner-layout-group")) return;
 
         const deselectBtn = e.target.closest(".block-deselect-btn");
         if (deselectBtn) {
@@ -347,7 +348,7 @@
 
         const inner = groupEl.querySelector(".group-block-inner");
         const children = inner ? [...inner.querySelectorAll(":scope > .drag-item")] : [];
-        const builtInIds = ["1", "2", "3", "4", "5", "6", "7"];
+        const builtInIds = ["1", "3", "4", "5", "6", "7"];
 
         children.forEach(block => {
             const isBuiltIn = builtInIds.includes(block.dataset.id);
@@ -498,25 +499,23 @@
     };
 
     // ─── inner-layout 객체 주입 ───
+    // 날짜/시간/당직/OT/되돌리기, Task번호/복사/고객명, 주소/지도, 작업내용/특이사항은
+    // 전부 하나의 입력 그룹(1-fields)으로 취급 — 간격 없이 붙어서 표시되고,
+    // 각 객체는 개별적으로 롱탭 이동 / 드래그 리사이즈가 가능하다.
     window.ensureInnerLayoutObjects = () => {
         const specs = [
-            { key: "1-top", items: [
+            { key: "1-fields", items: [
                 ["date", document.getElementById("workDateInput")?.parentElement, 2, 1],
                 ["time", document.getElementById("workTime"), 1, 1],
                 ["duty", document.getElementById("workDutyBtn"), 1, 1],
-                ["ot", document.getElementById("workOT"), 1, 1],
-                ["undo", document.getElementById("workUndoBtn"), 1, 1]
-            ]},
-            { key: "1-info", items: [
+                ["ot", document.getElementById("workOT"), 2, 1],
                 ["taskNo", document.getElementById("taskNo"), 2, 1],
                 ["copy", document.getElementById("workCopyBtn"), 1, 1],
-                ["customer", document.getElementById("customerName"), 3, 1]
-            ]},
-            { key: "1-address", items: [
-                ["address", document.getElementById("workAddress"), 5, 1],
-                ["map", document.getElementById("workAddress")?.parentElement?.querySelector("button"), 1, 1]
-            ]},
-            { key: "2-text", items: [
+                ["customer", document.getElementById("customerName"), 3, 1],
+                ["address", document.getElementById("workAddress"), 4, 1],
+                ["map", document.getElementById("workAddress")?.parentElement?.querySelector("button"), 1, 1],
+                ["undo", document.getElementById("workUndoBtn"), 1, 1],
+                // 작업내용/특이사항: 날짜·Task 블록과 같은 그룹에 고정 — 항상 붙어서 표시
                 ["content", document.getElementById("workContent"), 6, 3],
                 ["note", document.getElementById("workNote"), 6, 1]
             ]},
@@ -534,7 +533,12 @@
             let group = firstEl.closest(".inner-layout-group") || firstEl.parentElement;
             group.classList.add("inner-layout-group");
             group.dataset.innerGroup = spec.key;
-            group.style.cssText += ";display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-flow:row dense;";
+            // 주의: cssText += 는 date 래퍼에 이미 있던 inline "display:flex"와 충돌해
+            // grid가 적용되지 않는 버그가 있었음(각 칸이 flex로 동일폭 분할되어 겹쳐 보이던 원인).
+            // 개별 속성으로 직접 지정해 항상 grid가 적용되도록 함.
+            group.style.display = "grid";
+            group.style.gridTemplateColumns = "repeat(6, minmax(0, 1fr))";
+            group.style.gridAutoFlow = "row dense";
             validItems.forEach(([id, el, cs, rs]) => {
                 if (!el) return;
                 let cell = el.closest(".inner-layout-cell");
@@ -559,6 +563,15 @@
                     cell.appendChild(m);
                 }
             });
+        });
+
+        // 내용이 다른 곳으로 옮겨지고 남은 빈 work-obj-wrap은 숨김
+        // (그대로 두면 빈 칸이 그대로 자리를 차지해서 목록 사이에 빈 줄이 보임)
+        // 주의: inner-layout-group으로 재사용된 wrap(예: 날짜 칸)은 grid 컨테이너이므로
+        // 여기서 display를 건드리면 방금 지정한 "display:grid"가 지워져 버림 — 반드시 제외.
+        getContainer()?.querySelectorAll(".work-obj-wrap").forEach(wrap => {
+            if (wrap.classList.contains("inner-layout-group")) return;
+            wrap.style.display = wrap.children.length === 0 ? "none" : "";
         });
     };
 
