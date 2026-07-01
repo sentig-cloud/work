@@ -9,13 +9,10 @@
         .replace(/&/g, "&amp;").replace(/</g, "&lt;")
         .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
-    const getTagArray = (type) => {
-        if (type === "task") return window.taskTypes || [];
-        if (type === "coworker") return window.coworkers || [];
-        if (type === "equip") return window.equipments || [];
-        if (type === "memoTag") return window.memoTags || [];
-        return window.statuses || [];
-    };
+    // 커스텀 그룹(예: "그룹+"로 만든 선택 태그 상자)까지 포함해 groupId를 올바르게 해석하는
+    // work_tag_manager.js의 window.getTagArray로 위임한다. 예전엔 여기서 5개 고정 타입만 다뤄서
+    // 커스텀 그룹 id가 들어오면 무조건 "status"로 취급해 엉뚱한 그룹에 태그가 추가/삭제되던 버그가 있었음.
+    const getTagArray = (type) => (window.getTagArray ? window.getTagArray(type) : []);
 
     const getTag = (type, name) => getTagArray(type).find((t) => t.name === name);
     const showsNumber = (tag) => !tag || tag.showNumber !== false;
@@ -116,33 +113,26 @@
     // Undo 스택
     // ═══════════════════════════════════════════
     window.workUndoStack = [];
-    const snap = () => ({
-        taskNo: document.getElementById("taskNo")?.value ?? "",
-        customerName: document.getElementById("customerName")?.value ?? "",
-        address: document.getElementById("workAddress")?.value ?? "",
-        content: document.getElementById("workContent")?.value ?? "",
-        note: document.getElementById("workNote")?.value ?? "",
-        ot: document.getElementById("workOT")?.value ?? "",
-        time: document.getElementById("workTime")?.value ?? "",
-        date: document.getElementById("workDateInput")?.value ?? ""
-    });
 
     window.updateWorkUndoButton = () => {
         const btn = document.getElementById("workUndoBtn");
         if (btn) btn.disabled = !window.workUndoStack.length;
     };
 
-    // undoWorkDraft: 완전판은 아래에서 정의
-
+    // undoWorkDraft가 기대하는 스냅샷 모양({fields, isWorkDuty, ...})은 아래 snapshotWorkDraftFull()이 정의함.
+    // 이전에는 여기서 별도의 간단한 snap()을 만들어 다른 모양({taskNo, address, ...} 평면 객체)으로
+    // 스택에 바로 push했는데, undoWorkDraft()는 항상 snapshot.fields를 읽으므로 이 모양의 항목을
+    // pop하면 fields가 undefined라 TypeError로 조용히 실패했다 — 이게 "되돌리기가 전혀 안 먹는다"의 원인.
+    // 텍스트 입력 변경 감지도 동일한 snapshotWorkDraftFull()을 쓰도록 통일해서 스택 모양을 일치시킴.
     const bindDraftFieldUndo = () => {
         const modal = document.getElementById("workModal"); if (!modal) return;
         let before = null;
         modal.addEventListener("focusin", () => {
-            if (/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName)) before = snap();
+            if (/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName)) before = snapshotWorkDraftFull();
         });
         modal.addEventListener("change", () => {
             if (!before) return;
-            const cur = snap();
+            const cur = snapshotWorkDraftFull();
             if (JSON.stringify(before) !== JSON.stringify(cur)) {
                 window.workUndoStack.push(before);
                 if (window.workUndoStack.length > 30) window.workUndoStack.shift();
@@ -176,26 +166,14 @@
     // ═══════════════════════════════════════════
     const BLOCK_SELECTED_CLASS = "is-block-selected";
 
-    const ensureBlockOverlay = (el) => {
-        let overlay = el.querySelector(":scope > .block-overlay");
-        if (overlay) return overlay;
-        overlay = document.createElement("div");
-        overlay.className = "block-overlay";
-        overlay.innerHTML = `
-            <button type="button" class="block-move-handle" title="눌러서 이동">⠿</button>
-            <button type="button" class="block-deselect-btn" title="선택 해제">✕</button>
-        `;
-        el.appendChild(overlay);
-        return overlay;
-    };
-
+    // 선택 표시는 오직 주황 사각 테두리(.is-block-selected, CSS)뿐 —
+    // 이동은 순서 모드에서 선택된 영역을 직접 드래그해서 한다(별도 손잡이 버튼 없음).
     const selectBlock = (el, type) => {
         if (selectedBlock && selectedBlock.el !== el) {
             selectedBlock.el.classList.remove(BLOCK_SELECTED_CLASS);
         }
         selectedBlock = { el, type };
         el.classList.add(BLOCK_SELECTED_CLASS);
-        ensureBlockOverlay(el);
     };
 
     const deselectBlock = () => {
@@ -203,23 +181,20 @@
         selectedBlock = null;
     };
 
-    // ─── 드래그 대상 범위: 그룹 안이면 그 그룹 내부, 아니면 최상위 컨테이너 ───
-    const getDragScope = (el) => {
-        const parent = el.parentElement;
-        if (parent && parent.classList.contains("group-block-inner")) return parent;
-        return getContainer();
-    };
+    // ─── 드래그 대상 범위: 모든 블록은 최상위 컨테이너에 나란히 있다 ───
+    const getDragScope = () => getContainer();
 
     // ═══════════════════════════════════════════
     // 이동 핸들 드래그 (⠿) — 눌러서 그대로 끌면 이동
     // ═══════════════════════════════════════════
     let blockDragEl = null, blockDragParent = null;
 
+    // 순서 모드에서 이미 선택된(주황 사각) 블록의 몸체를 바로 누르면 그대로 끌어서 이동 —
+    // 별도 손잡이 아이콘 없이 "누르고 있는 대상을 다른 대상 쪽으로 밀어넣는" 자연스러운 방식.
     const startBlockMove = (e) => {
-        const handle = e.target.closest(".block-move-handle");
-        if (!handle || !window.isWorkLayoutMode) return;
-        const el = handle.closest(".drag-item");
-        if (!el) return;
+        if (!window.isWorkLayoutMode || !window.isOrderMode) return;
+        const el = e.target.closest(".drag-item.is-block-selected");
+        if (!el || !selectedBlock || selectedBlock.el !== el) return;
         e.preventDefault();
         e.stopPropagation();
         blockDragEl = el;
@@ -238,7 +213,8 @@
         if (!target || target === blockDragEl || target.parentElement !== blockDragParent) return;
         const rect = target.getBoundingClientRect();
         target.classList.add("is-block-drop-target");
-        const before = point.clientX < rect.left + rect.width / 2;
+        // 위/아래로 쌓인 블록이므로 세로 위치 기준으로 앞/뒤를 정한다
+        const before = point.clientY < rect.top + rect.height / 2;
         blockDragParent.insertBefore(blockDragEl, before ? target : target.nextSibling);
     };
 
@@ -281,41 +257,21 @@
     const onBlockTap = (e) => {
         if (!window.isWorkLayoutMode) return;
         if (blockJustDragged) { blockJustDragged = false; return; }
-        if (e.target.closest(".block-move-handle") || e.target.closest(".block-resize-handle")) return;
 
         // 날짜/시간/주소/작업내용 등 개별 필드는 별도의 inner-layout 드래그 시스템이 전담
         // (그룹 배경을 탭해도 상위 섹션 전체가 선택되지 않도록 그룹 범위 전체를 제외) —
         // 단, "순서" 모드일 때는 객체 선택을 막고 그룹(블록) 전체 선택만 허용해야 하므로 이 예외를 건너뛴다.
         if (!window.isOrderMode && (e.target.closest(".inner-layout-cell") || e.target.closest(".inner-layout-group"))) return;
 
-        const deselectBtn = e.target.closest(".block-deselect-btn");
-        if (deselectBtn) {
-            e.preventDefault();
-            e.stopPropagation();
-            deselectBlock();
-            return;
-        }
-
         const modal = document.getElementById("workModal");
         if (!modal || !modal.contains(e.target)) return;
 
-        const grpTitle = e.target.closest(".group-block-titlebar");
-        if (grpTitle) {
-            const grp = grpTitle.closest(".is-group-block");
-            if (grp && !e.target.closest(".group-title-text")) {
-                e.preventDefault();
-                e.stopPropagation();
-                selectBlock(grp, "group");
-                return;
-            }
-            if (grp) return; // 제목 자체는 길게 눌러 이름 변경(box-title 로직 재사용)
-        }
-
-        const sec = e.target.closest("#workDragContainer > .drag-item, .group-block-inner > .drag-item");
+        // 이름 수정을 위한 롱탭은 box-title 자신의 핸들러가 처리 — 여기서는 선택만 담당
+        const sec = e.target.closest("#workDragContainer > .drag-item");
         if (sec) {
             e.preventDefault();
             e.stopPropagation();
-            selectBlock(sec, sec.classList.contains("is-group-block") ? "group" : "section");
+            selectBlock(sec, "section");
             return;
         }
 
@@ -324,16 +280,20 @@
     };
 
     // ─── 그룹 삭제 (그룹- = 해당 커스텀 태그 상자 그룹을 완전히 삭제) ───
+    // 작업유형/매니저 등 기본 그룹도 화면 순서 동기화를 위해 data-group-ref를 갖고 있지만,
+    // 기본 그룹은 삭제 대상이 아니므로 removeGroup()이 실제로 지웠을 때만 화면에서도 제거한다.
     const deleteGroupBlock = (groupEl) => {
         const groupId = groupEl.dataset.groupRef || groupEl.dataset.id;
         const g = groupId && window.getGroupById ? window.getGroupById(groupId) : null;
         const label = g ? g.title : "이 그룹";
         if (!confirm(`"${label}" 그룹을 삭제하시겠습니까?\n그룹 안의 선택 항목도 함께 삭제됩니다.`)) return;
 
-        if (groupId && window.removeGroup) {
-            window.removeGroup(groupId);
-            window.markDirty?.("master", "groups", "upsert");
+        const removed = groupId && window.removeGroup ? window.removeGroup(groupId) : false;
+        if (!removed) {
+            alert("기본 제공 그룹은 삭제할 수 없습니다.");
+            return;
         }
+        window.markDirty?.("master", "groups", "upsert");
 
         groupEl.remove();
         deselectBlock();
@@ -690,22 +650,21 @@
         }
         const groupId = g ? g.id : ("grp_" + Date.now());
 
+        // 기존 작업유형/매니저 등 기본 그룹과 완전히 동일한 마크업(w95-in + box-title + btn-tag-area)을 사용해
+        // 새로 만든 그룹도 디자인이 똑같고, 이름 수정(길게 눌러 변경)도 동일하게 동작한다.
         const groupEl = document.createElement("div");
-        groupEl.className = "drag-item is-group-block";
+        groupEl.className = "drag-item w95-in";
         groupEl.dataset.id = groupId;
         groupEl.dataset.groupRef = groupId;
-        setBlockSize(groupEl, GRID_COLS, 2);
+        setBlockSize(groupEl, GRID_COLS, 1);
 
         groupEl.innerHTML = `
-            <div class="group-block-titlebar w95-titlebar" style="font-size:0.8rem;padding:3px 6px;">
-                <span class="group-title-text" id="boxTitle_${esc(groupId)}" title="길게 눌러 이름 변경"
-                    onmousedown="window.startTitlePress(event, '${esc(groupId)}')" onmouseup="window.endTitlePress()" onmouseleave="window.endTitlePress()"
-                    ontouchstart="window.startTitlePress(event, '${esc(groupId)}')" ontouchend="window.endTitlePress()" ontouchcancel="window.endTitlePress()"
-                    >${esc(title.trim())}</span>
-            </div>
-            <div class="group-block-inner" style="--group-cols:${GRID_COLS};padding:4px;display:flex;flex-wrap:wrap;gap:4px;">
-                <div id="customGroupArea_${esc(groupId)}" style="display:flex;flex-wrap:wrap;gap:4px;width:100%;"></div>
-            </div>
+            <div id="boxTitle_${esc(groupId)}" class="box-title" title="길게 눌러 이름 변경"
+                onmousedown="window.startTitlePress(event, '${esc(groupId)}')" onmouseup="window.endTitlePress()" onmouseleave="window.endTitlePress()"
+                ontouchstart="window.startTitlePress(event, '${esc(groupId)}')" ontouchend="window.endTitlePress()" ontouchcancel="window.endTitlePress()"
+                >${esc(title.trim())}</div>
+            <div id="customGroupArea_${esc(groupId)}" class="btn-tag-area"></div>
+            <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>
         `;
 
         // 선택된 섹션이 있으면 그 위치에, 없으면 맨 아래
@@ -728,8 +687,8 @@
             alert("레이아웃 편집 모드에서 사용하세요.");
             return;
         }
-        if (!selectedBlock || selectedBlock.type !== "group") {
-            alert("삭제할 그룹을 탭해서 선택한 뒤 그룹- 을 누르세요.");
+        if (!selectedBlock || !selectedBlock.el.dataset.groupRef) {
+            alert("삭제할 그룹(선택 태그 상자)을 탭해서 선택한 뒤 그룹- 을 누르세요.");
             return;
         }
         deleteGroupBlock(selectedBlock.el);
@@ -915,7 +874,7 @@
         } else if (type === "memoTag") {
             window.toggleTagSelection("memoTag", tag.name);
         }
-        renderTagType(type);
+        window.renderChangedTagType(type);
     };
 
     window.openTagEditBox = (type, index) => {
@@ -1011,7 +970,7 @@
             else delete window.activeEquips[newName];
         }
         if (window.saveLocal) window.saveLocal();
-        renderTagType(type);
+        window.renderChangedTagType(type);
         if (window.renderMain) window.renderMain();
         window.closeTagEditModal();
     };
@@ -1029,14 +988,16 @@
         if (type === "equip" && window.activeEquips) delete window.activeEquips[tag.name];
         arr.splice(window.editingTagIndex, 1);
         if (window.saveLocal) window.saveLocal();
-        renderTagType(type);
+        window.renderChangedTagType(type);
         if (window.renderMain) window.renderMain();
         window.closeTagEditModal();
     };
 
     window.addNewType = (type) => {
         const titles = { task: "작업유형", coworker: "매니저", equip: "장비/기타", memoTag: "메모 태그", status: "상태" };
-        let name = prompt(`새로운 ${titles[type] || "항목"}을 입력하세요.`);
+        const customGroup = titles[type] ? null : (window.getGroupById && window.getGroupById(type));
+        const title = titles[type] || (customGroup ? customGroup.title : "항목");
+        let name = prompt(`새로운 ${title}을 입력하세요.`);
         if (!name) return;
         name = name.trim();
         const arr = getTagArray(type);
@@ -1051,8 +1012,14 @@
         else if (type === "equip") window.activeEquips[name] = 1;
         else if (type === "memoTag" && !(window.activeEditTags || []).includes(name)) window.activeEditTags.push(name);
         else if (type === "status") window.activeStatus = name;
+        else {
+            // 커스텀 그룹: 선택 상태에도 반영
+            if (!window.activeCustomGroupSelections) window.activeCustomGroupSelections = {};
+            if (!window.activeCustomGroupSelections[type]) window.activeCustomGroupSelections[type] = [];
+            if (!window.activeCustomGroupSelections[type].includes(name)) window.activeCustomGroupSelections[type].push(name);
+        }
         if (window.saveLocal) window.saveLocal();
-        renderTagType(type);
+        window.renderChangedTagType(type);
     };
 
     window.startTagSaveDelete = (event) => {

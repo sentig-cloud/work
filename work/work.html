@@ -114,7 +114,7 @@
                         </div>
                         <!-- 시간 -->
                         <div class="work-obj-wrap" data-obj-id="time" data-obj-label="시간">
-                            <input type="text" id="workTime" inputmode="numeric" class="m-input w95-in" style="width:100%; text-align:center; height:28px;" placeholder="시간" onblur="window.formatTimeInput(this)">
+                            <input type="text" id="workTime" inputmode="numeric" class="m-input w95-in" style="width:100%; text-align:center; height:28px;" placeholder="시간" onblur="window.formatTimeInput(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
                         </div>
                         <!-- 당직 -->
                         <div class="work-obj-wrap" data-obj-id="duty" data-obj-label="당직">
@@ -122,7 +122,7 @@
                         </div>
                         <!-- OT -->
                         <div class="work-obj-wrap" data-obj-id="ot" data-obj-label="OT">
-                            <input type="text" id="workOT" inputmode="numeric" class="m-input w95-in" style="width:100%; text-align:center; height:28px;" placeholder="OT(00:00)" onblur="window.formatOTInput(this)">
+                            <input type="text" id="workOT" inputmode="numeric" class="m-input w95-in" style="width:100%; text-align:center; height:28px;" placeholder="OT(00:00)" onblur="window.formatOTInput(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
                         </div>
                         <!-- 되돌리기 -->
                         <div class="work-obj-wrap" data-obj-id="undo" data-obj-label="되돌리기">
@@ -227,12 +227,12 @@
                     
                     <div style="flex:1; display:flex; flex-direction:column; justify-content:space-between; gap:6px;">
                         <div style="display:flex; gap:4px; align-items:center;">
-                            <input type="text" id="commuteTime" inputmode="numeric" class="m-input w95-in" style="flex:1;" placeholder="시간" onblur="window.formatTimeInput(this); if(window.updateOvertime) window.updateOvertime();">
+                            <input type="text" id="commuteTime" inputmode="numeric" class="m-input w95-in" style="flex:1;" placeholder="시간" onblur="window.formatTimeInput(this); if(window.updateOvertime) window.updateOvertime();" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
                             <input type="number" id="commuteKm" inputmode="numeric" class="m-input w95-in" style="flex:1;" placeholder="거리(km)">
                         </div>
                         <div style="display:flex; gap:4px; align-items:center;">
                             <button type="button" id="editBaseTimeBtn" class="w95-btn icon-btn" style="width:28px; height:32px; flex-shrink:0; padding:0;" onclick="window.toggleEditBaseTime()"><i class="fa-solid fa-pen"></i></button>
-                            <input type="text" id="commuteBaseTime" class="m-input w95-in" style="width:55px; flex-shrink:0; text-align:center;" readonly onblur="window.formatTimeInput(this); if(window.updateOvertime) window.updateOvertime();">
+                            <input type="text" id="commuteBaseTime" class="m-input w95-in" style="width:55px; flex-shrink:0; text-align:center;" readonly onblur="window.formatTimeInput(this); if(window.updateOvertime) window.updateOvertime();" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
                             <input type="text" id="commuteOvertime" class="m-input w95-in" style="flex:1;" readonly placeholder="초과">
                             <button type="button" id="commuteExceptionBtn" class="w95-btn" style="padding:0 6px; height:32px; flex-shrink:0;" onclick="window.toggleException()">예외</button>
                         </div>

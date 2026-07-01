@@ -229,160 +229,19 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
     background: rgba(219, 234, 254, 0.6);
 }
 
-/* ─── 블록 조작 오버레이 (선택 시 표시) ─── */
-.block-overlay {
-    display: none;
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    z-index: 30;
-    pointer-events: none;
-}
-.layout-edit-mode .drag-item.is-block-selected .block-overlay {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-}
+/* 선택 표시는 오직 주황 사각 테두리뿐(.is-block-selected, 위에서 정의) —
+   순서 모드에서 선택된 블록은 손잡이 없이 몸체를 바로 눌러서 위/아래로 끈다. */
 .drag-item.is-block-dragging {
     opacity: 0.55;
     outline: 2px dashed #d97706;
     z-index: 40;
+    transition: none;
 }
 .drag-item.is-block-drop-target {
     outline: 2px dashed #2563eb;
     background: rgba(219, 234, 254, 0.55);
 }
-
-/* 이동 핸들 [O] - 블록 상단 중앙 */
-.block-move-handle {
-    position: absolute;
-    top: 2px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 36px;
-    height: 22px;
-    background: rgba(245, 158, 11, 0.92);
-    border: 1px solid #d97706;
-    border-radius: 4px;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    cursor: grab;
-    touch-action: none;
-    pointer-events: auto;
-    z-index: 31;
-    font-size: 0.75rem;
-    font-weight: bold;
-    color: #7c2d12;
-    user-select: none;
-}
-.block-move-handle:active { cursor: grabbing; }
-.layout-edit-mode .drag-item.is-block-selected .block-move-handle { display: flex; }
-
-
-/* 리사이즈 핸들 [/] - 블록 우측 하단 */
-.block-resize-handle {
-    position: absolute;
-    bottom: 2px;
-    right: 2px;
-    width: 32px;
-    height: 22px;
-    background: rgba(37, 99, 235, 0.88);
-    border: 1px solid #1d4ed8;
-    border-radius: 4px;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    cursor: nwse-resize;
-    touch-action: none;
-    pointer-events: auto;
-    z-index: 31;
-    font-size: 0.75rem;
-    font-weight: bold;
-    color: #fff;
-    user-select: none;
-}
-/* 그룹(블록) 크기는 내용에 맞춰 자동으로 정해짐 — 우측하단 점으로 수동 리사이즈할 필요 없음.
-   객체(칸) 크기가 그룹 폭을 넘어서면 grid가 알아서 다음 줄로 넘겨 그룹 높이를 늘려준다. */
-
-
-/* 선택 해제 버튼 - 블록 우측 상단 */
-.block-deselect-btn {
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    width: 20px;
-    height: 20px;
-    background: rgba(100,100,100,0.75);
-    border: 1px solid #555;
-    border-radius: 3px;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    pointer-events: auto;
-    z-index: 32;
-    font-size: 0.7rem;
-    color: #fff;
-    user-select: none;
-}
-.layout-edit-mode .drag-item.is-block-selected .block-deselect-btn { display: flex; }
-
-
-/* ─── 그룹 컨테이너 블록 ─── */
-.drag-item.is-group-block {
-    background: #f0f9ff;
-    border: 2px solid #0ea5e9 !important;
-    padding: 0;
-}
-.drag-item.is-group-block > .group-block-inner {
-    display: grid;
-    grid-template-columns: repeat(var(--group-cols, 4), minmax(0, 1fr));
-    grid-auto-rows: minmax(36px, auto);
-    gap: 2px;
-    padding: 2px;
-    width: 100%;
-    box-sizing: border-box;
-}
-.group-block-titlebar {
-    background: #0ea5e9;
-    color: #fff;
-    font-size: 0.8rem;
-    font-weight: bold;
-    padding: 3px 6px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    cursor: pointer;
-}
-.group-block-titlebar .group-add-btn {
-    background: rgba(255,255,255,0.25);
-    border: 1px solid rgba(255,255,255,0.5);
-    color: #fff;
-    font-size: 0.8rem;
-    font-weight: bold;
-    padding: 0 6px;
-    height: 20px;
-    border-radius: 3px;
-    cursor: pointer;
-    pointer-events: auto;
-    display: inline-flex;
-    align-items: center;
-}
-
-/* 그룹 내 블록도 동일한 선택/이동/리사이즈 */
-.drag-item.is-group-block .drag-item {
-    background: var(--w-white);
-    border: 1px solid #bae6fd;
-}
-
-/* ─── 비활성 그룹 (그룹해제 상태) ─── */
-.drag-item.is-group-disabled {
-    opacity: 0.5;
-    filter: grayscale(0.7);
-}
-.drag-item.is-group-disabled .group-block-titlebar {
-    background: #94a3b8;
-}
+/* 그룹(블록) 크기는 내용에 맞춰 자동으로 정해짐 — 수동 리사이즈 없음 */
 
 /* ─── 레이아웃 편집 모드 ─── */
 #workModalTitlebar.is-layout-edit {
@@ -474,6 +333,12 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
        각 객체가 그룹 안 어디로든(1,1 / 2,1 / 2,2 ...) 자유롭게 배치될 수 있다 */
     grid-column: var(--obj-col, auto) / span var(--widget-cols, 1);
     grid-row: var(--obj-row, auto) / span var(--widget-rows, 1);
+    /* 자리를 옮기거나 다른 칸과 자리를 맞바꿀 때 순간이동처럼 보이지 않도록 부드럽게 전환 */
+    transition: grid-row 0.16s ease, grid-column 0.16s ease;
+}
+/* 지금 손가락으로 끌고 있는 칸은 지연 없이 바로 따라와야 하므로 전환 효과 제외 */
+.inner-layout-cell.is-widget-dragging {
+    transition: none;
 }
 .inner-layout-cell > input,
 .inner-layout-cell > textarea,
