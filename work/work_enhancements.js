@@ -163,467 +163,180 @@
     window.workLayoutLongPressed = false;
     window.workLayoutPressTimer = null;
 
-    // 현재 선택된 객체 정보
-    // { el, type: 'section'|'widget'|'tag-btn', parent, isResizable }
-    let selected = null;
-    let objPanel = null; // w95 스타일 팝업
+    // 현재 선택된 블록 정보: { el, type: 'section'|'group' }
+    let selectedBlock = null;
 
     const getContainer = () => document.getElementById("workDragContainer");
     const getAllSections = (c) => [...(c || getContainer())?.querySelectorAll(":scope > .drag-item") || []];
 
-    // ─── 객체 타입 판별 ───
-    // work-obj-wrap: drag-item 안의 개별 input/button 래퍼
-    // tag-btn: 선택태그 버튼
-    // section: drag-item 블록 전체
-    // group: 그룹 블록
-    const getObjType = (el) => {
-        if (!el) return null;
-        // 1. work-obj-wrap (개별 input/button)
-        if (el.classList.contains("work-obj-wrap")) return "obj";
-        const wrap = el.closest(".work-obj-wrap");
-        if (wrap) return "obj";
-        // 2. 태그 버튼
-        if (el.classList.contains("layout-tag-button")) return "tag-btn";
-        const tagBtn = el.closest(".layout-tag-button");
-        if (tagBtn) return "tag-btn";
-        // 3. 그룹 블록
-        if (el.classList.contains("is-group-block")) return "group";
-        const grp = el.closest(".is-group-block");
-        if (grp && !el.closest(".group-block-inner")) return "group";
-        // 4. drag-item 섹션
-        if (el.classList.contains("drag-item")) return "section";
-        const sec = el.closest("#workDragContainer > .drag-item");
-        if (sec) return "section";
-        return null;
-    };
+    // ═══════════════════════════════════════════
+    // 선택 오버레이: 클릭하면 이동/리사이즈 핸들 표시
+    // (CSS의 .block-overlay/.block-move-handle/.block-resize-handle는
+    //  이미 준비돼 있었으나 v3에서 사용되지 않고 있었음 — 여기서 연결)
+    // ═══════════════════════════════════════════
+    const BLOCK_SELECTED_CLASS = "is-block-selected";
 
-    // 실제 대상 요소 반환
-    const getObjEl = (el) => {
-        if (!el) return null;
-        if (el.classList.contains("work-obj-wrap")) return el;
-        const wrap = el.closest(".work-obj-wrap");
-        if (wrap) return wrap;
-        if (el.classList.contains("layout-tag-button")) return el;
-        const tagBtn = el.closest(".layout-tag-button");
-        if (tagBtn) return tagBtn;
-        if (el.classList.contains("is-group-block")) return el;
-        const grp = el.closest(".is-group-block");
-        if (grp && !el.closest(".group-block-inner")) return grp;
-        if (el.classList.contains("drag-item")) return el;
-        return el.closest("#workDragContainer > .drag-item");
-    };
-
-    // 리사이즈 가능 여부
-    const isResizable = (el, type) => {
-        if (type === "tag-btn") return false;
-        if (type === "obj") {
-            // 태그 영역(btn-tag-area)은 리사이즈 없음
-            if (el.querySelector(".btn-tag-area")) return false;
-            return true;
-        }
-        return true;
-    };
-
-    // obj 레이블
-    const getObjLabel = (el, type) => {
-        if (type === "obj") return el.dataset.objLabel || el.dataset.objId || "객체";
-        if (type === "tag-btn") return `태그: ${el.dataset.tagName || el.textContent.trim().slice(0,10)}`;
-        if (type === "group") return el.querySelector(".group-title-text")?.textContent || "그룹";
-        if (type === "section") return el.querySelector(".box-title")?.textContent || `블록 ${el.dataset.id||""}`;
-        return "객체";
-    };
-
-    // ─── 선택 표시 ───
-    const SELECTED_CLASS = "is-obj-selected";
-    const clearSelected = () => {
-        document.querySelectorAll("." + SELECTED_CLASS).forEach(el => el.classList.remove(SELECTED_CLASS));
-        selected = null;
-    };
-
-    const markSelected = (el) => {
-        clearSelected();
-        el.classList.add(SELECTED_CLASS);
-    };
-
-    // ─── w95 스타일 패널 ───
-    const W95_PANEL_ID = "layoutObjPanel";
-
-    const removePanel = () => {
-        const old = document.getElementById(W95_PANEL_ID);
-        if (old) old.remove();
-        objPanel = null;
-    };
-
-    const buildPanel = (el, type) => {
-        removePanel();
-
-        const canResize = isResizable(el, type);
-        const isGroup = type === "group";
-        const isTagBtn = type === "tag-btn";
-
-        // 제목
-        let title = getObjLabel(el, type);
-        if (type === "obj") title = el.dataset.objLabel || el.dataset.objId || "객체";
-
-        // 그룹 목록 (이동 대상)
-        const groups = getAllSections().filter(s => s.classList.contains("is-group-block"));
-        const groupOptions = groups.length
-            ? groups.map(g => {
-                const gTitle = g.querySelector(".group-title-text")?.textContent || g.dataset.id;
-                return `<option value="${esc(g.dataset.id)}">${esc(gTitle)}</option>`;
-            }).join("")
-            : "";
-
-        // 현재 크기
-        const curCols = Number(el.dataset.cols || el.dataset.widgetCols || GRID_COLS);
-        const curRows = Number(el.dataset.rows || el.dataset.widgetRows || 1);
-
-        // 패널 HTML (w95 스타일)
-        const panel = document.createElement("div");
-        panel.id = W95_PANEL_ID;
-        panel.className = "w95-window";
-        panel.style.cssText = `
-            position:fixed; z-index:9500; min-width:180px; max-width:220px;
-            display:flex; flex-direction:column;
-            border: 2px solid; border-color: #fff #000 #000 #fff;
-            box-shadow: 3px 3px 6px rgba(0,0,0,0.5);
+    const ensureBlockOverlay = (el) => {
+        let overlay = el.querySelector(":scope > .block-overlay");
+        if (overlay) return overlay;
+        overlay = document.createElement("div");
+        overlay.className = "block-overlay";
+        overlay.innerHTML = `
+            <button type="button" class="block-move-handle" title="눌러서 이동">⠿</button>
+            <button type="button" class="block-deselect-btn" title="선택 해제">✕</button>
+            <button type="button" class="block-resize-handle" title="눌러서 크기 조절">⤡</button>
         `;
-
-        panel.innerHTML = `
-            <div class="w95-titlebar" style="padding:3px 6px; font-size:0.8rem; display:flex; justify-content:space-between; align-items:center; gap:4px;">
-                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${esc(title)}">${esc(title)}</span>
-                <button type="button" class="w95-btn" id="objPanelClose"
-                    style="width:18px;height:18px;padding:0;font-size:0.75rem;flex-shrink:0;line-height:1;">✕</button>
-            </div>
-            <div style="padding:6px;display:flex;flex-direction:column;gap:5px;background:var(--w-gray);">
-
-                ${/* 이동 버튼 */""}
-                <div style="display:flex;gap:4px;">
-                    <button type="button" class="w95-btn" id="objPanelMoveUp"
-                        style="flex:1;height:28px;font-size:0.8rem;"
-                        title="위로 이동">▲ 위</button>
-                    <button type="button" class="w95-btn" id="objPanelMoveDown"
-                        style="flex:1;height:28px;font-size:0.8rem;"
-                        title="아래로 이동">▼ 아래</button>
-                </div>
-
-                ${/* 그룹으로 이동 (그룹 있을 때만) */groups.length && !isGroup ? `
-                <div style="display:flex;gap:4px;align-items:center;">
-                    <select id="objPanelGroupSel" class="w95-in m-input"
-                        style="flex:1;height:26px;font-size:0.78rem;padding:0 3px;">
-                        <option value="">그룹 선택…</option>
-                        ${groupOptions}
-                    </select>
-                    <button type="button" class="w95-btn" id="objPanelMoveToGroup"
-                        style="height:26px;padding:0 6px;font-size:0.78rem;color:var(--w-blue);font-weight:bold;">→</button>
-                </div>` : ""}
-
-                ${/* 크기 조절 (리사이즈 가능한 것만) */canResize ? `
-                <div style="border-top:1px solid var(--w-dark-gray);padding-top:5px;">
-                    <div style="font-size:0.72rem;color:#555;margin-bottom:3px;font-weight:bold;">크기 조절</div>
-                    <div style="display:flex;align-items:center;gap:3px;margin-bottom:3px;">
-                        <span style="font-size:0.72rem;width:22px;">가로</span>
-                        <button type="button" class="w95-btn" data-action="cols-" style="width:24px;height:24px;padding:0;font-size:0.9rem;">−</button>
-                        <span id="objPanelCols" style="width:20px;text-align:center;font-size:0.85rem;font-weight:bold;">${curCols}</span>
-                        <button type="button" class="w95-btn" data-action="cols+" style="width:24px;height:24px;padding:0;font-size:0.9rem;">＋</button>
-                        <span style="font-size:0.7rem;color:#888;">/ ${GRID_COLS}칸</span>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:3px;">
-                        <span style="font-size:0.72rem;width:22px;">세로</span>
-                        <button type="button" class="w95-btn" data-action="rows-" style="width:24px;height:24px;padding:0;font-size:0.9rem;">−</button>
-                        <span id="objPanelRows" style="width:20px;text-align:center;font-size:0.85rem;font-weight:bold;">${curRows}</span>
-                        <button type="button" class="w95-btn" data-action="rows+" style="width:24px;height:24px;padding:0;font-size:0.9rem;">＋</button>
-                        <span style="font-size:0.7rem;color:#888;">줄</span>
-                    </div>
-                </div>` : `
-                <div style="font-size:0.72rem;color:#888;text-align:center;padding:2px 0;">
-                    ℹ 태그는 글자 수에 따라 자동 크기
-                </div>`}
-
-                ${/* 그룹 전용 버튼 */isGroup ? `
-                <div style="border-top:1px solid var(--w-dark-gray);padding-top:5px;display:flex;flex-direction:column;gap:3px;">
-                    <button type="button" class="w95-btn" id="objPanelAddTag"
-                        style="height:26px;font-size:0.78rem;color:#059669;font-weight:bold;">
-                        + 선택태그 추가</button>
-                    <button type="button" class="w95-btn" id="objPanelRenameGroup"
-                        style="height:26px;font-size:0.78rem;">이름 변경</button>
-                    <button type="button" class="w95-btn" id="objPanelUngroup"
-                        style="height:26px;font-size:0.78rem;color:#dc2626;font-weight:bold;">그룹해제</button>
-                </div>` : ""}
-
-            </div>
-        `;
-
-        document.body.appendChild(panel);
-        objPanel = panel;
-
-        // 위치 계산
-        positionPanel(el);
-
-        // ─── 이벤트 바인딩 ───
-
-        panel.querySelector("#objPanelClose")?.addEventListener("click", (e) => {
-            e.stopPropagation();
-            closeObjPanel();
-        });
-
-        // 위/아래 이동
-        panel.querySelector("#objPanelMoveUp")?.addEventListener("click", () => moveObj(el, type, "up"));
-        panel.querySelector("#objPanelMoveDown")?.addEventListener("click", () => moveObj(el, type, "down"));
-
-        // 그룹으로 이동
-        panel.querySelector("#objPanelMoveToGroup")?.addEventListener("click", () => {
-            const sel = panel.querySelector("#objPanelGroupSel");
-            const groupId = sel?.value;
-            if (!groupId) return;
-            moveObjToGroup(el, type, groupId);
-        });
-
-        // 크기 +/-
-        panel.querySelectorAll("[data-action]").forEach(btn => {
-            btn.addEventListener("click", () => {
-                const action = btn.dataset.action;
-                adjustObjSize(el, type, action);
-                // 표시 업데이트
-                const c = Number(el.dataset.cols || el.dataset.widgetCols || GRID_COLS);
-                const r = Number(el.dataset.rows || el.dataset.widgetRows || 1);
-                const colsEl = panel.querySelector("#objPanelCols");
-                const rowsEl = panel.querySelector("#objPanelRows");
-                if (colsEl) colsEl.textContent = c;
-                if (rowsEl) rowsEl.textContent = r;
-            });
-        });
-
-        // 그룹 전용
-        panel.querySelector("#objPanelAddTag")?.addEventListener("click", () => addTagToGroup(el));
-        panel.querySelector("#objPanelRenameGroup")?.addEventListener("click", () => renameGroup(el));
-        panel.querySelector("#objPanelUngroup")?.addEventListener("click", () => ungroupBlock(el));
+        el.appendChild(overlay);
+        return overlay;
     };
 
-    const positionPanel = (anchorEl) => {
-        if (!objPanel) return;
-        const rect = anchorEl.getBoundingClientRect();
-        const pw = objPanel.offsetWidth || 200;
-        const ph = objPanel.offsetHeight || 220;
-        const vw = window.innerWidth;
-        const vh = window.innerHeight;
-
-        let left = rect.left + rect.width / 2 - pw / 2;
-        let top = rect.bottom + 8;
-
-        if (left < 6) left = 6;
-        if (left + pw > vw - 6) left = vw - pw - 6;
-        if (top + ph > vh - 6) top = rect.top - ph - 8;
-        if (top < 6) top = 6;
-
-        objPanel.style.left = left + "px";
-        objPanel.style.top = top + "px";
-    };
-
-    const closeObjPanel = () => {
-        if (objPanel) {
-            objPanel.classList.remove("is-visible");
-            objPanel.classList.remove("is-obj-panel-open");
+    const selectBlock = (el, type) => {
+        if (selectedBlock && selectedBlock.el !== el) {
+            selectedBlock.el.classList.remove(BLOCK_SELECTED_CLASS);
         }
-        removePanel();
-        clearSelected();
+        selectedBlock = { el, type };
+        el.classList.add(BLOCK_SELECTED_CLASS);
+        ensureBlockOverlay(el);
     };
 
-    // ─── 객체 탭 → 패널 표시 ───
-    const onObjTap = (e) => {
+    const deselectBlock = () => {
+        if (selectedBlock) selectedBlock.el.classList.remove(BLOCK_SELECTED_CLASS);
+        selectedBlock = null;
+    };
+
+    // ─── 드래그 대상 범위: 그룹 안이면 그 그룹 내부, 아니면 최상위 컨테이너 ───
+    const getDragScope = (el) => {
+        const parent = el.parentElement;
+        if (parent && parent.classList.contains("group-block-inner")) return parent;
+        return getContainer();
+    };
+
+    // ═══════════════════════════════════════════
+    // 이동 핸들 드래그 (⠿) — 눌러서 그대로 끌면 이동
+    // ═══════════════════════════════════════════
+    let blockDragEl = null, blockDragParent = null;
+
+    const startBlockMove = (e) => {
+        const handle = e.target.closest(".block-move-handle");
+        if (!handle || !window.isWorkLayoutMode) return;
+        const el = handle.closest(".drag-item");
+        if (!el) return;
+        e.preventDefault();
+        e.stopPropagation();
+        blockDragEl = el;
+        blockDragParent = getDragScope(el);
+        el.classList.add("is-block-dragging");
+        if (navigator.vibrate) navigator.vibrate(25);
+    };
+
+    const moveBlockMove = (e) => {
+        if (!blockDragEl || !blockDragParent) return;
+        e.preventDefault();
+        const point = e.touches ? e.touches[0] : e;
+        const over = document.elementFromPoint(point.clientX, point.clientY);
+        const target = over && over.closest(".drag-item");
+        document.querySelectorAll(".is-block-drop-target").forEach(i => i.classList.remove("is-block-drop-target"));
+        if (!target || target === blockDragEl || target.parentElement !== blockDragParent) return;
+        const rect = target.getBoundingClientRect();
+        target.classList.add("is-block-drop-target");
+        const before = point.clientX < rect.left + rect.width / 2;
+        blockDragParent.insertBefore(blockDragEl, before ? target : target.nextSibling);
+    };
+
+    const endBlockMove = () => {
+        document.querySelectorAll(".is-block-drop-target").forEach(i => i.classList.remove("is-block-drop-target"));
+        if (blockDragEl) {
+            blockDragEl.classList.remove("is-block-dragging");
+            window.saveWorkLayout();
+        }
+        blockDragEl = null; blockDragParent = null;
+    };
+
+    // ═══════════════════════════════════════════
+    // 리사이즈 핸들 드래그 (⤡) — 눌러서 끌면 가로/세로 크기 조절
+    // ═══════════════════════════════════════════
+    let blockResizeEl = null, blockResizeStart = null;
+
+    const startBlockResize = (e) => {
+        const handle = e.target.closest(".block-resize-handle");
+        if (!handle || !window.isWorkLayoutMode) return;
+        const el = handle.closest(".drag-item");
+        if (!el) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const scope = getDragScope(el);
+        const scopeRect = scope.getBoundingClientRect();
+        const point = e.touches ? e.touches[0] : e;
+        blockResizeEl = el;
+        blockResizeStart = {
+            x: point.clientX, y: point.clientY,
+            cols: Number(el.dataset.cols || GRID_COLS),
+            rows: Number(el.dataset.rows || 1),
+            colWidth: Math.max(1, scopeRect.width / GRID_COLS),
+            rowHeight: 36
+        };
+    };
+
+    const moveBlockResize = (e) => {
+        if (!blockResizeEl || !blockResizeStart) return;
+        e.preventDefault();
+        const point = e.touches ? e.touches[0] : e;
+        const dCols = Math.round((point.clientX - blockResizeStart.x) / blockResizeStart.colWidth);
+        const dRows = Math.round((point.clientY - blockResizeStart.y) / blockResizeStart.rowHeight);
+        setBlockSize(blockResizeEl, blockResizeStart.cols + dCols, blockResizeStart.rows + dRows);
+    };
+
+    const endBlockResize = () => {
+        if (blockResizeEl) window.saveWorkLayout();
+        blockResizeEl = null; blockResizeStart = null;
+    };
+
+    // ═══════════════════════════════════════════
+    // 탭 → 선택(핸들 표시) / 배경·✕ 탭 → 선택 해제
+    // ═══════════════════════════════════════════
+    let blockJustDragged = false;
+
+    const onBlockTap = (e) => {
         if (!window.isWorkLayoutMode) return;
-        if (objPanel && objPanel.contains(e.target)) return;
+        if (blockJustDragged) { blockJustDragged = false; return; }
+        if (e.target.closest(".block-move-handle") || e.target.closest(".block-resize-handle")) return;
 
-        // 날짜/시간/주소 등은 별도의 inner-layout 드래그 시스템(실제 이동·리사이즈 핸들)이
-        // 전담한다. 여기서 또 반응하면 이미 다른 곳으로 옮겨진 빈 래퍼가 선택되어
-        // "이동해도 변화 없음 / 크기만 이상하게 늘어남" 현상이 발생하므로 건너뛴다.
+        // 날짜/시간/주소 등 개별 필드는 별도의 inner-layout 드래그 시스템이 전담
         if (e.target.closest(".inner-layout-cell")) return;
 
-        // 패널이 열려있으면 닫기
-        if (objPanel && objPanel.classList.contains("is-obj-panel-open")) {
-            closeObjPanel();
+        const deselectBtn = e.target.closest(".block-deselect-btn");
+        if (deselectBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            deselectBlock();
             return;
         }
 
         const modal = document.getElementById("workModal");
         if (!modal || !modal.contains(e.target)) return;
 
-        let el = null, type = null;
-
-        // 우선순위: work-obj-wrap > tag-btn > group titlebar > section
-        // 1. work-obj-wrap (개별 input/button 래퍼) - 최우선
-        const wrap = e.target.closest(".work-obj-wrap");
-        if (wrap && modal.contains(wrap)) {
-            el = wrap; type = "obj";
-        }
-        // 2. 태그 버튼
-        if (!el) {
-            const tagBtn = e.target.closest(".layout-tag-button");
-            if (tagBtn && modal.contains(tagBtn)) { el = tagBtn; type = "tag-btn"; }
-        }
-        // 3. 그룹 타이틀바 탭 → 그룹 선택
-        if (!el) {
-            const grpTitle = e.target.closest(".group-block-titlebar");
-            if (grpTitle) {
-                const grp = grpTitle.closest(".is-group-block");
-                if (grp) { el = grp; type = "group"; }
+        const grpTitle = e.target.closest(".group-block-titlebar");
+        if (grpTitle) {
+            const grp = grpTitle.closest(".is-group-block");
+            if (grp && !e.target.closest(".group-title-text")) {
+                e.preventDefault();
+                e.stopPropagation();
+                selectBlock(grp, "group");
+                return;
             }
-        }
-        // 4. drag-item 섹션 배경 탭 (위 해당 없을 때)
-        if (!el) {
-            const sec = e.target.closest("#workDragContainer > .drag-item");
-            if (sec && !e.target.closest(".work-obj-wrap") && !e.target.closest(".btn-tag-area")) {
-                el = sec; type = "section";
-            }
+            if (grp) return; // 제목 자체는 길게 눌러 이름 변경(box-title 로직 재사용)
         }
 
-        if (!el || !type) return;
-
-        e.preventDefault();
-        e.stopPropagation();
-
-        markSelected(el);
-        selected = { el, type };
-        buildPanel(el, type);
-    };
-
-    // ─── 위/아래 이동 ───
-    const moveObj = (el, type, dir) => {
-        if (type === "section" || type === "group") {
-            const container = getContainer();
-            if (!container) return;
-            const siblings = getAllSections(container);
-            const idx = siblings.indexOf(el);
-            if (dir === "up" && idx > 0) container.insertBefore(el, siblings[idx - 1]);
-            else if (dir === "down" && idx < siblings.length - 1) container.insertBefore(el, siblings[idx + 2] || null);
-        } else if (type === "obj") {
-            // work-obj-wrap: 같은 drag-item 안에서 이동
-            const parent = el.parentElement;
-            if (!parent) return;
-            const siblings = [...parent.querySelectorAll(":scope > .work-obj-wrap")];
-            const idx = siblings.indexOf(el);
-            if (dir === "up" && idx > 0) parent.insertBefore(el, siblings[idx - 1]);
-            else if (dir === "down" && idx < siblings.length - 1) parent.insertBefore(el, siblings[idx + 2] || null);
-        } else if (type === "tag-btn") {
-            const area = el.parentElement;
-            if (!area) return;
-            const btns = [...area.querySelectorAll(".layout-tag-button")];
-            const idx = btns.indexOf(el);
-            if (dir === "up" && idx > 0) area.insertBefore(el, btns[idx - 1]);
-            else if (dir === "down" && idx < btns.length - 1) area.insertBefore(el, btns[idx + 2] || null);
-        }
-        window.saveWorkLayout();
-        positionPanel(el);
-    };
-
-    // ─── 그룹으로 이동 ───
-    const moveObjToGroup = (el, type, groupId) => {
-        const container = getContainer();
-        const groupBlock = container?.querySelector(`.drag-item[data-id="${groupId}"]`);
-        if (!groupBlock) return;
-        const inner = groupBlock.querySelector(".group-block-inner");
-        if (!inner) return;
-
-        if (type === "section") {
-            inner.appendChild(el);
-        } else if (type === "obj") {
-            // work-obj-wrap을 그룹 내로 이동
-            // 먼저 임시 섹션 블록을 만들어서 감싸기
-            const secId = "moved_" + Date.now();
-            let wrapper = document.createElement("div");
-            wrapper.className = "drag-item w95-out";
-            wrapper.dataset.id = secId;
-            wrapper.style.cssText = "--item-cols:4;--item-rows:1;";
-            wrapper.appendChild(el);
-            inner.appendChild(wrapper);
-        } else if (type === "tag-btn") {
-            inner.appendChild(el);
+        const sec = e.target.closest("#workDragContainer > .drag-item, .group-block-inner > .drag-item");
+        if (sec) {
+            e.preventDefault();
+            e.stopPropagation();
+            selectBlock(sec, sec.classList.contains("is-group-block") ? "group" : "section");
+            return;
         }
 
-        window.saveWorkLayout();
-        positionPanel(el);
-    };
-
-    // ─── 크기 조절 (+/-) ───
-    const adjustObjSize = (el, type, action) => {
-        if (type === "section" || type === "group") {
-            let c = Number(el.dataset.cols || GRID_COLS);
-            let r = Number(el.dataset.rows || 1);
-            if (action === "cols+") c = Math.min(GRID_COLS, c + 1);
-            else if (action === "cols-") c = Math.max(1, c - 1);
-            else if (action === "rows+") r = Math.min(20, r + 1);
-            else if (action === "rows-") r = Math.max(1, r - 1);
-            setBlockSize(el, c, r);
-        } else if (type === "obj") {
-            // work-obj-wrap: flex-grow / height 조절
-            let cols = Number(el.dataset.objCols || 1);
-            let rows = Number(el.dataset.objRows || 1);
-            const parent = el.closest(".drag-item");
-            const totalCols = parent ? GRID_COLS : 4;
-            if (action === "cols+") cols = Math.min(totalCols, cols + 1);
-            else if (action === "cols-") cols = Math.max(1, cols - 1);
-            else if (action === "rows+") rows = Math.min(6, rows + 1);
-            else if (action === "rows-") rows = Math.max(1, rows - 1);
-            el.dataset.objCols = cols;
-            el.dataset.objRows = rows;
-            el.style.setProperty("--obj-cols", cols);
-            el.style.setProperty("--obj-rows", rows);
-            // 높이 적용
-            const baseH = 30;
-            el.style.minHeight = rows > 1 ? `${rows * baseH + (rows-1)*2}px` : "";
-            // 내부 input/textarea 높이도 조절
-            const inner = el.querySelector("input, textarea");
-            if (inner && rows > 1) inner.style.height = `${rows * baseH}px`;
-        }
-        window.saveWorkLayout();
-    };
-
-    // ─── 그룹에 선택태그 추가 ───
-    const addTagToGroup = (groupEl) => {
-        const name = prompt("새 선택태그 그룹 이름을 입력하세요.");
-        if (!name?.trim()) return;
-
-        let newGroup = null;
-        if (window.addCustomGroup) {
-            newGroup = window.addCustomGroup(name.trim());
-            window.markDirty?.("master", "groups", "upsert");
-            window.saveLocal?.("group-add");
-        }
-
-        const tagSection = document.createElement("div");
-        tagSection.className = "drag-item w95-in";
-        tagSection.dataset.id = "grp_tag_" + (newGroup ? newGroup.id : Date.now());
-        tagSection.dataset.groupId = newGroup ? newGroup.id : "";
-        setBlockSize(tagSection, GRID_COLS, 1);
-        tagSection.innerHTML = `
-            <div class="box-title">${esc(name.trim())}</div>
-            <div id="customGroupArea_${newGroup ? newGroup.id : "tmp"}" class="btn-tag-area"></div>
-        `;
-
-        const inner = groupEl.querySelector(".group-block-inner");
-        if (inner) inner.appendChild(tagSection);
-
-        if (newGroup && window.renderCustomGroup) window.renderCustomGroup(newGroup.id);
-        window.saveWorkLayout();
-        closeObjPanel();
-    };
-
-    // ─── 그룹 이름 변경 ───
-    const renameGroup = (groupEl) => {
-        const titleEl = groupEl.querySelector(".group-title-text");
-        const old = titleEl?.textContent || "";
-        const neu = prompt("그룹 이름을 입력하세요.", old);
-        if (!neu?.trim() || neu.trim() === old) return;
-        if (titleEl) titleEl.textContent = neu.trim();
-
-        // groups 데이터도 업데이트
-        const g = window.getGroupById?.(groupEl.dataset.groupRef);
-        if (g) {
-            g.title = neu.trim();
-            window.markDirty?.("master", "groups", "upsert");
-            window.saveLocal?.("group-title");
-        }
-        window.saveWorkLayout();
+        // 빈 배경 탭 → 선택 해제
+        deselectBlock();
     };
 
     // ─── 그룹해제 ───
@@ -652,7 +365,7 @@
         });
 
         groupEl.remove();
-        closeObjPanel();
+        deselectBlock();
         window.saveWorkLayout();
     };
 
@@ -821,7 +534,7 @@
             let group = firstEl.closest(".inner-layout-group") || firstEl.parentElement;
             group.classList.add("inner-layout-group");
             group.dataset.innerGroup = spec.key;
-            group.style.cssText += ";display:grid;grid-template-columns:repeat(6,minmax(0,1fr));";
+            group.style.cssText += ";display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-flow:row dense;";
             validItems.forEach(([id, el, cs, rs]) => {
                 if (!el) return;
                 let cell = el.closest(".inner-layout-cell");
@@ -839,11 +552,15 @@
                     h.className = "widget-resize-handle";
                     cell.appendChild(h);
                 }
+                // 이동 핸들: 눌러서 그대로 끌면 이동 (CSS는 이미 준비돼 있었으나 미사용 상태였음)
+                if (!cell.querySelector(":scope > .inner-move-handle")) {
+                    const m = document.createElement("div");
+                    m.className = "inner-move-handle";
+                    cell.appendChild(m);
+                }
             });
         });
     };
-
-    window.ensureBlockHandles = () => {}; // v3에서는 패널로 대체
 
     // ═══════════════════════════════════════════
     // 레이아웃 모드 진입/해제
@@ -866,7 +583,7 @@
                 el.readOnly = el.dataset.prevRo === "1";
                 delete el.dataset.prevRo;
             });
-            closeObjPanel();
+            deselectBlock();
             window.saveWorkLayout();
             window.applyWorkLayout();
         }
@@ -920,7 +637,15 @@
         if (!title?.trim()) return;
 
         const container = getContainer(); if (!container) return;
-        const groupId = "grp_" + Date.now();
+
+        // v2 groups 등록 (id를 먼저 확정한 뒤 DOM에 반영)
+        let g = null;
+        if (window.addCustomGroup) {
+            g = window.addCustomGroup(title.trim());
+            window.markDirty?.("master", "groups", "upsert");
+        }
+        const groupId = g ? g.id : ("grp_" + Date.now());
+
         const groupEl = document.createElement("div");
         groupEl.className = "drag-item is-group-block";
         groupEl.dataset.id = groupId;
@@ -929,27 +654,23 @@
 
         groupEl.innerHTML = `
             <div class="group-block-titlebar w95-titlebar" style="font-size:0.8rem;padding:3px 6px;">
-                <span class="group-title-text">${esc(title.trim())}</span>
+                <span class="group-title-text" id="boxTitle_${esc(groupId)}" title="길게 눌러 이름 변경"
+                    onmousedown="window.startTitlePress(event, '${esc(groupId)}')" onmouseup="window.endTitlePress()" onmouseleave="window.endTitlePress()"
+                    ontouchstart="window.startTitlePress(event, '${esc(groupId)}')" ontouchend="window.endTitlePress()" ontouchcancel="window.endTitlePress()"
+                    >${esc(title.trim())}</span>
             </div>
-            <div class="group-block-inner" style="--group-cols:${GRID_COLS};padding:2px;display:grid;grid-template-columns:repeat(${GRID_COLS},minmax(0,1fr));gap:2px;"></div>
+            <div class="group-block-inner" style="--group-cols:${GRID_COLS};padding:2px;display:grid;grid-template-columns:repeat(${GRID_COLS},minmax(0,1fr));grid-auto-flow:row dense;gap:2px;"></div>
         `;
 
         // 선택된 섹션이 있으면 그 위치에, 없으면 맨 아래
-        const selSection = selected?.type === "section" ? selected.el : null;
+        const selSection = selectedBlock?.type === "section" ? selectedBlock.el : null;
         if (selSection && selSection.parentElement === container) {
             container.insertBefore(groupEl, selSection.nextSibling);
         } else {
             container.appendChild(groupEl);
         }
 
-        // v2 groups 등록
-        if (window.addCustomGroup) {
-            const g = window.addCustomGroup(title.trim());
-            if (g) groupEl.dataset.groupRef = g.id;
-            window.markDirty?.("master", "groups", "upsert");
-        }
-
-        closeObjPanel();
+        deselectBlock();
         window.saveWorkLayout();
     };
 
@@ -958,11 +679,11 @@
             alert("레이아웃 편집 모드에서 사용하세요.");
             return;
         }
-        if (!selected || selected.type !== "group") {
+        if (!selectedBlock || selectedBlock.type !== "group") {
             alert("그룹 블록을 탭해서 선택한 뒤 그룹해제를 누르세요.");
             return;
         }
-        ungroupBlock(selected.el);
+        ungroupBlock(selectedBlock.el);
     };
 
     // ═══════════════════════════════════════════
@@ -974,9 +695,30 @@
         const modal = document.getElementById("workModal");
         if (!modal) return;
 
-        // 탭/클릭 → 객체 선택 패널
-        modal.addEventListener("touchend", onObjTap, { passive: false });
-        modal.addEventListener("click", onObjTap);
+        // 이동 핸들(⠿) / 리사이즈 핸들(⤡) 누르기 시작
+        modal.addEventListener("touchstart", startBlockMove, { passive: false });
+        modal.addEventListener("mousedown", startBlockMove);
+        modal.addEventListener("touchstart", startBlockResize, { passive: false });
+        modal.addEventListener("mousedown", startBlockResize);
+
+        const onBlockPointerMove = (e) => {
+            if (blockDragEl) { moveBlockMove(e); return; }
+            if (blockResizeEl) { moveBlockResize(e); return; }
+        };
+        const onBlockPointerEnd = () => {
+            if (blockDragEl) { blockJustDragged = true; endBlockMove(); }
+            if (blockResizeEl) { blockJustDragged = true; endBlockResize(); }
+        };
+
+        modal.addEventListener("touchmove", onBlockPointerMove, { passive: false });
+        window.addEventListener("mousemove", onBlockPointerMove);
+        modal.addEventListener("touchend", onBlockPointerEnd);
+        modal.addEventListener("touchcancel", onBlockPointerEnd);
+        window.addEventListener("mouseup", onBlockPointerEnd);
+
+        // 탭/클릭 → 선택(핸들 표시) / 배경 탭 → 선택 해제 (드래그 종료 판정 이후에 등록)
+        modal.addEventListener("touchend", onBlockTap, { passive: false });
+        modal.addEventListener("click", onBlockTap);
 
         window.hasInitDragListeners = true;
     };
@@ -984,7 +726,7 @@
     window.hasInitTagReorderListeners = false;
     window.initTagReorderListeners = () => {
         if (window.hasInitTagReorderListeners) return;
-        // 레이아웃 모드 탭은 onObjTap에서 통합 처리
+        // 레이아웃 모드 탭은 onBlockTap에서 통합 처리
         window.hasInitTagReorderListeners = true;
     };
 
@@ -1071,7 +813,7 @@
         fill("searchMemoTag", "태그", "memoTag", window.memoTags);
     };
 
-    // ─── CSS: 선택 표시 (is-obj-selected) ───
+    // ─── CSS: 선택 표시 ───
     const styleEl = document.createElement("style");
     styleEl.textContent = `
         .is-obj-selected {
@@ -1083,10 +825,6 @@
         }
         .is-obj-selected.layout-tag-button {
             outline-offset: 0;
-        }
-        #${W95_PANEL_ID} .w95-btn:active {
-            border-color: var(--w-black) var(--w-white) var(--w-white) var(--w-black);
-            box-shadow: inset 1px 1px var(--w-dark-gray);
         }
     `;
     document.head.appendChild(styleEl);
