@@ -301,7 +301,8 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
     color: #fff;
     user-select: none;
 }
-.layout-edit-mode .drag-item.is-block-selected .block-resize-handle { display: flex; }
+/* 그룹(블록) 크기는 내용에 맞춰 자동으로 정해짐 — 우측하단 점으로 수동 리사이즈할 필요 없음.
+   객체(칸) 크기가 그룹 폭을 넘어서면 grid가 알아서 다음 줄로 넘겨 그룹 높이를 늘려준다. */
 
 
 /* 선택 해제 버튼 - 블록 우측 상단 */
@@ -405,6 +406,13 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
     color: #8a4300;
     font-size: 0.72rem;
 }
+.work-layout-order-btn {
+    display: none;
+    height: 24px;
+    padding: 0 6px;
+    font-size: 0.72rem;
+    color: #7c2d12;
+}
 .work-layout-group-btn {
     display: none;
     height: 24px;
@@ -420,6 +428,7 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
     color: #dc2626;
 }
 .layout-edit-mode .work-layout-reset-btn { display: inline-flex; }
+.layout-edit-mode .work-layout-order-btn { display: inline-flex; }
 .layout-edit-mode .work-layout-group-btn { display: inline-flex; }
 .layout-edit-mode .work-layout-ungroup-btn { display: inline-flex; }
 

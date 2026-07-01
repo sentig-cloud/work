@@ -340,34 +340,22 @@
         deselectBlock();
     };
 
-    // ─── 그룹해제 ───
-    const ungroupBlock = (groupEl) => {
-        if (!confirm("그룹을 해제하시겠습니까?\n커스텀 태그 상자는 비활성화됩니다.")) return;
-        const container = getContainer();
-        if (!container) return;
+    // ─── 그룹 삭제 (그룹- = 해당 커스텀 태그 상자 그룹을 완전히 삭제) ───
+    const deleteGroupBlock = (groupEl) => {
+        const groupId = groupEl.dataset.groupRef || groupEl.dataset.id;
+        const g = groupId && window.getGroupById ? window.getGroupById(groupId) : null;
+        const label = g ? g.title : "이 그룹";
+        if (!confirm(`"${label}" 그룹을 삭제하시겠습니까?\n그룹 안의 선택 항목도 함께 삭제됩니다.`)) return;
 
-        const inner = groupEl.querySelector(".group-block-inner");
-        const children = inner ? [...inner.querySelectorAll(":scope > .drag-item")] : [];
-        const builtInIds = ["1", "3", "4", "5", "6", "7"];
-
-        children.forEach(block => {
-            const isBuiltIn = builtInIds.includes(block.dataset.id);
-            const isCustomTag = block.dataset.id?.startsWith("grp_tag_");
-            if (isCustomTag) {
-                block.classList.add("is-group-disabled");
-                const gId = block.dataset.groupId;
-                if (gId && window.getGroupById) {
-                    const g = window.getGroupById(gId);
-                    if (g) { g.enabled = false; window.markDirty?.("master", "groups", "upsert"); }
-                }
-            }
-            setBlockSize(block, GRID_COLS, Number(block.dataset.rows) || 1);
-            container.insertBefore(block, groupEl);
-        });
+        if (groupId && window.removeGroup) {
+            window.removeGroup(groupId);
+            window.markDirty?.("master", "groups", "upsert");
+        }
 
         groupEl.remove();
         deselectBlock();
         window.saveWorkLayout();
+        if (window.saveLocal) window.saveLocal("group-delete");
     };
 
     // ═══════════════════════════════════════════
@@ -513,7 +501,8 @@
                 ["copy", document.getElementById("workCopyBtn"), 1, 1],
                 ["customer", document.getElementById("customerName"), 3, 1],
                 ["address", document.getElementById("workAddress"), 4, 1],
-                ["map", document.getElementById("workAddress")?.parentElement?.querySelector("button"), 1, 1],
+                // 이전 selector가 주소 래퍼 안에서 button을 찾아 항상 null이었음(지도 버튼은 별도 래퍼) — 직접 지정
+                ["map", document.querySelector('.work-obj-wrap[data-obj-id="map"] button'), 1, 1],
                 ["undo", document.getElementById("workUndoBtn"), 1, 1],
                 // 작업내용/특이사항: 날짜·Task 블록과 같은 그룹에 고정 — 항상 붙어서 표시
                 ["content", document.getElementById("workContent"), 6, 3],
@@ -673,7 +662,9 @@
                     ontouchstart="window.startTitlePress(event, '${esc(groupId)}')" ontouchend="window.endTitlePress()" ontouchcancel="window.endTitlePress()"
                     >${esc(title.trim())}</span>
             </div>
-            <div class="group-block-inner" style="--group-cols:${GRID_COLS};padding:2px;display:grid;grid-template-columns:repeat(${GRID_COLS},minmax(0,1fr));grid-auto-flow:row;gap:2px;"></div>
+            <div class="group-block-inner" style="--group-cols:${GRID_COLS};padding:4px;display:flex;flex-wrap:wrap;gap:4px;">
+                <div id="customGroupArea_${esc(groupId)}" style="display:flex;flex-wrap:wrap;gap:4px;width:100%;"></div>
+            </div>
         `;
 
         // 선택된 섹션이 있으면 그 위치에, 없으면 맨 아래
@@ -683,6 +674,9 @@
         } else {
             container.appendChild(groupEl);
         }
+
+        // 선택 태그를 추가할 수 있는 초기 상태(+ 버튼만 있는 빈 상자)로 즉시 렌더링
+        if (window.renderCustomGroup) window.renderCustomGroup(groupId);
 
         deselectBlock();
         window.saveWorkLayout();
@@ -694,10 +688,33 @@
             return;
         }
         if (!selectedBlock || selectedBlock.type !== "group") {
-            alert("그룹 블록을 탭해서 선택한 뒤 그룹해제를 누르세요.");
+            alert("삭제할 그룹을 탭해서 선택한 뒤 그룹- 을 누르세요.");
             return;
         }
-        ungroupBlock(selectedBlock.el);
+        deleteGroupBlock(selectedBlock.el);
+    };
+
+    // ─── 그룹(블록) 순서 변경 ───
+    window.reorderSelectedBlock = () => {
+        if (!window.isWorkLayoutMode) {
+            alert("레이아웃 편집 모드에서 사용하세요.");
+            return;
+        }
+        if (!selectedBlock) {
+            alert("순서를 바꿀 그룹(블록)을 먼저 탭해서 선택하세요.");
+            return;
+        }
+        const el = selectedBlock.el;
+        const parent = el.parentElement;
+        const siblings = [...parent.querySelectorAll(":scope > .drag-item")];
+        const currentPos = siblings.indexOf(el) + 1;
+        const input = prompt(`몇 번째 순서로 옮길까요? (1~${siblings.length})`, String(currentPos));
+        if (!input) return;
+        const targetPos = Math.max(1, Math.min(siblings.length, parseInt(input, 10) || currentPos));
+        const others = siblings.filter(s => s !== el);
+        others.splice(targetPos - 1, 0, el);
+        others.forEach(s => parent.appendChild(s));
+        window.saveWorkLayout();
     };
 
     // ═══════════════════════════════════════════
@@ -1235,7 +1252,27 @@
             }
             if (event.cancelable) event.preventDefault();
             const over = document.elementFromPoint(point.clientX, point.clientY);
-            const target = over && over.closest(".inner-layout-cell");
+            let target = over && over.closest(".inner-layout-cell");
+            if (target && (target === dragCell || target.parentElement !== dragGroup)) target = null;
+            // 커서 아래에 칸이 없는 빈 공간(줄 사이 여백 등)에 놓아도 "안 움직인다"고 느끼지 않도록,
+            // 그룹 안의 가장 가까운 칸을 찾아 그 앞/뒤로 이동시킨다 — 자유 이동 보장
+            if (!target) {
+                const groupRect = dragGroup.getBoundingClientRect();
+                if (point.clientX < groupRect.left || point.clientX > groupRect.right ||
+                    point.clientY < groupRect.top - 40 || point.clientY > groupRect.bottom + 40) {
+                    modal.querySelectorAll(".is-widget-drop-target").forEach((i) => i.classList.remove("is-widget-drop-target"));
+                    return;
+                }
+                let nearest = null, nearestDist = Infinity;
+                [...dragGroup.querySelectorAll(":scope > .inner-layout-cell")].forEach((cell) => {
+                    if (cell === dragCell) return;
+                    const r = cell.getBoundingClientRect();
+                    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+                    const dist = Math.hypot(point.clientX - cx, point.clientY - cy);
+                    if (dist < nearestDist) { nearestDist = dist; nearest = cell; }
+                });
+                target = nearest;
+            }
             modal.querySelectorAll(".is-widget-drop-target").forEach((i) => i.classList.remove("is-widget-drop-target"));
             if (!target || target === dragCell || target.parentElement !== dragGroup) return;
             const rect = target.getBoundingClientRect();
