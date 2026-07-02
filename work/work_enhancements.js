@@ -1173,13 +1173,16 @@
                     rows: Number(pendingResizeCell.dataset.widgetRows) || 1,
                     colWidth: Math.max(1, groupRect.width / 6), rowHeight: 32
                 };
+                // 예전엔 1500ms 동안 10px 이내로 완벽히 고정해야 이동모드로 넘어갔는데,
+                // 그정도로 오래 손가락을 떨지 않고 버티는 게 사실상 불가능해서 항상 크기조절로만
+                // 빠졌음(이동모드 진입 실패) — 시간을 줄이고 허용 오차를 넉넉하게 늘림.
                 resizeModeTimer = setTimeout(() => {
                     resizeHandleLongPressed = true;
                     dragCell = pendingResizeCell; dragGroup = pendingResizeCell && pendingResizeCell.parentElement;
                     if (dragCell) { selectCell(dragCell); dragCell.classList.add("is-widget-dragging"); }
                     pendingResizeCell = null; pendingResizeStart = null;
                     if (navigator.vibrate) navigator.vibrate(50);
-                }, 1500);
+                }, 700);
                 if (event.cancelable) event.preventDefault();
                 return;
             }
@@ -1196,7 +1199,7 @@
                 if (event.cancelable) event.preventDefault();
                 const dist = Math.hypot(point.clientX - pendingResizeStart.x, point.clientY - pendingResizeStart.y);
                 if (resizeHandleLongPressed) { pendingResizeCell = null; pendingResizeStart = null; }
-                else if (dist > 10) {
+                else if (dist > 20) {
                     clearTimeout(resizeModeTimer);
                     resizeCell = pendingResizeCell; resizeStart = pendingResizeStart;
                     resizeCell.classList.add("is-widget-dragging"); // 크기 조절 중에도 전환 지연 없이 즉시 반응
