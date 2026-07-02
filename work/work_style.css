@@ -360,7 +360,7 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
 
 /* 손잡이 하나만 사용: 탭하면 선택되고 가운데 점이 뜬다.
    그 점을 바로 드래그하면 크기 조절(우측=늘어남, 좌측=줄어듦, 아래=늘어남, 위=줄어듦),
-   1.5초 눌렀다 드래그하면 이동. */
+   0.7초 눌렀다 드래그하면 이동. */
 .widget-resize-handle {
     display: none;
     position: absolute;
@@ -374,9 +374,24 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
     border: 1px solid #1d4ed8;
     border-radius: 50%;
 }
+/* 점 자체는 작게 보이되, 실제로 손가락이 닿는 판정 영역은 44x44px로 넓힘 —
+   20px 그대로면 자주 빗나가서 그 옆(스크롤 막지 않는 영역)을 짚어 스크롤로 씹혔었음 */
+.widget-resize-handle::before {
+    content: "";
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 44px; height: 44px;
+    transform: translate(-50%, -50%);
+    touch-action: none;
+}
 /* 선택된 객체에만 점 표시 — 나머지 칸은 평상시 색/모양 그대로 유지 */
 .layout-edit-mode .inner-layout-cell.is-widget-selected > .widget-resize-handle { display: block; }
 .inner-layout-cell.is-widget-dragging { opacity: 0.58; outline: 2px dashed #d97706; z-index: 20; }
+/* 점을 살짝 빗나가도(칸 안이면) 브라우저가 스크롤로 가로채지 않도록 칸 전체에서 스크롤 차단 —
+   실제 선택/이동/리사이즈 여부는 JS가 판단하므로 여기서 막아도 안전함 */
+.layout-edit-mode .inner-layout-cell {
+    touch-action: none;
+}
 
 /* ─── 잠금 모드 ─── */
 .work-edit-locked #workDragContainer { filter: saturate(0.82); }
