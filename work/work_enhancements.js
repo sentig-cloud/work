@@ -271,14 +271,25 @@
         if (!window.isWorkLayoutMode) return;
         if (blockJustDragged) { blockJustDragged = false; return; }
 
-        // 날짜/시간/주소/작업내용 등 개별 필드는 별도의 inner-layout 드래그 시스템이 전담
-        // (그룹 배경을 탭해도 상위 섹션 전체가 선택되지 않도록 그룹 범위 전체를 제외) —
-        // 단, "순서" 모드일 때는 객체 선택을 막고 그룹(블록) 전체 선택만 허용해야 하므로 이 예외를 건너뛴다.
-        if (!window.isOrderMode && (e.target.closest(".inner-layout-cell") || e.target.closest(".inner-layout-group"))) return;
+        // 순서 모드도 기억 선택 모드도 아니면 그룹(블록) 탭은 아무 동작도 하지 않는다 —
+        // 개별 객체(칸) 선택/이동/리사이즈는 initInnerReorderListeners가 별도로 계속 담당한다.
+        if (!window.isOrderMode && !window.isRememberSelectMode) return;
 
         const modal = document.getElementById("workModal");
         if (!modal || !modal.contains(e.target)) return;
 
+        // 기억 선택 모드: 탭한 그룹의 기억 on/off만 토글하고 끝(이동/하이라이트 없음)
+        if (window.isRememberSelectMode) {
+            const groupEl = e.target.closest("#workDragContainer > .drag-item[data-group-ref]");
+            if (groupEl && groupEl.dataset.groupRef !== "duration") {
+                e.preventDefault();
+                e.stopPropagation();
+                window.toggleGroupRemember(groupEl.dataset.groupRef);
+            }
+            return;
+        }
+
+        // 여기부터는 순서 모드: 기존 그룹(블록) 선택/이동 로직
         // 이름 수정을 위한 롱탭은 box-title 자신의 핸들러가 처리 — 여기서는 선택만 담당
         const sec = e.target.closest("#workDragContainer > .drag-item");
         if (sec) {
@@ -702,6 +713,7 @@
     // ─── 순서 모드 토글 ───
     // 켜면: 객체(칸) 선택은 막히고 그룹(블록) 전체만 선택 가능 — 그 상태에서 이동(⠿)만 허용.
     // 꺼지면: 원래대로 객체 단위 선택/이동/리사이즈로 복귀.
+    // 기억 모드와는 동시에 켤 수 없다(그룹을 탭했을 때 이동인지 기억 토글인지 모호해지므로).
     window.isOrderMode = false;
     window.toggleOrderMode = () => {
         if (!window.isWorkLayoutMode) {
@@ -709,20 +721,53 @@
             return;
         }
         window.isOrderMode = !window.isOrderMode;
+        if (window.isOrderMode) window.isRememberSelectMode = false;
         deselectBlock();
         document.getElementById("workLayoutOrderBtn")?.classList.toggle("active-btn", window.isOrderMode);
         document.getElementById("workModal")?.classList.toggle("order-mode", window.isOrderMode);
-    };
-
-    // ─── 기억 모드: on/off 스위치 — 켜져 있으면 새 작업일지를 열 때 마지막 선택값을 자동 적용 ───
-    window.updateRememberModeBtn = () => {
-        document.getElementById("workRememberModeBtn")?.classList.toggle("active-btn", !!window.isRememberMode);
-    };
-
-    window.toggleRememberMode = () => {
-        window.isRememberMode = !window.isRememberMode;
-        localStorage.setItem("wm_remember_mode", JSON.stringify(window.isRememberMode));
         window.updateRememberModeBtn();
+    };
+
+    // ─── 기억 선택 모드 토글 ───
+    // 켜면(순서와 동일한 방식): 그룹(블록)을 탭할 때마다 "그 그룹만" 기억 켜짐/꺼짐이 토글된다
+    // (이동은 하지 않음). 기억이 켜진 그룹은 새 작업일지를 열 때 마지막 선택값을 자동 적용하고,
+    // 제목 줄 오른쪽에 초록 점으로 표시한다. 순서 모드와는 동시에 켤 수 없다.
+    window.isRememberSelectMode = false;
+    window.toggleRememberSelectMode = () => {
+        if (!window.isWorkLayoutMode) {
+            alert("레이아웃 편집 모드에서 사용하세요.");
+            return;
+        }
+        window.isRememberSelectMode = !window.isRememberSelectMode;
+        if (window.isRememberSelectMode) window.isOrderMode = false;
+        deselectBlock();
+        document.getElementById("workLayoutOrderBtn")?.classList.toggle("active-btn", window.isOrderMode);
+        document.getElementById("workModal")?.classList.toggle("order-mode", window.isOrderMode);
+        window.updateRememberModeBtn();
+    };
+
+    window.updateRememberModeBtn = () => {
+        document.getElementById("workRememberModeBtn")?.classList.toggle("active-btn", !!window.isRememberSelectMode);
+    };
+
+    // duration(시작/종료)은 태그 선택 그룹이 아니므로 기억 대상에서 제외
+    window.toggleGroupRemember = (groupId) => {
+        if (groupId === "duration") return;
+        const g = window.getGroupById && window.getGroupById(groupId);
+        if (!g) return;
+        g.remember = !g.remember;
+        window.markDirty?.("master", "groups", "upsert");
+        if (window.saveLocal) window.saveLocal("group-remember");
+        window.refreshRememberDots();
+        if (navigator.vibrate) navigator.vibrate(20);
+    };
+
+    // 각 그룹 상자(제목이 있는 .drag-item)에 기억 on/off에 따라 점 표시 클래스를 갱신
+    window.refreshRememberDots = () => {
+        (window.groups || []).forEach(g => {
+            const el = document.querySelector(`#workDragContainer > .drag-item[data-group-ref="${g.id}"]`);
+            if (el) el.classList.toggle("has-remember", !!g.remember && g.id !== "duration");
+        });
     };
 
     // ═══════════════════════════════════════════
@@ -1212,8 +1257,8 @@
         // 손잡이 없이 칸 몸체를 탭하면 그냥 선택만 한다(이동/크기조절은 반드시 가운데 점에서만).
         const start = (event) => {
             if (!window.isWorkLayoutMode) return;
-            // 순서 모드에서는 객체(칸) 단위 선택/이동/리사이즈를 막고 그룹(블록) 선택만 허용
-            if (window.isOrderMode) return;
+            // 순서/기억 선택 모드에서는 객체(칸) 단위 선택/이동/리사이즈를 막고 그룹(블록) 탭만 허용
+            if (window.isOrderMode || window.isRememberSelectMode) return;
             clearTimeout(resizeModeTimer);
             resizeHandleLongPressed = false; pendingResizeCell = null; pendingResizeStart = null;
             const resizeHandle = event.target.closest(".widget-resize-handle");

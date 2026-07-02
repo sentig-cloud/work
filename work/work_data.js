@@ -45,6 +45,7 @@ const DEFAULT_GROUPS = [
         enabled: true,
         order: 0,
         selectionMode: 'multi',   // multi: 다중선택, single: 단일선택, qty: 수량선택, tag: 메모태그
+        remember: false,          // 켜면 새 작업일지를 열 때 이 그룹만 마지막 선택값을 자동 적용
         tags: [
             { name: '설치', count: 0, showNumber: true, includeMonthly: true },
             { name: 'A/S', count: 0, showNumber: true, includeMonthly: true },
@@ -57,6 +58,7 @@ const DEFAULT_GROUPS = [
         enabled: true,
         order: 1,
         selectionMode: 'multi',
+        remember: false,
         tags: []
     },
     {
@@ -65,6 +67,7 @@ const DEFAULT_GROUPS = [
         enabled: true,
         order: 2,
         selectionMode: 'single',
+        remember: false,
         tags: [
             { name: '완료', count: 0, showNumber: true, includeMonthly: true },
             { name: '취소', count: 0, showNumber: true, includeMonthly: true },
@@ -78,6 +81,7 @@ const DEFAULT_GROUPS = [
         enabled: true,
         order: 3,
         selectionMode: 'qty',
+        remember: false,
         tags: [
             { name: '인' },
             { name: '티' },
@@ -143,21 +147,26 @@ window.migrateToGroups = function () {
 
 window.migrateToGroups();
 
+// 이미 groups가 저장돼 있던 기존 사용자(예: 서버 동기화로 이미 받아온 데이터)에게는
+// 새로 추가된 기본 그룹(예: duration=시작/종료)이 없을 수 있으므로, 없으면 추가해준다.
+// (DEFAULT_GROUPS는 groups가 아예 없을 때만 쓰이므로, 이 보정이 없으면 기존 사용자는
+// 새 기본 그룹을 영영 못 받는다.) 최초 로드뿐 아니라 서버 동기화로 window.groups가
+// 통째로 교체될 때마다(work_sync.js) 다시 불러 써야 하므로 함수로 분리한다.
+window.ensureDefaultGroups = function () {
+    if (!Array.isArray(window.groups)) window.groups = [];
+    DEFAULT_GROUPS.forEach(defaultGroup => {
+        if (!window.groups.find(g => g.id === defaultGroup.id)) {
+            window.groups.push({ ...defaultGroup, tags: [...defaultGroup.tags] });
+        }
+    });
+};
+
 // groups 로드 (없으면 기본값)
 window.groups = (window.safeParseLocal('wm_groups', null) || DEFAULT_GROUPS).map(g => ({
     ...g,
     tags: (g.tags || []).filter(Boolean)
 }));
-
-// 이미 groups가 저장돼 있던 기존 사용자에게는(예: 서버 동기화로 이미 받아온 데이터)
-// 새로 추가된 기본 그룹(예: duration=시작/종료)이 없을 수 있으므로, 없으면 추가해준다.
-// (DEFAULT_GROUPS는 groups가 아예 없을 때만 쓰이므로, 이 보정이 없으면 기존 사용자는
-// 새 기본 그룹을 영영 못 받는다.)
-DEFAULT_GROUPS.forEach(defaultGroup => {
-    if (!window.groups.find(g => g.id === defaultGroup.id)) {
-        window.groups.push({ ...defaultGroup, tags: [...defaultGroup.tags] });
-    }
-});
+window.ensureDefaultGroups();
 
 // ─── 하위 호환: 기존 코드가 window.taskTypes 등을 참조하는 경우 대응 ───
 // groups에서 파생된 getter로 연결
@@ -230,21 +239,18 @@ window.isWorkDuty = false;
 window.workStartTime = null;
 window.workEndTime = null;
 
-// ─── 기억 모드: 새 작업일지를 열 때 마지막으로 선택했던 태그들을 자동 적용할지 여부 ───
-window.isRememberMode = window.safeParseLocal('wm_remember_mode', false) === true;
-
-window.getLastRememberedSelections = function () {
-    return window.safeParseLocal('wm_last_selections', null) || {};
+// ─── 기억(remember): 그룹별로 켜고 끄는 기능. 켜진 그룹만 마지막 선택값을 저장/복원한다.
+// 레이아웃 편집모드의 "기억" 버튼을 눌러 선택모드로 들어간 뒤, 원하는 그룹을 탭해서
+// 그 그룹만 켜고 끌 수 있다(순서 모드가 그룹을 탭해서 이동시키는 것과 동일한 방식).
+window.getGroupRememberedValue = function (groupId) {
+    const store = window.safeParseLocal('wm_group_last_selections', null) || {};
+    return store[groupId];
 };
 
-window.saveLastRememberedSelections = function () {
-    window.localStorage.setItem('wm_last_selections', JSON.stringify({
-        taskTypes: [...(window.activeTaskTypes || [])],
-        coworkers: [...(window.selectedCoworkers || [])],
-        status: window.activeStatus || null,
-        equips: { ...(window.activeEquips || {}) },
-        customGroups: JSON.parse(JSON.stringify(window.activeCustomGroupSelections || {}))
-    }));
+window.saveGroupRememberedValue = function (groupId, value) {
+    const store = window.safeParseLocal('wm_group_last_selections', null) || {};
+    store[groupId] = value;
+    window.localStorage.setItem('wm_group_last_selections', JSON.stringify(store));
 };
 
 // ─── 그룹 헬퍼 함수 ───
@@ -328,6 +334,7 @@ window.addCustomGroup = function (title) {
         enabled: true,
         order: maxOrder + 1,
         selectionMode: 'multi',
+        remember: false,
         tags: []
     };
     window.groups.push(newGroup);

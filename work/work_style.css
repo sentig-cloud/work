@@ -453,6 +453,21 @@ input, textarea, [contenteditable="true"] {
 }
 .box-title:active { background: rgba(0,0,0,0.1); }
 
+/* 기억(remember) 켜진 그룹 표시 — 제목이 있는 줄(상자) 오른쪽 위에 초록 점(.drag-item은 이미 position:relative) */
+.drag-item[data-group-ref].has-remember::before {
+    content: "";
+    position: absolute;
+    top: 5px;
+    right: 6px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #16a34a;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.35);
+    z-index: 6;
+    pointer-events: none;
+}
+
 /* 드래그 핸들 (레거시 - 하위호환) */
 .drag-handle {
     position: absolute; right: 8%; bottom: -16px; width: 38px; height: 22px;

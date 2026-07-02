@@ -85,7 +85,7 @@
                 <span>작업 일지 작성</span>
                 <div class="work-layout-title-actions">
                     <button type="button" id="workRememberModeBtn" class="w95-btn work-layout-remember-btn"
-                        title="켜면 방금 선택한 값을 다음 새 작업일지에 자동으로 적용" onclick="window.toggleRememberMode()">기억</button>
+                        title="켜고 그룹을 탭하면 그 그룹만 기억 on/off 토글(다시 탭하면 해제)" onclick="window.toggleRememberSelectMode()">기억</button>
                     <button type="button" id="workLayoutOrderBtn" class="w95-btn work-layout-order-btn"
                         title="켜면 그룹 단위로만 선택·이동 가능" onclick="window.toggleOrderMode()">순서</button>
                     <button type="button" id="workLayoutGroupBtn" class="w95-btn work-layout-group-btn"
@@ -170,9 +170,15 @@
                             ontouchstart="window.startTitlePress(event, 'duration')" ontouchend="window.endTitlePress()" ontouchcancel="window.endTitlePress()"
                             >시작/종료</div>
                         <div class="btn-tag-area" style="justify-content:center;">
-                            <button type="button" id="workStartBtn" class="w95-btn" style="flex:1; min-width:70px;" onclick="window.stampWorkStart()">시작</button>
-                            <button type="button" id="workEndBtn" class="w95-btn" style="flex:1; min-width:70px;" onclick="window.stampWorkEnd()">종료</button>
-                            <div id="workTotalTimeLabel" style="flex:1; min-width:80px; text-align:center; font-weight:bold; color:var(--w-blue); font-size:0.85rem;">총 --:--</div>
+                            <button type="button" id="workStartBtn" class="w95-btn" style="flex:1; min-width:70px;" title="짧게 탭: 찍기/취소 토글 · 길게 누르면 시간 수정"
+                                onmousedown="window.startDurationPress(event,'start')" onmouseup="window.endDurationPress(event,'start')" onmouseleave="window.cancelDurationPress()"
+                                ontouchstart="window.startDurationPress(event,'start')" ontouchend="window.endDurationPress(event,'start')" ontouchcancel="window.cancelDurationPress()"
+                                >시작</button>
+                            <button type="button" id="workEndBtn" class="w95-btn" style="flex:1; min-width:70px;" title="짧게 탭: 찍기/취소 토글 · 길게 누르면 시간 수정"
+                                onmousedown="window.startDurationPress(event,'end')" onmouseup="window.endDurationPress(event,'end')" onmouseleave="window.cancelDurationPress()"
+                                ontouchstart="window.startDurationPress(event,'end')" ontouchend="window.endDurationPress(event,'end')" ontouchcancel="window.cancelDurationPress()"
+                                >종료</button>
+                            <div id="workTotalTimeLabel" style="flex:1; min-width:80px; text-align:center; font-weight:bold; color:var(--w-blue); font-size:0.85rem;">--:--</div>
                         </div>
                         <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>
                     </div>
@@ -273,6 +279,17 @@
                 <button type="button" class="w95-btn" style="height:40px; font-size:1.1rem; font-weight:bold;" onclick="window.openSpecificMap('tmap')">T맵</button>
                 <button type="button" class="w95-btn" style="height:40px; font-size:1.1rem; font-weight:bold;" onclick="window.openSpecificMap('naver')">네이버 지도</button>
                 <button type="button" class="w95-btn" style="height:40px; font-size:1.1rem; font-weight:bold;" onclick="window.openSpecificMap('kakaomap')">카카오맵</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="durationTimeEditModal" class="modal-overlay" style="z-index: 2750;">
+        <div class="modal-box w95-window" style="max-width: 220px;">
+            <div class="w95-titlebar"><span id="durationTimeEditTitle">시간 수정</span><button type="button" class="w95-btn" onclick="window.closeDurationTimeEditModal()">X</button></div>
+            <div style="padding:10px; background:var(--w-gray);">
+                <input type="text" id="durationTimeEditInput" inputmode="numeric" class="m-input w95-in" style="width:100%; text-align:center; margin-bottom:8px;" placeholder="0000" maxlength="4"
+                    onblur="window.formatTimeInput(this)" onkeydown="if(event.key==='Enter'){event.preventDefault(); window.saveDurationTimeEdit();}">
+                <button type="button" class="w95-btn" style="width:100%; color:var(--w-blue); font-weight:bold; height:32px;" onclick="window.saveDurationTimeEdit()">저장</button>
             </div>
         </div>
     </div>

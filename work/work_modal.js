@@ -30,11 +30,23 @@ window.toggleDuty = () => {
 };
 
 // ─── 시작/종료/총시간 (특수 그룹: 태그 목록이 아니라 workStartTime/workEndTime 두 값만 다룸) ───
+
+// 저장용 최종 총시간 — 시작/종료가 둘 다 있어야 계산됨(로그 저장 시 이것을 사용)
 window.computeWorkDurationMin = () => {
     if (!window.workStartTime || !window.workEndTime) return null;
     const toMin = (t) => { const parts = t.split(':').map(Number); return (parts[0] || 0) * 60 + (parts[1] || 0); };
     let diff = toMin(window.workEndTime) - toMin(window.workStartTime);
     if (diff < 0) diff += 24 * 60; // 자정을 넘기는 근무(야간 등) 대응
+    return diff;
+};
+
+// 화면 표시용 실시간 총시간 — 종료 전이면 "지금"을 임시 종료시각처럼 써서 실시간으로 흐르게 함
+window.computeLiveDurationMin = () => {
+    if (!window.workStartTime) return null;
+    const endRef = window.workEndTime || window.getCurrentTimeString();
+    const toMin = (t) => { const parts = t.split(':').map(Number); return (parts[0] || 0) * 60 + (parts[1] || 0); };
+    let diff = toMin(endRef) - toMin(window.workStartTime);
+    if (diff < 0) diff += 24 * 60;
     return diff;
 };
 
@@ -51,23 +63,92 @@ window.renderWorkDuration = () => {
         endBtn.classList.toggle('active-btn', !!window.workEndTime);
     }
     if (totalLabel) {
-        const totalMin = window.computeWorkDurationMin();
-        totalLabel.innerText = totalMin !== null ? `총 ${window.formatDurationMin(totalMin)}` : '총 --:--';
+        const liveMin = window.computeLiveDurationMin();
+        totalLabel.innerText = liveMin !== null ? window.formatDurationMin(liveMin) : '--:--';
     }
 };
 
-window.stampWorkStart = () => {
+// 시작만 찍혀 있고 종료 전이면 총시간이 실시간으로 흐르도록 주기적으로 다시 그림
+window.workDurationTimer = null;
+window.startWorkDurationTimer = () => {
+    window.stopWorkDurationTimer();
+    window.workDurationTimer = setInterval(() => {
+        if (window.workStartTime && !window.workEndTime) window.renderWorkDuration();
+    }, 15000);
+};
+window.stopWorkDurationTimer = () => {
+    clearTimeout(window.workDurationTimer);
+    clearInterval(window.workDurationTimer);
+    window.workDurationTimer = null;
+};
+
+// 시작/종료 버튼: 짧게 탭 = 토글(찍기 ↔ 오작동 대비 취소), 길게 누르면 시간 직접 수정 팝업
+window.workDurationPressTimer = null;
+window.workDurationLongPressed = false;
+
+window.startDurationPress = (event, which) => {
+    if (window.isWorkEditLocked) return;
+    if (event) event.preventDefault();
+    window.workDurationLongPressed = false;
+    clearTimeout(window.workDurationPressTimer);
+    window.workDurationPressTimer = setTimeout(() => {
+        window.workDurationLongPressed = true;
+        if (navigator.vibrate) navigator.vibrate(30);
+        window.openDurationTimeEditModal(which);
+    }, 600);
+};
+
+window.endDurationPress = (event, which) => {
+    if (event) event.preventDefault();
+    clearTimeout(window.workDurationPressTimer);
+    if (window.workDurationLongPressed) { window.workDurationLongPressed = false; return; }
+    window.toggleDurationStamp(which);
+};
+
+window.cancelDurationPress = () => {
+    clearTimeout(window.workDurationPressTimer);
+    window.workDurationLongPressed = false;
+};
+
+window.toggleDurationStamp = (which) => {
     if (window.isWorkEditLocked) return;
     window.pushWorkUndo && window.pushWorkUndo();
-    window.workStartTime = window.getCurrentTimeString();
+    if (which === 'start') {
+        window.workStartTime = window.workStartTime ? null : window.getCurrentTimeString();
+    } else {
+        window.workEndTime = window.workEndTime ? null : window.getCurrentTimeString();
+    }
     window.renderWorkDuration();
 };
 
-window.stampWorkEnd = () => {
+// ─── 시작/종료 시간 직접 수정 팝업 (윈95 스타일, 4자리 24시간 입력) ───
+window.durationEditTarget = null;
+
+window.openDurationTimeEditModal = (which) => {
     if (window.isWorkEditLocked) return;
+    window.durationEditTarget = which;
+    const current = which === 'start' ? window.workStartTime : window.workEndTime;
+    const input = document.getElementById('durationTimeEditInput');
+    input.value = current ? current.replace(':', '') : '';
+    document.getElementById('durationTimeEditTitle').innerText = which === 'start' ? '시작 시간 수정' : '종료 시간 수정';
+    document.getElementById('durationTimeEditModal').style.display = 'flex';
+    setTimeout(() => { input.focus(); input.select(); }, 50);
+};
+
+window.closeDurationTimeEditModal = () => {
+    document.getElementById('durationTimeEditModal').style.display = 'none';
+    window.durationEditTarget = null;
+};
+
+window.saveDurationTimeEdit = () => {
+    const input = document.getElementById('durationTimeEditInput');
+    window.formatTimeInput(input);
+    if (!input.value) { alert('시간을 입력하세요.'); return; }
     window.pushWorkUndo && window.pushWorkUndo();
-    window.workEndTime = window.getCurrentTimeString();
+    if (window.durationEditTarget === 'start') window.workStartTime = input.value;
+    else if (window.durationEditTarget === 'end') window.workEndTime = input.value;
     window.renderWorkDuration();
+    window.closeDurationTimeEditModal();
 };
 
 window.updateWorkDateLabel = () => {
@@ -300,15 +381,17 @@ window.openWorkModal = (id = null) => {
         const todayLogs = window.logs.filter(l => l.y === window.currentYear && l.m === window.curMonth && l.d === window.curDay);
         window.isWorkDuty = todayLogs.some(l => l.cat === 'work' && l.isDuty);
 
-        // 기억 모드: 새 작업일지를 열 때 마지막으로 선택했던 태그를 그대로 눌린 상태로 적용
-        if (window.isRememberMode) {
-            const last = window.getLastRememberedSelections();
-            window.activeTaskTypes = [...(last.taskTypes || [])];
-            window.selectedCoworkers = [...(last.coworkers || [])];
-            window.activeStatus = last.status || null;
-            window.activeEquips = { ...(last.equips || {}) };
-            window.activeCustomGroupSelections = JSON.parse(JSON.stringify(last.customGroups || {}));
-        }
+        // 기억(그룹별): 새 작업일지를 열 때, 기억이 켜진 그룹만 마지막 선택값을 그대로 적용
+        (window.getActiveGroups ? window.getActiveGroups() : []).forEach(g => {
+            if (g.id === 'duration' || !g.remember) return;
+            const val = window.getGroupRememberedValue(g.id);
+            if (val === undefined) return;
+            if (g.id === 'taskTypes') window.activeTaskTypes = Array.isArray(val) ? [...val] : [];
+            else if (g.id === 'coworkers') window.selectedCoworkers = Array.isArray(val) ? [...val] : [];
+            else if (g.id === 'statuses') window.activeStatus = val || null;
+            else if (g.id === 'equipments') window.activeEquips = { ...(val || {}) };
+            else window.activeCustomGroupSelections[g.id] = Array.isArray(val) ? [...val] : [];
+        });
     }
 
     const dutyBtn = document.getElementById('workDutyBtn');
@@ -316,6 +399,7 @@ window.openWorkModal = (id = null) => {
     else { dutyBtn.style.color = 'var(--w-black)'; dutyBtn.classList.remove('active-btn'); }
 
     window.updateRememberModeBtn && window.updateRememberModeBtn();
+    window.refreshRememberDots && window.refreshRememberDots();
 
     const editSaveBtn = document.getElementById('workEditSaveBtn');
     if (editSaveBtn) editSaveBtn.style.display = id ? 'block' : 'none';
@@ -334,9 +418,11 @@ window.openWorkModal = (id = null) => {
     document.getElementById('workModal').style.display = 'flex';
     window.initWorkDragListeners();
     if (window.setWorkEditLocked) window.setWorkEditLocked(!!id);
+    window.startWorkDurationTimer && window.startWorkDurationTimer();
 };
 
 window.closeWorkModal = () => {
+    window.stopWorkDurationTimer && window.stopWorkDurationTimer();
     document.getElementById('workModal').style.display = 'none';
     document.getElementById('workAddress').value = "";
     document.getElementById('workNote').value = "";

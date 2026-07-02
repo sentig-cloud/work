@@ -209,7 +209,7 @@ window.getWorkDraftText = () => {
         (window.workStartTime || window.workEndTime)
             ? `시작/종료: ${window.workStartTime || "--:--"} ~ ${window.workEndTime || "--:--"}` +
               (window.computeWorkDurationMin && window.computeWorkDurationMin() !== null
-                  ? ` (총 ${window.formatDurationMin(window.computeWorkDurationMin())})`
+                  ? ` (${window.formatDurationMin(window.computeWorkDurationMin())})`
                   : "")
             : ""
     ].filter(Boolean).join("\n");
@@ -417,10 +417,17 @@ window.saveWorkLog = async () => {
             window.updateCommuteDetailByDate(saveY, saveM, saveD);
         }
 
-        // 기억 모드가 켜져 있으면 이번에 선택한 태그들을 다음 새 작업일지를 위해 저장
-        if (window.isRememberMode && window.saveLastRememberedSelections) {
-            window.saveLastRememberedSelections();
-        }
+        // 기억이 켜진 그룹만, 이번에 선택한 값을 다음 새 작업일지를 위해 그룹별로 저장
+        (window.getActiveGroups ? window.getActiveGroups() : []).forEach(g => {
+            if (g.id === 'duration' || !g.remember) return;
+            let val;
+            if (g.id === 'taskTypes') val = [...window.activeTaskTypes];
+            else if (g.id === 'coworkers') val = [...window.selectedCoworkers];
+            else if (g.id === 'statuses') val = window.activeStatus;
+            else if (g.id === 'equipments') val = { ...window.activeEquips };
+            else val = [...(window.activeCustomGroupSelections[g.id] || [])];
+            window.saveGroupRememberedValue(g.id, val);
+        });
 
         window.saveLocal(`work:${id}`);
         window.closeWorkModal();

@@ -264,7 +264,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
         // 시작/종료/총시간 (특수 그룹 — 태그 목록이 아니라 log.startTime/endTime/totalMin에 직접 저장)
         if (l.startTime || l.endTime) {
             const totalStr = l.totalMin ? window.formatDurationMin(l.totalMin) : '--:--';
-            detailsHtml.push(`<div style="color:#0f766e; font-size:0.85rem; font-weight:bold;"><i class="fa-solid fa-hourglass-half" style="width:16px;"></i> ${l.startTime || '--:--'} ~ ${l.endTime || '--:--'} (총 ${totalStr})</div>`);
+            detailsHtml.push(`<div style="color:#0f766e; font-size:0.85rem; font-weight:bold;"><i class="fa-solid fa-hourglass-half" style="width:16px;"></i> ${l.startTime || '--:--'} ~ ${l.endTime || '--:--'} (${totalStr})</div>`);
         }
 
         // 커스텀 그룹 값 카드에 표시

@@ -259,6 +259,8 @@ window.applyServerData = function (data) {
             // v1 → 클라이언트 측 마이그레이션
             window.migrateToGroups && window.migrateToGroups();
         }
+        // 서버 데이터에는 이 기기에서 새로 추가된 기본 그룹(duration 등)이 없을 수 있으므로 보정
+        window.ensureDefaultGroups && window.ensureDefaultGroups();
 
         window.saveAllLocalOnly();
     } finally {
@@ -299,6 +301,7 @@ window.applyRemoteOperations = function (operations, master) {
             // v2: groups 통합
             if (Array.isArray(master.groups) && master.groups.length > 0) {
                 window.groups = master.groups.filter(Boolean);
+                window.ensureDefaultGroups && window.ensureDefaultGroups();
             } else {
                 // v1 하위 호환
                 for (const key of ["taskTypes","coworkers","statuses","equipments","memoTags"]) {
