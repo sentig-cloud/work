@@ -440,22 +440,22 @@
     // 각 객체는 개별적으로 롱탭 이동 / 드래그 리사이즈가 가능하다.
     window.ensureInnerLayoutObjects = () => {
         const specs = [
-            // 칸 높이가 객체마다 제각각이던 것을 정리: 날짜/시간/당직 등 작은 필드·버튼들은
-            // 전부 2줄(64px) 높이로 통일 — 특이사항(1줄, 32px)보다는 높고 작업내용(3줄, 96px)보다는 낮다.
+            // 날짜/시간/당직 등 작은 필드·버튼들은 전부 1줄(32px)로 통일 —
+            // 작업유형/매니저 등에서 쓰는 태그 선택 버튼(.w95-btn)의 높이(32px)와 동일하게 맞춤.
             { key: "1-fields", items: [
-                ["date", document.getElementById("workDateInput")?.parentElement, 2, 2],
-                ["time", document.getElementById("workTime"), 1, 2],
-                ["duty", document.getElementById("workDutyBtn"), 1, 2],
-                ["ot", document.getElementById("workOT"), 2, 2],
-                ["taskNo", document.getElementById("taskNo"), 2, 2],
-                ["copy", document.getElementById("workCopyBtn"), 1, 2],
-                ["customer", document.getElementById("customerName"), 3, 2],
-                ["address", document.getElementById("workAddress"), 4, 2],
+                ["date", document.getElementById("workDateInput")?.parentElement, 2, 1],
+                ["time", document.getElementById("workTime"), 1, 1],
+                ["duty", document.getElementById("workDutyBtn"), 1, 1],
+                ["ot", document.getElementById("workOT"), 2, 1],
+                ["taskNo", document.getElementById("taskNo"), 2, 1],
+                ["copy", document.getElementById("workCopyBtn"), 1, 1],
+                ["customer", document.getElementById("customerName"), 3, 1],
+                ["address", document.getElementById("workAddress"), 4, 1],
                 // 이전 selector(주소 래퍼 안에서 button 검색)는 항상 null이었음(지도 버튼은 별도 래퍼).
                 // 버튼 자신의 속성으로 직접 찾아야 이 함수가 여러 번 호출돼 버튼이 이미 칸 안으로
                 // 옮겨진 뒤에도(부모가 바뀐 뒤에도) 계속 같은 버튼을 다시 찾을 수 있다.
-                ["map", document.querySelector('button[onmousedown*="startMapPress"]'), 1, 2],
-                ["undo", document.getElementById("workUndoBtn"), 1, 2],
+                ["map", document.querySelector('button[onmousedown*="startMapPress"]'), 1, 1],
+                ["undo", document.getElementById("workUndoBtn"), 1, 1],
                 // 작업내용/특이사항: 날짜·Task 블록과 같은 그룹에 고정 — 항상 붙어서 표시
                 ["content", document.getElementById("workContent"), 6, 3],
                 ["note", document.getElementById("workNote"), 6, 1]
