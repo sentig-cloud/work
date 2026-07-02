@@ -93,10 +93,10 @@
                     <button type="button" id="workLayoutResetBtn" class="w95-btn work-layout-reset-btn"
                         title="기본 배치 복원" onclick="window.resetWorkLayout()">초기화</button>
                     <button type="button" id="workLayoutModeBtn" class="w95-btn" style="padding:0 6px;"
-                        title="2초 이상 누르면 레이아웃 변경 모드"
+                        title="1.2초 이상 누르면 레이아웃 변경 모드"
                         onpointerdown="window.startWorkLayoutPress(event)"
                         onpointerup="window.endWorkLayoutPress(event)"
-                        onpointerleave="window.cancelWorkLayoutPress()"
+                        onpointermove="window.moveWorkLayoutPress(event)"
                         onpointercancel="window.cancelWorkLayoutPress()">X</button>
                 </div>
             </div>

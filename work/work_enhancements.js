@@ -541,10 +541,17 @@
         titlebar?.classList.toggle("is-layout-edit", window.isWorkLayoutMode);
     };
 
+    // 예전엔 2000ms + onpointerleave(버튼 사각형을 살짝만 벗어나도 취소)라서
+    // 2초 내내 손가락을 완벽히 고정해야 했고, 미세한 떨림에도 자꾸 취소돼 "롱탭이 안 먹는다"는
+    // 문제가 있었음. 시간을 1.2초로 줄이고, 취소 기준을 "버튼 밖으로 나가면"이 아니라
+    // "처음 누른 지점에서 일정 거리 이상 움직이면"으로 바꿔 훨씬 관대하게 했다.
+    window.workLayoutPressOrigin = null;
     window.startWorkLayoutPress = (event) => {
         if (event) event.preventDefault();
         clearTimeout(window.workLayoutPressTimer);
         window.workLayoutLongPressed = false;
+        const point = event.touches ? event.touches[0] : event;
+        window.workLayoutPressOrigin = point ? { x: point.clientX, y: point.clientY } : null;
         const btn = document.getElementById("workLayoutModeBtn");
         if (btn) btn.classList.add("is-layout-pressing");
         window.workLayoutPressTimer = setTimeout(() => {
@@ -552,12 +559,21 @@
             window.setWorkLayoutMode(true);
             document.getElementById("workLayoutModeBtn")?.classList.remove("is-layout-pressing");
             if (navigator.vibrate) navigator.vibrate(40);
-        }, 2000);
+        }, 1200);
+    };
+
+    window.moveWorkLayoutPress = (event) => {
+        if (!window.workLayoutPressOrigin) return;
+        const point = event.touches ? event.touches[0] : event;
+        if (!point) return;
+        const dist = Math.hypot(point.clientX - window.workLayoutPressOrigin.x, point.clientY - window.workLayoutPressOrigin.y);
+        if (dist > 24) window.cancelWorkLayoutPress();
     };
 
     window.endWorkLayoutPress = (event) => {
         if (event) event.preventDefault();
         clearTimeout(window.workLayoutPressTimer);
+        window.workLayoutPressOrigin = null;
         document.getElementById("workLayoutModeBtn")?.classList.remove("is-layout-pressing");
         if (!window.workLayoutLongPressed && window.isWorkLayoutMode) window.setWorkLayoutMode(false);
         window.workLayoutLongPressed = false;
@@ -565,6 +581,7 @@
 
     window.cancelWorkLayoutPress = () => {
         clearTimeout(window.workLayoutPressTimer);
+        window.workLayoutPressOrigin = null;
         document.getElementById("workLayoutModeBtn")?.classList.remove("is-layout-pressing");
     };
 
