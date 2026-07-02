@@ -92,8 +92,20 @@ const DEFAULT_GROUPS = [
         order: 4,
         selectionMode: 'tag',
         tags: []
+    },
+    {
+        id: 'duration',
+        title: '시작/종료',
+        enabled: true,
+        order: 5,
+        selectionMode: 'duration', // 시작/종료 버튼 + 총시간 표시 전용 특수 그룹(태그 목록 없음)
+        tags: []
     }
 ];
+
+// 기본 제공 그룹 id 목록 — 삭제(그룹-)는 안 되고 비활성화만 가능.
+// duration(시작/종료)도 특수 기능이라 그룹 해제 대상에서 제외된다.
+window.BUILT_IN_GROUP_IDS = ['taskTypes', 'coworkers', 'statuses', 'equipments', 'memoTags', 'duration'];
 
 // ─── 마이그레이션: 구 데이터 → groups 통합 구조 ───
 window.migrateToGroups = function () {
@@ -136,6 +148,16 @@ window.groups = (window.safeParseLocal('wm_groups', null) || DEFAULT_GROUPS).map
     ...g,
     tags: (g.tags || []).filter(Boolean)
 }));
+
+// 이미 groups가 저장돼 있던 기존 사용자에게는(예: 서버 동기화로 이미 받아온 데이터)
+// 새로 추가된 기본 그룹(예: duration=시작/종료)이 없을 수 있으므로, 없으면 추가해준다.
+// (DEFAULT_GROUPS는 groups가 아예 없을 때만 쓰이므로, 이 보정이 없으면 기존 사용자는
+// 새 기본 그룹을 영영 못 받는다.)
+DEFAULT_GROUPS.forEach(defaultGroup => {
+    if (!window.groups.find(g => g.id === defaultGroup.id)) {
+        window.groups.push({ ...defaultGroup, tags: [...defaultGroup.tags] });
+    }
+});
 
 // ─── 하위 호환: 기존 코드가 window.taskTypes 등을 참조하는 경우 대응 ───
 // groups에서 파생된 getter로 연결
@@ -205,6 +227,25 @@ window.calculatedOvertimeMin = 0;
 window.tempCommuteImg = null;
 window.tempCommuteOriginalName = "";
 window.isWorkDuty = false;
+window.workStartTime = null;
+window.workEndTime = null;
+
+// ─── 기억 모드: 새 작업일지를 열 때 마지막으로 선택했던 태그들을 자동 적용할지 여부 ───
+window.isRememberMode = window.safeParseLocal('wm_remember_mode', false) === true;
+
+window.getLastRememberedSelections = function () {
+    return window.safeParseLocal('wm_last_selections', null) || {};
+};
+
+window.saveLastRememberedSelections = function () {
+    window.localStorage.setItem('wm_last_selections', JSON.stringify({
+        taskTypes: [...(window.activeTaskTypes || [])],
+        coworkers: [...(window.selectedCoworkers || [])],
+        status: window.activeStatus || null,
+        equips: { ...(window.activeEquips || {}) },
+        customGroups: JSON.parse(JSON.stringify(window.activeCustomGroupSelections || {}))
+    }));
+};
 
 // ─── 그룹 헬퍼 함수 ───
 
@@ -308,8 +349,7 @@ window.toggleGroupEnabled = function (groupId) {
 // 그룹 삭제
 window.removeGroup = function (groupId) {
     // 기본 그룹은 삭제 불가 (비활성화만 가능)
-    const builtIn = ['taskTypes', 'coworkers', 'statuses', 'equipments', 'memoTags'];
-    if (builtIn.includes(groupId)) return false;
+    if (window.BUILT_IN_GROUP_IDS.includes(groupId)) return false;
     window.groups = window.groups.filter(g => g.id !== groupId);
     return true;
 };

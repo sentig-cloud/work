@@ -29,6 +29,47 @@ window.toggleDuty = () => {
     else { dutyBtn.style.color = 'var(--w-black)'; dutyBtn.classList.remove('active-btn'); }
 };
 
+// ─── 시작/종료/총시간 (특수 그룹: 태그 목록이 아니라 workStartTime/workEndTime 두 값만 다룸) ───
+window.computeWorkDurationMin = () => {
+    if (!window.workStartTime || !window.workEndTime) return null;
+    const toMin = (t) => { const parts = t.split(':').map(Number); return (parts[0] || 0) * 60 + (parts[1] || 0); };
+    let diff = toMin(window.workEndTime) - toMin(window.workStartTime);
+    if (diff < 0) diff += 24 * 60; // 자정을 넘기는 근무(야간 등) 대응
+    return diff;
+};
+
+window.renderWorkDuration = () => {
+    const startBtn = document.getElementById('workStartBtn');
+    const endBtn = document.getElementById('workEndBtn');
+    const totalLabel = document.getElementById('workTotalTimeLabel');
+    if (startBtn) {
+        startBtn.innerText = window.workStartTime ? `시작 ${window.workStartTime}` : '시작';
+        startBtn.classList.toggle('active-btn', !!window.workStartTime);
+    }
+    if (endBtn) {
+        endBtn.innerText = window.workEndTime ? `종료 ${window.workEndTime}` : '종료';
+        endBtn.classList.toggle('active-btn', !!window.workEndTime);
+    }
+    if (totalLabel) {
+        const totalMin = window.computeWorkDurationMin();
+        totalLabel.innerText = totalMin !== null ? `총 ${window.formatDurationMin(totalMin)}` : '총 --:--';
+    }
+};
+
+window.stampWorkStart = () => {
+    if (window.isWorkEditLocked) return;
+    window.pushWorkUndo && window.pushWorkUndo();
+    window.workStartTime = window.getCurrentTimeString();
+    window.renderWorkDuration();
+};
+
+window.stampWorkEnd = () => {
+    if (window.isWorkEditLocked) return;
+    window.pushWorkUndo && window.pushWorkUndo();
+    window.workEndTime = window.getCurrentTimeString();
+    window.renderWorkDuration();
+};
+
 window.updateWorkDateLabel = () => {
     const dateVal = document.getElementById('workDateInput').value;
     const labelEl = document.getElementById('workDayLabel');
@@ -218,6 +259,8 @@ window.openWorkModal = (id = null) => {
 
     let y = window.currentYear, m = window.curMonth, d = window.curDay;
     window.isWorkDuty = false;
+    window.workStartTime = null;
+    window.workEndTime = null;
 
     if (id) {
         const log = window.logs.find(l => l.id === id);
@@ -236,6 +279,8 @@ window.openWorkModal = (id = null) => {
         if (log.imgs) window.workImgs = [...log.imgs];
         if (log.equips) window.activeEquips = { ...log.equips };
         window.isWorkDuty = log.isDuty || false;
+        window.workStartTime = log.startTime || null;
+        window.workEndTime = log.endTime || null;
 
         // 커스텀 그룹 선택 복원
         if (log.customGroups) {
@@ -254,11 +299,23 @@ window.openWorkModal = (id = null) => {
         document.getElementById('workOT').value = "";
         const todayLogs = window.logs.filter(l => l.y === window.currentYear && l.m === window.curMonth && l.d === window.curDay);
         window.isWorkDuty = todayLogs.some(l => l.cat === 'work' && l.isDuty);
+
+        // 기억 모드: 새 작업일지를 열 때 마지막으로 선택했던 태그를 그대로 눌린 상태로 적용
+        if (window.isRememberMode) {
+            const last = window.getLastRememberedSelections();
+            window.activeTaskTypes = [...(last.taskTypes || [])];
+            window.selectedCoworkers = [...(last.coworkers || [])];
+            window.activeStatus = last.status || null;
+            window.activeEquips = { ...(last.equips || {}) };
+            window.activeCustomGroupSelections = JSON.parse(JSON.stringify(last.customGroups || {}));
+        }
     }
 
     const dutyBtn = document.getElementById('workDutyBtn');
     if (window.isWorkDuty) { dutyBtn.style.color = 'red'; dutyBtn.classList.add('active-btn'); }
     else { dutyBtn.style.color = 'var(--w-black)'; dutyBtn.classList.remove('active-btn'); }
+
+    window.updateRememberModeBtn && window.updateRememberModeBtn();
 
     const editSaveBtn = document.getElementById('workEditSaveBtn');
     if (editSaveBtn) editSaveBtn.style.display = id ? 'block' : 'none';

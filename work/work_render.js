@@ -261,9 +261,15 @@ window.getLogCardHtml = (l, indexStr = '') => {
         if (l.ot) detailsHtml.push(`<div style="color:#e11d48; font-size:0.85rem; font-weight:bold;"><i class="fa-solid fa-clock" style="width:16px;"></i> OT ${l.ot}</div>`);
         if (l.note) detailsHtml.push(`<div style="color:#d97706; font-size:0.85rem;"><i class="fa-solid fa-triangle-exclamation" style="width:16px;"></i> ${l.note}</div>`);
 
+        // 시작/종료/총시간 (특수 그룹 — 태그 목록이 아니라 log.startTime/endTime/totalMin에 직접 저장)
+        if (l.startTime || l.endTime) {
+            const totalStr = l.totalMin ? window.formatDurationMin(l.totalMin) : '--:--';
+            detailsHtml.push(`<div style="color:#0f766e; font-size:0.85rem; font-weight:bold;"><i class="fa-solid fa-hourglass-half" style="width:16px;"></i> ${l.startTime || '--:--'} ~ ${l.endTime || '--:--'} (총 ${totalStr})</div>`);
+        }
+
         // 커스텀 그룹 값 카드에 표시
         const customGroups = window.getActiveGroups().filter(g =>
-            !['taskTypes', 'coworkers', 'statuses', 'equipments', 'memoTags'].includes(g.id)
+            !(window.BUILT_IN_GROUP_IDS || ['taskTypes', 'coworkers', 'statuses', 'equipments', 'memoTags', 'duration']).includes(g.id)
         );
         customGroups.forEach(g => {
             const val = l.customGroups && l.customGroups[g.id];
@@ -521,9 +527,11 @@ window.renderAllWorkGroups = () => {
     window.renderStatuses();
     window.renderEquips();
 
+    window.renderWorkDuration && window.renderWorkDuration();
+
     // 커스텀 그룹
     const customGroups = window.getActiveGroups().filter(g =>
-        !['taskTypes', 'coworkers', 'statuses', 'equipments', 'memoTags'].includes(g.id)
+        !(window.BUILT_IN_GROUP_IDS || ['taskTypes', 'coworkers', 'statuses', 'equipments', 'memoTags', 'duration']).includes(g.id)
     );
     customGroups.forEach(g => window.renderCustomGroup(g.id));
 };

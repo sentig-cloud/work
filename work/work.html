@@ -84,6 +84,8 @@
             <div id="workModalTitlebar" class="w95-titlebar">
                 <span>작업 일지 작성</span>
                 <div class="work-layout-title-actions">
+                    <button type="button" id="workRememberModeBtn" class="w95-btn work-layout-remember-btn"
+                        title="켜면 방금 선택한 값을 다음 새 작업일지에 자동으로 적용" onclick="window.toggleRememberMode()">기억</button>
                     <button type="button" id="workLayoutOrderBtn" class="w95-btn work-layout-order-btn"
                         title="켜면 그룹 단위로만 선택·이동 가능" onclick="window.toggleOrderMode()">순서</button>
                     <button type="button" id="workLayoutGroupBtn" class="w95-btn work-layout-group-btn"
@@ -160,6 +162,19 @@
                         <div class="work-obj-wrap" data-obj-id="note" data-obj-label="특이사항">
                             <input type="text" id="workNote" class="m-input w95-in" style="width:100%; height:28px;" placeholder="특이사항">
                         </div>
+                    </div>
+
+                    <div class="drag-item w95-in" data-id="8" data-group-ref="duration">
+                        <div id="boxTitle_duration" class="box-title" title="길게 눌러 이름 변경"
+                            onmousedown="window.startTitlePress(event, 'duration')" onmouseup="window.endTitlePress()" onmouseleave="window.endTitlePress()"
+                            ontouchstart="window.startTitlePress(event, 'duration')" ontouchend="window.endTitlePress()" ontouchcancel="window.endTitlePress()"
+                            >시작/종료</div>
+                        <div class="btn-tag-area" style="justify-content:center;">
+                            <button type="button" id="workStartBtn" class="w95-btn" style="flex:1; min-width:70px;" onclick="window.stampWorkStart()">시작</button>
+                            <button type="button" id="workEndBtn" class="w95-btn" style="flex:1; min-width:70px;" onclick="window.stampWorkEnd()">종료</button>
+                            <div id="workTotalTimeLabel" style="flex:1; min-width:80px; text-align:center; font-weight:bold; color:var(--w-blue); font-size:0.85rem;">총 --:--</div>
+                        </div>
+                        <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>
                     </div>
 
                     <div class="drag-item w95-in" data-id="3" data-group-ref="taskTypes">

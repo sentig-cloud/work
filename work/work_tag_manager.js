@@ -290,7 +290,7 @@ window.promptToggleGroup = (groupId) => {
 window.promptRemoveGroup = (groupId) => {
     const g = window.getGroupById(groupId);
     if (!g) return;
-    const builtIn = ['taskTypes', 'coworkers', 'statuses', 'equipments', 'memoTags'];
+    const builtIn = window.BUILT_IN_GROUP_IDS || ['taskTypes', 'coworkers', 'statuses', 'equipments', 'memoTags', 'duration'];
     if (builtIn.includes(groupId)) {
         return alert('기본 그룹은 삭제할 수 없습니다.\n비활성화 버튼을 사용해주세요.');
     }

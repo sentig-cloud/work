@@ -16,6 +16,9 @@ window.WorkExportUI = {
         { id: 'note',      name: '특이사항',   customName: '특이사항' },
         { id: 'equips',    name: '장비/KM',    customName: '장비/KM' },
         { id: 'duty',      name: '당직여부',   customName: '당직여부' },
+        { id: 'durationStart', name: '시작시간', customName: '시작시간' },
+        { id: 'durationEnd',   name: '종료시간', customName: '종료시간' },
+        { id: 'durationTotal', name: '총시간',   customName: '총시간' },
         { id: 'oxDisplay', name: 'O/X표시',    customName: 'O/X표시' },
         { id: 'tags',      name: '태그',       customName: '태그' },
         { id: 'hasPhoto',  name: '사진유무',   customName: '사진유무' },
@@ -32,7 +35,9 @@ window.WorkExportUI = {
         const cols = [...this.systemColumns];
         // v2: 커스텀 그룹 컬럼 동적 추가
         if (window.groups) {
-            const builtInIds = ['taskTypes','coworkers','statuses','equipments','memoTags'];
+            // duration(시작/종료)은 아래 systemColumns에 durationStart/End/Total로 이미 전용 컬럼이
+            // 있으므로 여기서 또 일반 customGroups 컬럼으로 중복 추가하지 않도록 제외한다.
+            const builtInIds = window.BUILT_IN_GROUP_IDS || ['taskTypes','coworkers','statuses','equipments','memoTags','duration'];
             const customGroups = (window.groups || []).filter(g => !builtInIds.includes(g.id));
             customGroups.forEach(g => {
                 // 이미 있으면 스킵

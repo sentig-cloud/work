@@ -57,6 +57,9 @@ window.WorkExport = {
                         }
                     }
                     else if (col.id === "duty") value = log.isDuty ? "당직" : "";
+                    else if (col.id === "durationStart") value = log.startTime || "";
+                    else if (col.id === "durationEnd") value = log.endTime || "";
+                    else if (col.id === "durationTotal") value = log.totalMin ? window.formatDurationMin(log.totalMin) : "";
                     else if (col.id === "oxDisplay") value = log.personalCheck || "";
                     else if (col.id === "tags") value = (log.tags || []).join(", ");
                     else if (col.id === "hasPhoto") {
@@ -365,7 +368,10 @@ window.WorkExport = {
                     "O/X표시",
                     "당직여부",
                     "사진유무",
-                    "Task번호"
+                    "Task번호",
+                    "시작시간",
+                    "종료시간",
+                    "총시간"
                 ].includes(columnName);
 
                 const wrapped = [

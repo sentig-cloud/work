@@ -714,6 +714,17 @@
         document.getElementById("workModal")?.classList.toggle("order-mode", window.isOrderMode);
     };
 
+    // ─── 기억 모드: on/off 스위치 — 켜져 있으면 새 작업일지를 열 때 마지막 선택값을 자동 적용 ───
+    window.updateRememberModeBtn = () => {
+        document.getElementById("workRememberModeBtn")?.classList.toggle("active-btn", !!window.isRememberMode);
+    };
+
+    window.toggleRememberMode = () => {
+        window.isRememberMode = !window.isRememberMode;
+        localStorage.setItem("wm_remember_mode", JSON.stringify(window.isRememberMode));
+        window.updateRememberModeBtn();
+    };
+
     // ═══════════════════════════════════════════
     // 이벤트 리스너 초기화
     // ═══════════════════════════════════════════
@@ -1060,6 +1071,8 @@
         return {
             fields,
             isWorkDuty: !!window.isWorkDuty,
+            workStartTime: window.workStartTime || null,
+            workEndTime: window.workEndTime || null,
             activeTaskTypes: JSON.parse(JSON.stringify(window.activeTaskTypes || [])),
             selectedCoworkers: JSON.parse(JSON.stringify(window.selectedCoworkers || [])),
             activeStatus: window.activeStatus || null,
@@ -1093,6 +1106,8 @@
             if (el) el.value = value;
         });
         window.isWorkDuty = snapshot.isWorkDuty;
+        window.workStartTime = snapshot.workStartTime || null;
+        window.workEndTime = snapshot.workEndTime || null;
         window.activeTaskTypes = snapshot.activeTaskTypes;
         window.selectedCoworkers = snapshot.selectedCoworkers;
         window.activeStatus = snapshot.activeStatus;
@@ -1108,6 +1123,7 @@
             duty.style.color = window.isWorkDuty ? "red" : "var(--w-black)";
             duty.classList.toggle("active-btn", window.isWorkDuty);
         }
+        window.renderWorkDuration && window.renderWorkDuration();
         window.renderTaskTypes && window.renderTaskTypes();
         window.renderCoworkers && window.renderCoworkers();
         window.renderEquips && window.renderEquips();

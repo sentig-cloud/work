@@ -205,7 +205,13 @@ window.getWorkDraftText = () => {
         content ? `내용: ${content}` : "",
         note ? `특이사항: ${note}` : "",
         ot ? `OT: ${ot}` : "",
-        window.isWorkDuty ? "당직: O" : ""
+        window.isWorkDuty ? "당직: O" : "",
+        (window.workStartTime || window.workEndTime)
+            ? `시작/종료: ${window.workStartTime || "--:--"} ~ ${window.workEndTime || "--:--"}` +
+              (window.computeWorkDurationMin && window.computeWorkDurationMin() !== null
+                  ? ` (총 ${window.formatDurationMin(window.computeWorkDurationMin())})`
+                  : "")
+            : ""
     ].filter(Boolean).join("\n");
 };
 
@@ -369,6 +375,9 @@ window.saveWorkLog = async () => {
             imgs: [...window.workImgs],
             time: originalTime,
             isDuty: window.isWorkDuty,
+            startTime: window.workStartTime || null,
+            endTime: window.workEndTime || null,
+            totalMin: window.computeWorkDurationMin ? window.computeWorkDurationMin() : null,
             updatedAt: new Date().toISOString(),
             // v2: 커스텀 그룹 선택값 저장
             customGroups: window.activeCustomGroupSelections
@@ -406,6 +415,11 @@ window.saveWorkLog = async () => {
 
         if (window.updateCommuteDetailByDate) {
             window.updateCommuteDetailByDate(saveY, saveM, saveD);
+        }
+
+        // 기억 모드가 켜져 있으면 이번에 선택한 태그들을 다음 새 작업일지를 위해 저장
+        if (window.isRememberMode && window.saveLastRememberedSelections) {
+            window.saveLastRememberedSelections();
         }
 
         window.saveLocal(`work:${id}`);
