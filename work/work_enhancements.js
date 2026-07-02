@@ -188,6 +188,12 @@
     // 이동 핸들 드래그 (⠿) — 눌러서 그대로 끌면 이동
     // ═══════════════════════════════════════════
     let blockDragEl = null, blockDragParent = null;
+    // 마지막으로 순서를 바꾼 시각 — 매 pointermove마다(초당 수십 번) DOM을 재배치하면
+    // 두 후보 자리 사이를 오가며 파르르 떠는 것처럼 보였음. 아이폰 홈화면 아이콘 재배치처럼
+    // 일정 간격(아래 REORDER_THROTTLE_MS)마다만 자리를 바꿔서 CSS transition이 끊기지 않고
+    // 끝까지 재생되도록 한다.
+    let lastBlockReorderAt = 0;
+    const REORDER_THROTTLE_MS = 140;
 
     // 순서 모드에서 이미 선택된(주황 사각) 블록의 몸체를 바로 누르면 그대로 끌어서 이동 —
     // 별도 손잡이 아이콘 없이 "누르고 있는 대상을 다른 대상 쪽으로 밀어넣는" 자연스러운 방식.
@@ -200,6 +206,7 @@
         blockDragEl = el;
         blockDragParent = getDragScope(el);
         el.classList.add("is-block-dragging");
+        lastBlockReorderAt = 0;
         if (navigator.vibrate) navigator.vibrate(25);
     };
 
@@ -209,13 +216,19 @@
         const point = e.touches ? e.touches[0] : e;
         const over = document.elementFromPoint(point.clientX, point.clientY);
         const target = over && over.closest(".drag-item");
-        document.querySelectorAll(".is-block-drop-target").forEach(i => i.classList.remove("is-block-drop-target"));
         if (!target || target === blockDragEl || target.parentElement !== blockDragParent) return;
         const rect = target.getBoundingClientRect();
-        target.classList.add("is-block-drop-target");
         // 위/아래로 쌓인 블록이므로 세로 위치 기준으로 앞/뒤를 정한다
         const before = point.clientY < rect.top + rect.height / 2;
-        blockDragParent.insertBefore(blockDragEl, before ? target : target.nextSibling);
+        const desiredNext = before ? target : target.nextSibling;
+        // 이미 그 자리면 아무것도 하지 않음(불필요한 재배치가 떨림의 절반 이상 원인이었음)
+        if (blockDragEl.nextSibling === desiredNext) return;
+        const now = Date.now();
+        if (now - lastBlockReorderAt < REORDER_THROTTLE_MS) return;
+        lastBlockReorderAt = now;
+        document.querySelectorAll(".is-block-drop-target").forEach(i => i.classList.remove("is-block-drop-target"));
+        target.classList.add("is-block-drop-target");
+        blockDragParent.insertBefore(blockDragEl, desiredNext);
     };
 
     // 블록(그룹) 이동 종료 후, groups[] 배열 순서도 화면 순서에 맞춰 동기화 —
@@ -324,9 +337,9 @@
     const applyCellChildHeight = (cell, rows) => {
         const child = cell.querySelector(":scope > input, :scope > textarea, :scope > button, :scope > div:not(.widget-resize-handle)");
         if (!child) return;
-        // 44px = 선택 태그상자(.btn-tag-area) 렌더링 높이, 12px = 칸 padding(상하 6px씩) —
-        // 칸 전체 높이에서 padding을 뺀 나머지가 실제 컨트롤 높이.
-        const px = Math.max(20, rows * 44 - 12);
+        // 36px = 한 줄 grid 트랙, 4px = 칸 padding(상하 2px씩) — 칸 전체 높이에서
+        // padding을 뺀 나머지(32px, 태그 버튼과 동일)가 실제 컨트롤 높이.
+        const px = Math.max(20, rows * 36 - 4);
         child.style.setProperty("height", `${px}px`, "important");
     };
 
@@ -338,10 +351,9 @@
         cell.style.setProperty("--widget-cols", c);
         cell.style.setProperty("--widget-rows", r);
         // .inner-layout-group의 gap이 0이라 줄 사이 여백이 없는데, 예전엔 줄마다 +2px씩
-        // 더 얹어서 실제 grid 트랙(44px*줄수)보다 커져 작업내용/특이사항 같은 여러 줄 칸이
-        // 칸 경계를 넘치던 버그가 있었음 — 실제 트랙 크기와 정확히 맞춘다.
-        // 44px = 선택 태그상자(.btn-tag-area) 렌더링 높이와 동일(work_style.css 참고).
-        cell.style.minHeight = `calc(${r} * 44px)`;
+        // 더 얹어서 실제 grid 트랙(36px*줄수)보다 커져 작업내용/특이사항 같은 여러 줄 칸이
+        // 칸 경계를 넘치던 버그가 있었음 — 실제 트랙 크기와 정확히 맞춘다(work_style.css 참고).
+        cell.style.minHeight = `calc(${r} * 36px)`;
         applyCellChildHeight(cell, r);
     };
     // 좌표는 더 이상 직접 계산하지 않는다 — grid-auto-flow: dense(CSS)가
@@ -458,10 +470,9 @@
     // 각 객체는 개별적으로 롱탭 이동 / 드래그 리사이즈가 가능하다.
     window.ensureInnerLayoutObjects = () => {
         const specs = [
-            // 날짜/시간/당직 등 작은 필드·버튼들은 전부 1줄(44px, work_style.css의
-            // grid-auto-rows 참고)로 통일 — 작업유형/매니저 등에서 쓰는 선택 태그상자
-            // (.btn-tag-area)의 실제 렌더링 높이(44px)와 칸 자체가 일치하고,
-            // 칸 안의 입력창/버튼은 셀 padding 덕에 32px로 태그 버튼 높이와도 일치한다.
+            // 날짜/시간/당직 등 작은 필드·버튼들은 전부 1줄(36px, work_style.css의
+            // grid-auto-rows 참고)로 통일 — 칸 안의 입력창/버튼은 셀 padding(상하 2px)을
+            // 뺀 32px로 작업유형/매니저 등 선택 태그 버튼(.w95-btn) 높이와 일치한다.
             { key: "1-fields", items: [
                 ["date", document.getElementById("workDateInput")?.parentElement, 2, 1],
                 ["time", document.getElementById("workTime"), 1, 1],
@@ -1161,6 +1172,11 @@
         let resizeCell = null, resizeStart = null;
         let pendingResizeCell = null, pendingResizeStart = null;
         let resizeHandleLongPressed = false, resizeModeTimer = null;
+        // move()에서 매 pointermove마다 재배치하면 두 후보 자리 사이를 오가며 파르르 떠는 것처럼
+        // 보였음 — 아이폰 홈화면 아이콘처럼 일정 간격(REORDER_THROTTLE_MS)마다만 자리를 바꿔서
+        // CSS transition이 끊기지 않고 끝까지 재생되게 한다.
+        let lastCellReorderAt = 0;
+        const REORDER_THROTTLE_MS = 140;
 
         const selectCell = (cell) => {
             if (selectedCell && selectedCell !== cell) selectedCell.classList.remove("is-widget-selected");
@@ -1173,7 +1189,7 @@
             const c = clampW(cs, 6), r = clampW(rs, 6);
             cell.dataset.widgetCols = String(c); cell.dataset.widgetRows = String(r);
             cell.style.setProperty("--widget-cols", c); cell.style.setProperty("--widget-rows", r);
-            cell.style.minHeight = `calc(${r} * 44px)`; // gap:0이므로 실제 grid 트랙 크기(44px)와 정확히 일치시킴
+            cell.style.minHeight = `calc(${r} * 36px)`; // gap:0이므로 실제 grid 트랙 크기(36px)와 정확히 일치시킴
             applyCellChildHeight(cell, r); // 드래그로 칸을 늘릴 때 실제 입력창/버튼도 즉시 같이 늘어나게 함
         };
 
@@ -1194,7 +1210,7 @@
                     x: point.clientX, y: point.clientY,
                     cols: Number(pendingResizeCell.dataset.widgetCols) || 1,
                     rows: Number(pendingResizeCell.dataset.widgetRows) || 1,
-                    colWidth: Math.max(1, groupRect.width / 6), rowHeight: 44
+                    colWidth: Math.max(1, groupRect.width / 6), rowHeight: 36
                 };
                 // 예전엔 1500ms 동안 10px 이내로 완벽히 고정해야 이동모드로 넘어갔는데,
                 // 그정도로 오래 손가락을 떨지 않고 버티는 게 사실상 불가능해서 항상 크기조절로만
@@ -1204,6 +1220,7 @@
                     dragCell = pendingResizeCell; dragGroup = pendingResizeCell && pendingResizeCell.parentElement;
                     if (dragCell) { selectCell(dragCell); dragCell.classList.add("is-widget-dragging"); }
                     pendingResizeCell = null; pendingResizeStart = null;
+                    lastCellReorderAt = 0;
                     if (navigator.vibrate) navigator.vibrate(50);
                 }, 700);
                 if (event.cancelable) event.preventDefault();
@@ -1263,7 +1280,13 @@
             const rect = target.getBoundingClientRect();
             const before = point.clientY < rect.top + rect.height / 2 ||
                 (Math.abs(point.clientY - (rect.top + rect.height / 2)) < rect.height / 3 && point.clientX < rect.left + rect.width / 2);
-            dragGroup.insertBefore(dragCell, before ? target : target.nextSibling);
+            const desiredNext = before ? target : target.nextSibling;
+            // 이미 그 자리면 아무것도 하지 않음(불필요한 재배치가 떨림의 절반 이상 원인이었음)
+            if (dragCell.nextSibling === desiredNext) return;
+            const now = Date.now();
+            if (now - lastCellReorderAt < REORDER_THROTTLE_MS) return;
+            lastCellReorderAt = now;
+            dragGroup.insertBefore(dragCell, desiredNext);
         };
 
         const end = () => {

@@ -330,22 +330,22 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
     /* dense: 아이폰 홈화면 아이콘처럼 빈칸을 항상 자동으로 메꿔서 빈 공간이 안 남게 함.
        각 칸은 DOM 순서 + 자기 크기(span)만 갖고, 실제 좌표는 브라우저가 자동 계산 —
        그래서 겹침 걱정 없이 크기 조절/순서 변경만 하면 나머지는 알아서 재정렬된다.
-       한 줄(44px) = 선택 태그상자(.btn-tag-area)의 실제 렌더링 높이와 동일:
-       태그 버튼 32px + 상자 자체 padding 8px(4px×2) + border 4px(2px×2) = 44px.
-       예전엔 여기를 32px(태그 "버튼" 자체 높이)로만 맞춰서 상자(44px)보다 12px 작아 보였음. */
+       한 줄(36px) = 선택 태그 버튼(32px, .w95-btn) + 위아래 여백 2px씩(4px) —
+       예전엔 선택 태그상자(.btn-tag-area) 자체 높이(44px)까지 그대로 맞췄더니
+       기본그룹처럼 여러 줄이 이어지는 구간에서는 그 padding이 누적돼 줄간격이 너무 넓어 보였음.
+       버튼 높이(32px)는 그대로 유지하면서 여백만 줄여 세로 공간을 더 확보한다. */
     grid-auto-flow: row dense;
-    grid-auto-rows: 44px;
+    grid-auto-rows: 36px;
     gap: 0;
 }
 .inner-layout-cell {
     position: relative;
     display: flex;
     min-width: 0;
-    min-height: calc(var(--widget-rows, 1) * 44px);
-    /* 상하 6px씩(총 12px) = 선택 태그상자의 padding+border 두께(12px)와 동일 —
-       그래서 칸(44px) 안의 실제 입력창/버튼은 100% 높이를 적용해도 정확히 32px가 되어
-       태그 버튼 높이와 일치하고, 칸 자체 높이는 태그상자 높이(44px)와 일치한다. */
-    padding: 6px 0;
+    min-height: calc(var(--widget-rows, 1) * 36px);
+    /* 상하 2px씩(총 4px) — 칸(36px) 안의 실제 입력창/버튼은 100% 높이를 적용하면
+       정확히 32px가 되어 태그 버튼 높이와는 계속 일치하되, 줄 간격 자체는 좁아진다. */
+    padding: 2px 0;
     grid-column: span var(--widget-cols, 1);
     grid-row: span var(--widget-rows, 1);
     /* 자리가 밀려날 때 순간이동처럼 보이지 않도록 부드럽게 전환 */
