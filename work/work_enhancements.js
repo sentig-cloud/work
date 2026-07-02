@@ -322,9 +322,10 @@
         cell.style.setProperty("--widget-cols", c);
         cell.style.setProperty("--widget-rows", r);
         // .inner-layout-group의 gap이 0이라 줄 사이 여백이 없는데, 예전엔 줄마다 +2px씩
-        // 더 얹어서 실제 grid 트랙(32px*줄수)보다 커져 작업내용/특이사항 같은 여러 줄 칸이
+        // 더 얹어서 실제 grid 트랙(44px*줄수)보다 커져 작업내용/특이사항 같은 여러 줄 칸이
         // 칸 경계를 넘치던 버그가 있었음 — 실제 트랙 크기와 정확히 맞춘다.
-        cell.style.minHeight = `calc(${r} * 32px)`;
+        // 44px = 선택 태그상자(.btn-tag-area) 렌더링 높이와 동일(work_style.css 참고).
+        cell.style.minHeight = `calc(${r} * 44px)`;
     };
     // 좌표는 더 이상 직접 계산하지 않는다 — grid-auto-flow: dense(CSS)가
     // DOM 순서 + 각 칸의 span(크기)만으로 빈틈없이 자동 배치해준다(아이폰 홈화면 방식).
@@ -440,8 +441,10 @@
     // 각 객체는 개별적으로 롱탭 이동 / 드래그 리사이즈가 가능하다.
     window.ensureInnerLayoutObjects = () => {
         const specs = [
-            // 날짜/시간/당직 등 작은 필드·버튼들은 전부 1줄(32px)로 통일 —
-            // 작업유형/매니저 등에서 쓰는 태그 선택 버튼(.w95-btn)의 높이(32px)와 동일하게 맞춤.
+            // 날짜/시간/당직 등 작은 필드·버튼들은 전부 1줄(44px, work_style.css의
+            // grid-auto-rows 참고)로 통일 — 작업유형/매니저 등에서 쓰는 선택 태그상자
+            // (.btn-tag-area)의 실제 렌더링 높이(44px)와 칸 자체가 일치하고,
+            // 칸 안의 입력창/버튼은 셀 padding 덕에 32px로 태그 버튼 높이와도 일치한다.
             { key: "1-fields", items: [
                 ["date", document.getElementById("workDateInput")?.parentElement, 2, 1],
                 ["time", document.getElementById("workTime"), 1, 1],
@@ -1153,7 +1156,7 @@
             const c = clampW(cs, 6), r = clampW(rs, 6);
             cell.dataset.widgetCols = String(c); cell.dataset.widgetRows = String(r);
             cell.style.setProperty("--widget-cols", c); cell.style.setProperty("--widget-rows", r);
-            cell.style.minHeight = `calc(${r} * 32px)`; // gap:0이므로 실제 grid 트랙 크기와 정확히 일치시킴
+            cell.style.minHeight = `calc(${r} * 44px)`; // gap:0이므로 실제 grid 트랙 크기(44px)와 정확히 일치시킴
         };
 
         // 손잡이 없이 칸 몸체를 탭하면 그냥 선택만 한다(이동/크기조절은 반드시 가운데 점에서만).
@@ -1173,7 +1176,7 @@
                     x: point.clientX, y: point.clientY,
                     cols: Number(pendingResizeCell.dataset.widgetCols) || 1,
                     rows: Number(pendingResizeCell.dataset.widgetRows) || 1,
-                    colWidth: Math.max(1, groupRect.width / 6), rowHeight: 32
+                    colWidth: Math.max(1, groupRect.width / 6), rowHeight: 44
                 };
                 // 예전엔 1500ms 동안 10px 이내로 완벽히 고정해야 이동모드로 넘어갔는데,
                 // 그정도로 오래 손가락을 떨지 않고 버티는 게 사실상 불가능해서 항상 크기조절로만

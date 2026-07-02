@@ -329,16 +329,23 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
     grid-template-columns: repeat(6, minmax(0, 1fr));
     /* dense: 아이폰 홈화면 아이콘처럼 빈칸을 항상 자동으로 메꿔서 빈 공간이 안 남게 함.
        각 칸은 DOM 순서 + 자기 크기(span)만 갖고, 실제 좌표는 브라우저가 자동 계산 —
-       그래서 겹침 걱정 없이 크기 조절/순서 변경만 하면 나머지는 알아서 재정렬된다. */
+       그래서 겹침 걱정 없이 크기 조절/순서 변경만 하면 나머지는 알아서 재정렬된다.
+       한 줄(44px) = 선택 태그상자(.btn-tag-area)의 실제 렌더링 높이와 동일:
+       태그 버튼 32px + 상자 자체 padding 8px(4px×2) + border 4px(2px×2) = 44px.
+       예전엔 여기를 32px(태그 "버튼" 자체 높이)로만 맞춰서 상자(44px)보다 12px 작아 보였음. */
     grid-auto-flow: row dense;
-    grid-auto-rows: 32px;
+    grid-auto-rows: 44px;
     gap: 0;
 }
 .inner-layout-cell {
     position: relative;
     display: flex;
     min-width: 0;
-    min-height: calc(var(--widget-rows, 1) * 32px);
+    min-height: calc(var(--widget-rows, 1) * 44px);
+    /* 상하 6px씩(총 12px) = 선택 태그상자의 padding+border 두께(12px)와 동일 —
+       그래서 칸(44px) 안의 실제 입력창/버튼은 100% 높이를 적용해도 정확히 32px가 되어
+       태그 버튼 높이와 일치하고, 칸 자체 높이는 태그상자 높이(44px)와 일치한다. */
+    padding: 6px 0;
     grid-column: span var(--widget-cols, 1);
     grid-row: span var(--widget-rows, 1);
     /* 자리가 밀려날 때 순간이동처럼 보이지 않도록 부드럽게 전환 */
@@ -354,7 +361,8 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
 .inner-layout-cell > div:not(.widget-resize-handle) {
     /* 원본 HTML에 height:28px 같은 인라인 스타일이 박혀 있어서, min-height만으로는
        칸(그리드 트랙)이 커져도 실제 입력창/버튼은 그대로인 것처럼 보일 수 있었음 —
-       !important로 인라인 높이를 확실히 덮어써서 칸이 커지면 내용물도 같이 커지게 함 */
+       !important로 인라인 높이를 확실히 덮어써서 칸이 커지면 내용물도 같이 커지게 함.
+       칸의 padding(위 참고)만큼 빠진 나머지(100%)를 채우므로 1줄일 때 정확히 32px가 된다. */
     flex: 1; width: 100%; height: 100% !important; min-height: 100%;
 }
 
