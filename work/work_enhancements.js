@@ -314,6 +314,22 @@
     };
 
     const clampWidgetSpan = (v, max) => Math.max(1, Math.min(max, Number(v) || 1));
+
+    // CSS의 ".inner-layout-cell > textarea { height:100% !important }"만으로는
+    // 일부 모바일 브라우저(특히 iOS Safari)에서 flex 컨테이너 안 textarea가 퍼센트 높이를
+    // 제대로 채우지 못하는 알려진 렌더링 버그가 있어서, 작업내용처럼 여러 줄(rowSpan>1)인
+    // 칸은 칸만 커지고 실제 textarea는 그대로라 가운데 리사이즈 점만 뚝 떨어져 보였음 —
+    // 퍼센트 계산에 기대지 않고 실제 컨트롤에 px 높이를 인라인 !important로 직접 박아서
+    // 브라우저 퍼센트 해석 차이와 무관하게 항상 칸 크기만큼 자라도록 함.
+    const applyCellChildHeight = (cell, rows) => {
+        const child = cell.querySelector(":scope > input, :scope > textarea, :scope > button, :scope > div:not(.widget-resize-handle)");
+        if (!child) return;
+        // 44px = 선택 태그상자(.btn-tag-area) 렌더링 높이, 12px = 칸 padding(상하 6px씩) —
+        // 칸 전체 높이에서 padding을 뺀 나머지가 실제 컨트롤 높이.
+        const px = Math.max(20, rows * 44 - 12);
+        child.style.setProperty("height", `${px}px`, "important");
+    };
+
     const setWidgetSize = (cell, colSpan, rowSpan) => {
         const c = clampWidgetSpan(colSpan, 6);
         const r = clampWidgetSpan(rowSpan, 6);
@@ -326,6 +342,7 @@
         // 칸 경계를 넘치던 버그가 있었음 — 실제 트랙 크기와 정확히 맞춘다.
         // 44px = 선택 태그상자(.btn-tag-area) 렌더링 높이와 동일(work_style.css 참고).
         cell.style.minHeight = `calc(${r} * 44px)`;
+        applyCellChildHeight(cell, r);
     };
     // 좌표는 더 이상 직접 계산하지 않는다 — grid-auto-flow: dense(CSS)가
     // DOM 순서 + 각 칸의 span(크기)만으로 빈틈없이 자동 배치해준다(아이폰 홈화면 방식).
@@ -1157,6 +1174,7 @@
             cell.dataset.widgetCols = String(c); cell.dataset.widgetRows = String(r);
             cell.style.setProperty("--widget-cols", c); cell.style.setProperty("--widget-rows", r);
             cell.style.minHeight = `calc(${r} * 44px)`; // gap:0이므로 실제 grid 트랙 크기(44px)와 정확히 일치시킴
+            applyCellChildHeight(cell, r); // 드래그로 칸을 늘릴 때 실제 입력창/버튼도 즉시 같이 늘어나게 함
         };
 
         // 손잡이 없이 칸 몸체를 탭하면 그냥 선택만 한다(이동/크기조절은 반드시 가운데 점에서만).
