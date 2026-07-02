@@ -307,6 +307,15 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
     opacity: 0.5;
     cursor: not-allowed !important;
 }
+/* 기본그룹 등 inner-layout-cell 안의 객체는 가운데 점(손잡이)으로 개별 선택/이동/리사이즈해야 하는데,
+   위의 일반 차단 규칙이 버튼/입력창까지 막아버려서 점을 놓치고 밑의 요소를 짚으면 아무 반응이
+   없던 게 "버튼-칸 위치 변경 안 됨"의 원인이었음 — inner-layout-cell 안에서는 다시 터치 가능하게 함
+   (점이 z-index로 항상 위에 있으므로 위험한 실수 클릭 걱정 없음). */
+.layout-edit-mode #workDragContainer .inner-layout-cell input,
+.layout-edit-mode #workDragContainer .inner-layout-cell textarea,
+.layout-edit-mode #workDragContainer .inner-layout-cell button {
+    pointer-events: auto !important;
+}
 
 /* 레이아웃 편집 모드: 선택 안 된 블록/객체는 평상시와 동일한 색으로 유지(시인성 확보) —
    노란색 강조는 실제로 선택된 객체에만 표시(.is-block-selected/.is-widget-selected 참고) */
