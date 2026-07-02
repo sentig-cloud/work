@@ -321,43 +321,13 @@
         cell.dataset.widgetRows = String(r);
         cell.style.setProperty("--widget-cols", c);
         cell.style.setProperty("--widget-rows", r);
-        cell.style.minHeight = `calc((${r} * 32px) + ((${r} - 1) * 2px))`;
+        // .inner-layout-group의 gap이 0이라 줄 사이 여백이 없는데, 예전엔 줄마다 +2px씩
+        // 더 얹어서 실제 grid 트랙(32px*줄수)보다 커져 작업내용/특이사항 같은 여러 줄 칸이
+        // 칸 경계를 넘치던 버그가 있었음 — 실제 트랙 크기와 정확히 맞춘다.
+        cell.style.minHeight = `calc(${r} * 32px)`;
     };
-    // 좌측상단 (1,1) 기준 명시적 좌표 — grid-auto-flow에 맡기지 않고 직접 위치를 고정한다
-    const setObjPos = (cell, row, col) => {
-        const r = Math.max(1, Math.min(200, Number(row) || 1));
-        const c = Math.max(1, Math.min(6, Number(col) || 1));
-        cell.dataset.objRow = String(r);
-        cell.dataset.objCol = String(c);
-        cell.style.setProperty("--obj-row", r);
-        cell.style.setProperty("--obj-col", c);
-    };
-    // 그룹 안의 다른 칸들이 차지한 좌표 집합(예외 칸 제외)
-    const getGroupOccupancy = (group, exceptCell) => {
-        const occ = new Set();
-        [...group.querySelectorAll(":scope > .inner-layout-cell")].forEach(c => {
-            if (c === exceptCell) return;
-            const r = Number(c.dataset.objRow) || 1, col = Number(c.dataset.objCol) || 1;
-            const cs = Number(c.dataset.widgetCols) || 1, rs = Number(c.dataset.widgetRows) || 1;
-            for (let rr = r; rr < r + rs; rr++) for (let cc = col; cc < col + cs; cc++) occ.add(`${rr},${cc}`);
-        });
-        return occ;
-    };
-    const footprintFree = (occ, row, col, cs, rs) => {
-        for (let rr = row; rr < row + rs; rr++) for (let cc = col; cc < col + cs; cc++) {
-            if (cc > 6 || occ.has(`${rr},${cc}`)) return false;
-        }
-        return true;
-    };
-    // 겹치지 않는 첫 빈 자리를 찾아 배치(최초 생성 시 기본 배치용)
-    const findFreeSlot = (occ, cs, rs) => {
-        for (let r = 1; r <= 200; r++) {
-            for (let c = 1; c <= 6 - cs + 1; c++) {
-                if (footprintFree(occ, r, c, cs, rs)) return { row: r, col: c };
-            }
-        }
-        return { row: 1, col: 1 };
-    };
+    // 좌표는 더 이상 직접 계산하지 않는다 — grid-auto-flow: dense(CSS)가
+    // DOM 순서 + 각 칸의 span(크기)만으로 빈틈없이 자동 배치해준다(아이폰 홈화면 방식).
 
     window.saveWorkLayout = () => {
         const container = getContainer(); if (!container) return;
@@ -391,9 +361,7 @@
             innerOrder[key] = [...group.querySelectorAll(":scope > .inner-layout-cell")].map(cell => {
                 widgets[key][cell.dataset.innerId] = {
                     colSpan: clampWidgetSpan(cell.dataset.widgetCols, 6),
-                    rowSpan: clampWidgetSpan(cell.dataset.widgetRows, 6),
-                    row: Number(cell.dataset.objRow) || 1,
-                    col: Number(cell.dataset.objCol) || 1
+                    rowSpan: clampWidgetSpan(cell.dataset.widgetRows, 6)
                 };
                 return cell.dataset.innerId;
             });
@@ -462,7 +430,6 @@
             [...group.querySelectorAll(":scope > .inner-layout-cell")].forEach(cell => {
                 const s = ws?.[cell.dataset.innerId];
                 setWidgetSize(cell, s?.colSpan || cell.dataset.widgetCols, s?.rowSpan || cell.dataset.widgetRows);
-                if (s && s.row && s.col) setObjPos(cell, s.row, s.col);
             });
         });
     };
@@ -510,9 +477,8 @@
             // 개별 속성으로 직접 지정해 항상 grid가 적용되도록 함.
             group.style.display = "grid";
             group.style.gridTemplateColumns = "repeat(6, minmax(0, 1fr))";
-            // dense는 한 칸을 줄이면 뒤의 다른 칸이 앞으로 당겨져 같이 움직이는 것처럼 보임 — 사용 안 함
-            group.style.gridAutoFlow = "row";
-            const cellsInSpec = [];
+            // dense: 빈칸을 자동으로 메꿔서 항상 빈 공간 없이 채워짐(아이폰 홈화면 아이콘처럼)
+            group.style.gridAutoFlow = "row dense";
             validItems.forEach(([id, el, cs, rs]) => {
                 if (!el) return;
                 let cell = el.closest(".inner-layout-cell");
@@ -532,22 +498,6 @@
                     h.title = "드래그=크기 조절 / 길게 눌렀다 드래그=이동";
                     cell.appendChild(h);
                 }
-                cellsInSpec.push(cell);
-            });
-
-            // 자동 정렬(auto-flow) 대신 명시적 좌표(row,col)를 사용 —
-            // 저장된 좌표가 없는 칸만 처음 한 번 빈 자리에 배치하고, 이후로는 사용자가 옮긴 위치를 그대로 유지한다.
-            const occ = new Set();
-            cellsInSpec.filter(c => c.dataset.objRow).forEach(c => {
-                const r = Number(c.dataset.objRow), col = Number(c.dataset.objCol);
-                const cs = Number(c.dataset.widgetCols) || 1, rs = Number(c.dataset.widgetRows) || 1;
-                for (let rr = r; rr < r + rs; rr++) for (let cc = col; cc < col + cs; cc++) occ.add(`${rr},${cc}`);
-            });
-            cellsInSpec.filter(c => !c.dataset.objRow).forEach(c => {
-                const cs = Number(c.dataset.widgetCols) || 1, rs = Number(c.dataset.widgetRows) || 1;
-                const slot = findFreeSlot(occ, cs, rs);
-                for (let rr = slot.row; rr < slot.row + rs; rr++) for (let cc = slot.col; cc < slot.col + cs; cc++) occ.add(`${rr},${cc}`);
-                setObjPos(c, slot.row, slot.col);
             });
         });
 
@@ -626,10 +576,15 @@
         [...getAllSections(container)]
             .sort((a, b) => Number(a.dataset.id) - Number(b.dataset.id))
             .forEach(block => { setBlockSize(block, GRID_COLS, 1); container.appendChild(block); });
-        // 이미 배치된 칸의 좌표/크기 데이터도 지워야 새로고침 없이 바로 기본 배치로 되돌아간다
+        // 순서(드래그로 바뀐 DOM 순서)와 크기를 모두 원래대로 되돌리기 위해,
+        // 각 칸의 내용물을 그룹 밖으로 꺼내고 빈 칸은 제거 — 다시 만들 때 spec 선언 순서로 재생성된다
         container.querySelectorAll(".inner-layout-cell").forEach(cell => {
-            delete cell.dataset.objRow; delete cell.dataset.objCol;
-            delete cell.dataset.widgetCols; delete cell.dataset.widgetRows;
+            const group = cell.parentElement;
+            while (cell.firstChild) {
+                if (cell.firstChild.classList?.contains("widget-resize-handle")) { cell.firstChild.remove(); continue; }
+                group.insertBefore(cell.firstChild, cell);
+            }
+            cell.remove();
         });
         window.ensureInnerLayoutObjects();
     };
@@ -1163,7 +1118,7 @@
         const modal = document.getElementById("workModal");
         if (!modal) return;
 
-        let selectedCell = null, dragCell = null, dragGroup = null, dragOrigPos = null;
+        let selectedCell = null, dragCell = null, dragGroup = null;
         let resizeCell = null, resizeStart = null;
         let pendingResizeCell = null, pendingResizeStart = null;
         let resizeHandleLongPressed = false, resizeModeTimer = null;
@@ -1179,7 +1134,7 @@
             const c = clampW(cs, 6), r = clampW(rs, 6);
             cell.dataset.widgetCols = String(c); cell.dataset.widgetRows = String(r);
             cell.style.setProperty("--widget-cols", c); cell.style.setProperty("--widget-rows", r);
-            cell.style.minHeight = `calc((${r} * 32px) + ((${r} - 1) * 2px))`;
+            cell.style.minHeight = `calc(${r} * 32px)`; // gap:0이므로 실제 grid 트랙 크기와 정확히 일치시킴
         };
 
         // 손잡이 없이 칸 몸체를 탭하면 그냥 선택만 한다(이동/크기조절은 반드시 가운데 점에서만).
@@ -1199,15 +1154,11 @@
                     x: point.clientX, y: point.clientY,
                     cols: Number(pendingResizeCell.dataset.widgetCols) || 1,
                     rows: Number(pendingResizeCell.dataset.widgetRows) || 1,
-                    row: Number(pendingResizeCell.dataset.objRow) || 1,
-                    col: Number(pendingResizeCell.dataset.objCol) || 1,
-                    colWidth: Math.max(1, groupRect.width / 6), rowHeight: 32,
-                    groupLeft: groupRect.left, groupTop: groupRect.top
+                    colWidth: Math.max(1, groupRect.width / 6), rowHeight: 32
                 };
                 resizeModeTimer = setTimeout(() => {
                     resizeHandleLongPressed = true;
                     dragCell = pendingResizeCell; dragGroup = pendingResizeCell && pendingResizeCell.parentElement;
-                    dragOrigPos = { row: pendingResizeStart.row, col: pendingResizeStart.col };
                     if (dragCell) { selectCell(dragCell); dragCell.classList.add("is-widget-dragging"); }
                     pendingResizeCell = null; pendingResizeStart = null;
                     if (navigator.vibrate) navigator.vibrate(50);
@@ -1231,55 +1182,53 @@
                 else if (dist > 10) {
                     clearTimeout(resizeModeTimer);
                     resizeCell = pendingResizeCell; resizeStart = pendingResizeStart;
+                    resizeCell.classList.add("is-widget-dragging"); // 크기 조절 중에도 전환 지연 없이 즉시 반응
                     pendingResizeCell = null; pendingResizeStart = null;
                 } else return;
             }
             if (resizeCell && resizeStart) {
                 if (event.cancelable) event.preventDefault();
-                // 좌측상단(row,col)은 고정, 우측/아래로 늘어나고 좌측/위로 줄어든다
-                const group = resizeCell.parentElement;
-                const occ = getGroupOccupancy(group, resizeCell);
-                let cols = clampW(resizeStart.cols + Math.round((point.clientX - resizeStart.x) / resizeStart.colWidth), 6 - resizeStart.col + 1);
-                let rows = Math.max(1, resizeStart.rows + Math.round((point.clientY - resizeStart.y) / resizeStart.rowHeight));
-                // 다른 칸과 겹치면 그 방향으로는 더 못 늘어나게 줄인다
-                while (cols > 1 && !footprintFree(occ, resizeStart.row, resizeStart.col, cols, rows)) cols--;
-                while (rows > 1 && !footprintFree(occ, resizeStart.row, resizeStart.col, cols, rows)) rows--;
+                // grid-auto-flow:dense가 겹침을 알아서 막아주므로 크기만 바꾸면 나머지는 자동 재배치된다
+                const cols = resizeStart.cols + Math.round((point.clientX - resizeStart.x) / resizeStart.colWidth);
+                const rows = resizeStart.rows + Math.round((point.clientY - resizeStart.y) / resizeStart.rowHeight);
                 setWSize(resizeCell, cols, rows);
                 return;
             }
             if (!dragCell || !dragGroup) return;
             if (event.cancelable) event.preventDefault();
-            const groupRect = dragGroup.getBoundingClientRect();
-            const cs = Number(dragCell.dataset.widgetCols) || 1;
-            const colWidth = Math.max(1, groupRect.width / 6);
-            let col = Math.floor((point.clientX - groupRect.left) / colWidth) + 1;
-            let row = Math.floor((point.clientY - groupRect.top) / 32) + 1;
-            col = Math.max(1, Math.min(6 - cs + 1, col));
-            row = Math.max(1, row);
-            // 드래그 중엔 목표 좌표로 바로 옮겨서 미리보기(최종 겹침 처리는 놓는 순간에)
-            setObjPos(dragCell, row, col);
+            // 커서 아래 가장 가까운 칸의 앞/뒤로 순서를 옮긴다 — 실제 화면 좌표는
+            // grid-auto-flow:dense가 빈틈없이 자동으로 다시 계산해준다(아이폰 홈화면 방식)
+            const over = document.elementFromPoint(point.clientX, point.clientY);
+            let target = over && over.closest(".inner-layout-cell");
+            if (target && (target === dragCell || target.parentElement !== dragGroup)) target = null;
+            if (!target) {
+                const groupRect = dragGroup.getBoundingClientRect();
+                if (point.clientX < groupRect.left || point.clientX > groupRect.right ||
+                    point.clientY < groupRect.top - 40 || point.clientY > groupRect.bottom + 40) {
+                    return;
+                }
+                let nearest = null, nearestDist = Infinity;
+                [...dragGroup.querySelectorAll(":scope > .inner-layout-cell")].forEach((cell) => {
+                    if (cell === dragCell) return;
+                    const r = cell.getBoundingClientRect();
+                    const dist = Math.hypot(point.clientX - (r.left + r.width / 2), point.clientY - (r.top + r.height / 2));
+                    if (dist < nearestDist) { nearestDist = dist; nearest = cell; }
+                });
+                target = nearest;
+            }
+            if (!target || target === dragCell || target.parentElement !== dragGroup) return;
+            const rect = target.getBoundingClientRect();
+            const before = point.clientY < rect.top + rect.height / 2 ||
+                (Math.abs(point.clientY - (rect.top + rect.height / 2)) < rect.height / 3 && point.clientX < rect.left + rect.width / 2);
+            dragGroup.insertBefore(dragCell, before ? target : target.nextSibling);
         };
 
         const end = () => {
             clearTimeout(resizeModeTimer);
-            if (dragCell && dragGroup) {
-                dragCell.classList.remove("is-widget-dragging");
-                const row = Number(dragCell.dataset.objRow), col = Number(dragCell.dataset.objCol);
-                const cs = Number(dragCell.dataset.widgetCols) || 1, rs = Number(dragCell.dataset.widgetRows) || 1;
-                // 놓은 자리에 다른 칸이 있으면 그 칸과 자리를 맞바꾼다(직관적이고 예측 가능한 규칙)
-                const collided = [...dragGroup.querySelectorAll(":scope > .inner-layout-cell")].find(c => {
-                    if (c === dragCell) return false;
-                    const r = Number(c.dataset.objRow) || 1, cc = Number(c.dataset.objCol) || 1;
-                    const ccs = Number(c.dataset.widgetCols) || 1, crs = Number(c.dataset.widgetRows) || 1;
-                    for (let rr = row; rr < row + rs; rr++) for (let col2 = col; col2 < col + cs; col2++) {
-                        if (rr >= r && rr < r + crs && col2 >= cc && col2 < cc + ccs) return true;
-                    }
-                    return false;
-                });
-                if (collided && dragOrigPos) setObjPos(collided, dragOrigPos.row, dragOrigPos.col);
-            }
+            if (dragCell) dragCell.classList.remove("is-widget-dragging");
+            if (resizeCell) resizeCell.classList.remove("is-widget-dragging");
             if (dragCell || resizeCell) window.saveWorkLayout && window.saveWorkLayout();
-            dragCell = null; dragGroup = null; dragOrigPos = null; resizeCell = null; resizeStart = null;
+            dragCell = null; dragGroup = null; resizeCell = null; resizeStart = null;
             pendingResizeCell = null; pendingResizeStart = null;
             resizeHandleLongPressed = false;
         };

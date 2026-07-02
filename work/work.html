@@ -105,6 +105,10 @@
                 <div id="workDragContainer">
 
                     <div class="drag-item w95-out" data-id="1" style="display:flex; flex-direction:column; gap:2px; padding:2px;">
+                        <div id="boxTitle_basicFields" class="box-title" title="길게 눌러 이름 변경"
+                            onmousedown="window.startTitlePress(event, 'basicFields')" onmouseup="window.endTitlePress()" onmouseleave="window.endTitlePress()"
+                            ontouchstart="window.startTitlePress(event, 'basicFields')" ontouchend="window.endTitlePress()" ontouchcancel="window.endTitlePress()"
+                            >기본그룹</div>
                         <!-- 날짜 -->
                         <div class="work-obj-wrap" data-obj-id="date" data-obj-label="날짜" style="display:flex; align-items:center; position:relative;">
                             <div style="position:relative; flex:1; display:flex; align-items:center; justify-content:center; background:#fff; border: 2px solid; border-color: #808080 #fff #fff #808080; height:28px; min-width:80px;">

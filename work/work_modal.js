@@ -51,6 +51,13 @@ window.applyCustomTitles = () => {
         if (el) el.innerText = g.title;
     });
 
+    // 날짜/시간/당직 등 고정 필드 그룹(basicFields)은 groups 데이터가 아니라 별도 키로 저장
+    const basicTitle = localStorage.getItem('wm_basic_group_title');
+    if (basicTitle) {
+        const basicEl = document.getElementById('boxTitle_basicFields');
+        if (basicEl) basicEl.innerText = basicTitle;
+    }
+
     // 내보내기 설정과도 연동
     let saved = localStorage.getItem('wm_export_conf');
     if (saved) {
@@ -99,6 +106,9 @@ window.saveBoxTitle = () => {
         g.title = newName;
         window.markDirty('master', 'groups', 'upsert');
         window.saveLocal('group-title');
+    } else if (id === 'basicFields') {
+        // 날짜/시간/당직 등 고정 필드 그룹은 groups 데이터가 아니므로 별도 키에 저장
+        localStorage.setItem('wm_basic_group_title', newName);
     }
 
     // 내보내기 UI 연동

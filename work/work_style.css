@@ -318,9 +318,10 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
 .inner-layout-group {
     display: grid;
     grid-template-columns: repeat(6, minmax(0, 1fr));
-    /* dense 금지: 한 칸 크기를 바꿔도 다른 칸이 앞으로 당겨져 재배치되지 않고
-       각 칸이 독립적으로만 커지고/줄어들게 함 */
-    grid-auto-flow: row;
+    /* dense: 아이폰 홈화면 아이콘처럼 빈칸을 항상 자동으로 메꿔서 빈 공간이 안 남게 함.
+       각 칸은 DOM 순서 + 자기 크기(span)만 갖고, 실제 좌표는 브라우저가 자동 계산 —
+       그래서 겹침 걱정 없이 크기 조절/순서 변경만 하면 나머지는 알아서 재정렬된다. */
+    grid-auto-flow: row dense;
     grid-auto-rows: 32px;
     gap: 0;
 }
@@ -328,12 +329,10 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
     position: relative;
     display: flex;
     min-width: 0;
-    min-height: calc((var(--widget-rows, 1) * 32px) + ((var(--widget-rows, 1) - 1) * 2px));
-    /* 자동 정렬(auto-flow) 대신 좌측상단 (1,1) 기준 명시 좌표를 직접 사용 —
-       각 객체가 그룹 안 어디로든(1,1 / 2,1 / 2,2 ...) 자유롭게 배치될 수 있다 */
-    grid-column: var(--obj-col, auto) / span var(--widget-cols, 1);
-    grid-row: var(--obj-row, auto) / span var(--widget-rows, 1);
-    /* 자리를 옮기거나 다른 칸과 자리를 맞바꿀 때 순간이동처럼 보이지 않도록 부드럽게 전환 */
+    min-height: calc(var(--widget-rows, 1) * 32px);
+    grid-column: span var(--widget-cols, 1);
+    grid-row: span var(--widget-rows, 1);
+    /* 자리가 밀려날 때 순간이동처럼 보이지 않도록 부드럽게 전환 */
     transition: grid-row 0.16s ease, grid-column 0.16s ease;
 }
 /* 지금 손가락으로 끌고 있는 칸은 지연 없이 바로 따라와야 하므로 전환 효과 제외 */
