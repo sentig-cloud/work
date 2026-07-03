@@ -256,17 +256,28 @@ window.setWorkEditLocked = (locked) => {
     }
 
     const editButton = document.getElementById("workEditSaveBtn");
-    const saveButton = document.getElementById("workSaveBtn");
 
     if (editButton) editButton.style.display = window.currentWorkId ? (window.isWorkEditLocked ? "block" : "none") : "none";
-    if (saveButton) saveButton.disabled = window.isWorkEditLocked;
+    // 저장 버튼은 잠금 여부와 상관없이 항상 눌러야 한다 — 기본그룹/시작·종료는 잠긴 상태에서도
+    // 바로 수정할 수 있는 예외라서, 그 값만 바꾼 뒤 곧바로 저장할 수 있어야 하기 때문.
 
     const editableRoot = document.getElementById("workDragContainer");
     if (!editableRoot) return;
 
+    // 기본그룹(날짜/시간/Task번호/고객명/주소/작업내용/특이사항 등)과 시작/종료(특수 기능)는
+    // "수정" 버튼 없이도 바로 고칠 수 있는 잠금 예외 — 사진 찍듯 바로바로 눌러야 하는 항목이라
+    // 매번 수정 버튼부터 누르게 하면 타이밍을 놓치기 쉬움.
+    const basicGroupEl = editableRoot.querySelector('.drag-item[data-id="1"]');
+    const durationGroupEl = editableRoot.querySelector('.drag-item[data-group-ref="duration"]');
+    const isLockExempt = (element) =>
+        (basicGroupEl && basicGroupEl.contains(element)) ||
+        (durationGroupEl && durationGroupEl.contains(element));
+
     editableRoot.querySelectorAll("input, textarea, select, button").forEach((element) => {
-        if (element.id === "workCopyBtn") {
+        if (element.id === "workCopyBtn" || isLockExempt(element)) {
             element.disabled = false;
+            if (element.matches("input, textarea")) element.readOnly = false;
+            element.classList.remove("work-locked-control");
             return;
         }
 
@@ -290,10 +301,8 @@ window.unlockWorkEdit = () => {
 
 window.saveWorkLog = async () => {
     try {
-        if (window.isWorkEditLocked) {
-            alert("수정 버튼을 눌러 잠금을 해제한 뒤 저장해주세요.");
-            return;
-        }
+        // 잠금 상태여도 저장은 막지 않는다 — 기본그룹/시작·종료는 잠금 예외라 그 값만
+        // 바로 고쳐서 저장할 수 있어야 하고, 잠긴 나머지 항목은 화면에서 아예 못 바꾸므로 안전하다.
 
         const timeInput = document.getElementById("workTime");
 

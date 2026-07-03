@@ -87,7 +87,7 @@ window.workDurationPressTimer = null;
 window.workDurationLongPressed = false;
 
 window.startDurationPress = (event, which) => {
-    if (window.isWorkEditLocked) return;
+    // 시작/종료는 기본그룹과 함께 잠금 예외라 잠긴 상태에서도 바로 눌러야 함
     if (event) event.preventDefault();
     window.workDurationLongPressed = false;
     clearTimeout(window.workDurationPressTimer);
@@ -111,7 +111,6 @@ window.cancelDurationPress = () => {
 };
 
 window.toggleDurationStamp = (which) => {
-    if (window.isWorkEditLocked) return;
     window.pushWorkUndo && window.pushWorkUndo();
     if (which === 'start') {
         window.workStartTime = window.workStartTime ? null : window.getCurrentTimeString();
@@ -125,7 +124,6 @@ window.toggleDurationStamp = (which) => {
 window.durationEditTarget = null;
 
 window.openDurationTimeEditModal = (which) => {
-    if (window.isWorkEditLocked) return;
     window.durationEditTarget = which;
     const current = which === 'start' ? window.workStartTime : window.workEndTime;
     const input = document.getElementById('durationTimeEditInput');

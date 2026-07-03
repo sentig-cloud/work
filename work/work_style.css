@@ -419,6 +419,10 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
 .work-edit-locked .box-title,
 .work-edit-locked .btn-tag-area,
 .work-edit-locked .layout-tag-button { pointer-events: none; }
+/* 시작/종료는 잠금 예외라 잠긴 상태에서도 눌려야 함 — 위 규칙이 .btn-tag-area 전체를
+   막아버리므로 이 그룹 안에서만 다시 클릭 가능하게 되돌린다. */
+.work-edit-locked .drag-item[data-group-ref="duration"] .btn-tag-area,
+.work-edit-locked .drag-item[data-group-ref="duration"] .box-title { pointer-events: auto; }
 
 /* ─── 기타 ─── */
 body *:not(input):not(textarea):not([contenteditable="true"]) {
