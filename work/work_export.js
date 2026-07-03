@@ -57,7 +57,7 @@ window.WorkExport = {
                         }
                     }
                     else if (col.id === "duty") value = log.isDuty ? "당직" : "";
-                    else if (col.id === "otCount") value = log.otCount || "";
+                    else if (col.id === "otCount") value = log.otCount ? "O" : "";
                     else if (col.id === "durationStart") value = log.startTime || "";
                     else if (col.id === "durationEnd") value = log.endTime || "";
                     else if (col.id === "durationTotal") value = log.totalMin ? window.formatDurationMin(log.totalMin) : "";

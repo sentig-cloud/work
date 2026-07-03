@@ -113,9 +113,13 @@ window.renderCal = (year, month) => {
         let otherCount = dayLogs.filter(l => l.cat !== 'work' && l.cat !== 'commute_in' && l.cat !== 'commute_out').length;
 
         let hasDuty = dayLogs.some(l => l.isDutyLog || l.cat === 'duty' || l.isDuty);
+        let hasOT = dayLogs.some(l => Number(l.otCount) > 0);
         let dayStyle = `color:${numColor}; font-weight:bold; font-size:1rem; flex-shrink:0;`;
+        // 당직=빨간 밑줄, OT=파란 밑줄 — 하루에 둘 다 있으면 기존에 있던 당직 표시를 우선한다
         if (hasDuty) {
             dayStyle += ` text-decoration: underline; text-decoration-color: red; text-decoration-thickness: 3px; text-underline-offset: 3px;`;
+        } else if (hasOT) {
+            dayStyle += ` text-decoration: underline; text-decoration-color: var(--w-blue); text-decoration-thickness: 3px; text-underline-offset: 3px;`;
         }
 
         let countBadge = '';
@@ -254,7 +258,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
             let eqStr = Object.entries(l.equips).filter(e => e[1] > 0).map(e => `${e[0]} ${e[1]}`).join(', ');
             if (eqStr) detailsHtml.push(`<div style="color:#0f766e; font-size:0.85rem; font-weight:bold;"><i class="fa-solid fa-box" style="width:16px;"></i> ${eqStr}</div>`);
         }
-        if (l.otCount) detailsHtml.push(`<div style="color:#e11d48; font-size:0.85rem; font-weight:bold;"><i class="fa-solid fa-clock" style="width:16px;"></i> OT ${l.otCount}회</div>`);
+        if (l.otCount) detailsHtml.push(`<div style="color:#e11d48; font-size:0.85rem; font-weight:bold;"><i class="fa-solid fa-clock" style="width:16px;"></i> OT</div>`);
         if (l.note) detailsHtml.push(`<div style="color:#d97706; font-size:0.85rem;"><i class="fa-solid fa-triangle-exclamation" style="width:16px;"></i> ${l.note}</div>`);
 
         // 시작/종료/총시간 (특수 그룹 — 태그 목록이 아니라 log.startTime/endTime/totalMin에 직접 저장)
@@ -509,8 +513,11 @@ window.renderCustomGroup = (groupId) => {
 
     let html = tags.map((t, idx) => {
         let activeCls = sel.includes(t.name) ? 'active-btn' : '';
-        const numberPrefix = showNumber ? `[${window.getGroupTagMonthlyCount(groupId, t.name)}] ` : '';
-        const countSuffix = showCount ? ` (${t.count || 0})` : '';
+        // 0은 표시하지 않는다(시인성 확보)
+        const monthlyCount = window.getGroupTagMonthlyCount(groupId, t.name);
+        const numberPrefix = (showNumber && monthlyCount > 0) ? `[${monthlyCount}] ` : '';
+        const baseCount = Number(t.count) || 0;
+        const countSuffix = (showCount && baseCount > 0) ? ` (${baseCount})` : '';
         return `<button type="button" class="w95-btn ${activeCls}"
             onclick="window.toggleCustomGroupTag('${groupId}', '${t.name}')"
             oncontextmenu="event.preventDefault(); window.openTagEditBox('${groupId}', ${idx});"

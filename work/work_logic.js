@@ -204,7 +204,7 @@ window.getWorkDraftText = () => {
         equips ? `장비: ${equips}` : "",
         content ? `내용: ${content}` : "",
         note ? `특이사항: ${note}` : "",
-        otCount ? `OT: ${otCount}회` : "",
+        otCount ? "OT: O" : "",
         window.isWorkDuty ? "당직: O" : "",
         (window.workStartTime || window.workEndTime)
             ? `시작/종료: ${window.workStartTime || "--:--"} ~ ${window.workEndTime || "--:--"}` +

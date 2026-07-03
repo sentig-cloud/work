@@ -149,63 +149,33 @@ window.saveDurationTimeEdit = () => {
     window.closeDurationTimeEditModal();
 };
 
-// ─── OT: 시간이 아니라 몇 번 했는지 세는 숫자 — 짧게 탭하면 +1, 길게 누르면 직접 입력 ───
+// ─── OT: 당직과 동일하게 작업일지 1개당 켜짐/꺼짐(on/off) — 탭하면 그냥 토글 ───
+// 버튼에 표시하는 숫자는 "이번 로그의 OT 값"이 아니라 "이번 달 OT 건수"(다른 태그의 [숫자]처럼).
+// 지금 열려있는 로그가 이미 저장된 것이라면 그 로그의 기존 상태를 이번 달 집계에서 빼고,
+// 지금 켜져 있는 상태를 다시 더해서 저장 전에도 실시간으로 반영되게 한다.
+window.getOTMonthlyCount = () => {
+    return (window.logs || []).filter((l) =>
+        l && l.cat === 'work' && l.y === window.currentYear && l.m === window.curMonth && Number(l.otCount) > 0
+    ).length;
+};
+
 window.renderWorkOT = () => {
     const btn = document.getElementById('workOTBtn');
     if (!btn) return;
-    const count = Number(window.workOTCount) || 0;
-    btn.innerHTML = count > 0
-        ? `OT <span style="text-decoration:underline; text-decoration-color:var(--w-blue); text-decoration-thickness:2px; text-underline-offset:2px;">${count}</span>`
-        : 'OT';
+    const isOn = Number(window.workOTCount) > 0;
+    const existingLog = window.currentWorkId ? window.logs.find((l) => l.id === window.currentWorkId) : null;
+    const wasOn = existingLog && Number(existingLog.otCount) > 0 ? 1 : 0;
+    const displayCount = Math.max(0, window.getOTMonthlyCount() - wasOn + (isOn ? 1 : 0));
+    btn.innerText = String(displayCount);
+    btn.style.color = isOn ? 'var(--w-blue)' : 'var(--w-black)';
+    btn.classList.toggle('active-btn', isOn);
 };
 
-window.workOTPressTimer = null;
-window.workOTLongPressed = false;
-
-window.startOTPress = (event) => {
-    if (window.isWorkEditLocked) return;
-    if (event) event.preventDefault();
-    window.workOTLongPressed = false;
-    clearTimeout(window.workOTPressTimer);
-    window.workOTPressTimer = setTimeout(() => {
-        window.workOTLongPressed = true;
-        if (navigator.vibrate) navigator.vibrate(30);
-        window.openOTEditModal();
-    }, 600);
-};
-
-window.endOTPress = (event) => {
-    if (event) event.preventDefault();
-    clearTimeout(window.workOTPressTimer);
-    if (window.workOTLongPressed) { window.workOTLongPressed = false; return; }
+// OT는 기본그룹 소속이라 잠금 예외(setWorkEditLocked)라서 여기서 잠금 여부를 따로 막지 않는다
+window.toggleOT = () => {
     window.pushWorkUndo && window.pushWorkUndo();
-    window.workOTCount = (Number(window.workOTCount) || 0) + 1;
+    window.workOTCount = window.workOTCount ? 0 : 1;
     window.renderWorkOT();
-};
-
-window.cancelOTPress = () => {
-    clearTimeout(window.workOTPressTimer);
-    window.workOTLongPressed = false;
-};
-
-window.openOTEditModal = () => {
-    const input = document.getElementById('otEditInput');
-    input.value = String(Number(window.workOTCount) || 0);
-    document.getElementById('otEditModal').style.display = 'flex';
-    setTimeout(() => { input.focus(); input.select(); }, 50);
-};
-
-window.closeOTEditModal = () => {
-    document.getElementById('otEditModal').style.display = 'none';
-};
-
-window.saveOTEdit = () => {
-    const input = document.getElementById('otEditInput');
-    const value = Math.max(0, parseInt(input.value, 10) || 0);
-    window.pushWorkUndo && window.pushWorkUndo();
-    window.workOTCount = value;
-    window.renderWorkOT();
-    window.closeOTEditModal();
 };
 
 window.updateWorkDateLabel = () => {

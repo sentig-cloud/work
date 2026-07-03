@@ -126,13 +126,9 @@
                         <div class="work-obj-wrap" data-obj-id="duty" data-obj-label="당직">
                             <button type="button" id="workDutyBtn" class="w95-btn" style="width:100%; height:28px;" onclick="window.toggleDuty()">당직</button>
                         </div>
-                        <!-- OT: 짧게 탭=1씩 증가, 길게 누르면 정확한 값 입력 -->
+                        <!-- OT: 당직처럼 탭하면 켜짐/꺼짐(작업일지 1개당 1개), 숫자는 이번달 OT 건수 -->
                         <div class="work-obj-wrap" data-obj-id="ot" data-obj-label="OT">
-                            <button type="button" id="workOTBtn" class="w95-btn" style="width:100%; height:28px; white-space:nowrap; overflow:hidden;"
-                                title="짧게 탭: +1 · 길게 누르면 직접 입력"
-                                onmousedown="window.startOTPress(event)" onmouseup="window.endOTPress(event)" onmouseleave="window.cancelOTPress()"
-                                ontouchstart="window.startOTPress(event)" ontouchend="window.endOTPress(event)" ontouchcancel="window.cancelOTPress()"
-                                >OT</button>
+                            <button type="button" id="workOTBtn" class="w95-btn" style="width:100%; height:28px;" title="OT on/off (이번달 OT 건수 표시)" onclick="window.toggleOT()">0</button>
                         </div>
                         <!-- 되돌리기 -->
                         <div class="work-obj-wrap" data-obj-id="undo" data-obj-label="되돌리기">
@@ -287,18 +283,7 @@
         </div>
     </div>
 
-    <div id="otEditModal" class="modal-overlay" style="z-index: 2750;">
-        <div class="modal-box w95-window" style="max-width: 200px;">
-            <div class="w95-titlebar"><span>OT 개수 수정</span><button type="button" class="w95-btn" onclick="window.closeOTEditModal()">X</button></div>
-            <div style="padding:10px; background:var(--w-gray);">
-                <input type="text" id="otEditInput" inputmode="numeric" class="m-input w95-in" style="width:100%; text-align:center; margin-bottom:8px;" placeholder="0"
-                    onkeydown="if(event.key==='Enter'){event.preventDefault(); window.saveOTEdit();}">
-                <button type="button" class="w95-btn" style="width:100%; color:var(--w-blue); font-weight:bold; height:32px;" onclick="window.saveOTEdit()">저장</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="durationTimeEditModal" class="modal-overlay" style="z-index: 2750;">
+<div id="durationTimeEditModal" class="modal-overlay" style="z-index: 2750;">
         <div class="modal-box w95-window" style="max-width: 220px;">
             <div class="w95-titlebar"><span id="durationTimeEditTitle">시간 수정</span><button type="button" class="w95-btn" onclick="window.closeDurationTimeEditModal()">X</button></div>
             <div style="padding:10px; background:var(--w-gray);">
@@ -339,6 +324,7 @@
                     <button type="button" id="tagShowCountBtn" class="w95-btn tag-toggle-btn" onclick="window.toggleTagShowCount()">숫자</button>
                     <button type="button" id="tagMonthlyBtn" class="w95-btn tag-toggle-btn" onclick="window.toggleTagMonthly()">월별</button>
                     <button type="button" id="tagCountSuffixBtn" class="w95-btn tag-toggle-btn" onclick="window.toggleTagShowQty()">갯수</button>
+                    <button type="button" id="tagDuplicateBtn" class="w95-btn tag-toggle-btn" title="켜면 그룹 내 여러 항목을 동시에 선택 가능" onclick="window.toggleGroupSelectionMode()">중복</button>
                 </div>
             </div>
         </div>

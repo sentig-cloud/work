@@ -27,10 +27,13 @@
 
     const getTagLabel = (type, tag) => {
         const groupId = window.typeToGroupId(type);
-        const monthly = showsNumber(type) ? `[${getMonthlyCount(type, tag.name)}] ` : "";
+        // 0은 표시하지 않는다(시인성 확보) — [숫자]가 켜져 있어도 이번 달 집계가 0이면 그냥 생략
+        const monthlyCount = getMonthlyCount(type, tag.name);
+        const monthly = (showsNumber(type) && monthlyCount > 0) ? `[${monthlyCount}] ` : "";
         const qty = type === "equip" ? Number(window.activeEquips && window.activeEquips[tag.name] || 0) : 0;
-        // 장비는 실제 선택된 수량이 있으면 그걸 우선 보여주고, 없으면 그룹의 "갯수" 설정을 따른다
-        const countSuffix = qty > 0 ? ` (${qty})` : (window.groupShowsCount(groupId) ? ` (${tag.count || 0})` : "");
+        // 장비는 실제 선택된 수량이 있으면 그걸 우선 보여주고, 없으면 그룹의 "갯수" 설정을 따른다(0이면 생략)
+        const baseCount = Number(tag.count) || 0;
+        const countSuffix = qty > 0 ? ` (${qty})` : (window.groupShowsCount(groupId) && baseCount > 0 ? ` (${baseCount})` : "");
         return `${monthly}${tag.name}${countSuffix}`;
     };
 
@@ -85,20 +88,13 @@
     };
 
     window.renderEquips = () => {
+        // 예전엔 여기서 라벨을 직접 만들어서 다른 그룹과 달리 숫자/월별 그룹 설정이 전혀 반영되지
+        // 않는 버그가 있었음 — 다른 그룹과 동일하게 tagButton/getTagLabel을 그대로 재사용한다.
         (window.equipments = window.equipments || []).sort((a, b) => getSortCount(b) - getSortCount(a));
-        const showCount = window.groupShowsCount("equipments");
         const el = document.getElementById("equipArea"); if (!el) return;
         el.innerHTML = window.equipments.map((eq, i) => {
             const cnt = window.activeEquips && window.activeEquips[eq.name] || 0;
-            const suffix = cnt > 0 ? ` (${cnt})` : (showCount ? ` (${eq.count || 0})` : "");
-            return `<button type="button" class="w95-btn layout-tag-button ${cnt > 0 ? "active-btn" : ""}"
-                data-tag-type="equip" data-tag-name="${esc(eq.name)}"
-                onmousedown="window.startPress(event,'equip',${i})"
-                onmouseup="window.endPress(event,'equip',${i})"
-                onmouseleave="window.cancelPress()"
-                ontouchstart="window.startPress(event,'equip',${i})"
-                ontouchend="window.endPress(event,'equip',${i})"
-                ontouchcancel="window.cancelPress()">${esc(`${eq.name}${suffix}`)}</button>`;
+            return tagButton("equip", eq, i, cnt > 0);
         }).join("") + addButtonHtml("equip");
     };
 
@@ -930,12 +926,19 @@
         if (!tag) return;
         if (document.activeElement && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) document.activeElement.blur();
         if (window.pushWorkUndo && type !== "memoTag") window.pushWorkUndo();
-        if (type === "task") {
-            const indexOf = (window.activeTaskTypes || []).indexOf(tag.name);
-            if (indexOf > -1) window.activeTaskTypes.splice(indexOf, 1); else window.activeTaskTypes.push(tag.name);
-        } else if (type === "coworker") {
-            const indexOf = (window.selectedCoworkers || []).indexOf(tag.name);
-            if (indexOf > -1) window.selectedCoworkers.splice(indexOf, 1); else window.selectedCoworkers.push(tag.name);
+        if (type === "task" || type === "coworker") {
+            // 그룹의 selectionMode(단일/중복)에 따라 동작이 달라진다 — "중복" 토글로 전환 가능
+            const listKey = type === "task" ? "activeTaskTypes" : "selectedCoworkers";
+            const groupId = window.typeToGroupId(type);
+            const g = window.getGroupById(groupId);
+            const current = window[listKey] || [];
+            if (g && g.selectionMode === "single") {
+                window[listKey] = current.includes(tag.name) ? [] : [tag.name];
+            } else {
+                const indexOf = current.indexOf(tag.name);
+                if (indexOf > -1) current.splice(indexOf, 1); else current.push(tag.name);
+                window[listKey] = current;
+            }
         } else if (type === "status") {
             window.activeStatus = window.activeStatus === tag.name ? null : tag.name;
         } else if (type === "equip") {
@@ -961,16 +964,52 @@
         setTimeout(() => document.getElementById("tagEditInput").select(), 80);
     };
 
+    // 상태는 앱 전체(카드/내보내기/검색/대시보드)가 "값 하나"라는 전제로 만들어져 있어서
+    // 중복(다중선택) 토글 대상에서 제외한다 — 장비(qty)/메모태그(tag)는 selectionMode 자체가
+    // single/multi가 아니므로 자연히 제외됨.
+    const canToggleSelectionMode = (groupId) => {
+        if (groupId === "statuses") return false;
+        const g = window.getGroupById(groupId);
+        return !!g && (g.selectionMode === "single" || g.selectionMode === "multi");
+    };
+
     window.refreshTagEditControls = () => {
         const qty = document.getElementById("tagQtyDisplay");
         const numberBtn = document.getElementById("tagShowCountBtn");
         const monthlyBtn = document.getElementById("tagMonthlyBtn");
         const countBtn = document.getElementById("tagCountSuffixBtn");
+        const dupBtn = document.getElementById("tagDuplicateBtn");
         const groupId = window.typeToGroupId(window.editingTagType);
         if (qty) qty.innerText = String(window.tempTagQty || 0);
         if (numberBtn) numberBtn.className = `w95-btn tag-toggle-btn ${window.groupShowsNumber(groupId) ? "is-on" : "is-off"}`;
         if (monthlyBtn) monthlyBtn.className = `w95-btn tag-toggle-btn ${window.groupIncludesMonthly(groupId) ? "is-on" : "is-off"}`;
         if (countBtn) countBtn.className = `w95-btn tag-toggle-btn ${window.groupShowsCount(groupId) ? "is-on" : "is-off"}`;
+        if (dupBtn) {
+            const toggleable = canToggleSelectionMode(groupId);
+            const g = window.getGroupById(groupId);
+            dupBtn.disabled = !toggleable;
+            dupBtn.style.opacity = toggleable ? "1" : "0.4";
+            dupBtn.className = `w95-btn tag-toggle-btn ${toggleable && g && g.selectionMode === "multi" ? "is-on" : "is-off"}`;
+        }
+    };
+
+    // "중복": 그룹의 selectionMode를 single↔multi로 전환 — 상태/장비/메모태그는 대상 제외(위 참고)
+    window.toggleGroupSelectionMode = () => {
+        const groupId = window.typeToGroupId(window.editingTagType);
+        if (!canToggleSelectionMode(groupId)) return;
+        const g = window.getGroupById(groupId);
+        g.selectionMode = g.selectionMode === "multi" ? "single" : "multi";
+        // 단일 모드로 바꿀 때 이미 여러 개가 선택돼 있으면 첫 번째만 남긴다
+        if (g.selectionMode === "single") {
+            const current = window.getGroupSelection(groupId);
+            if (Array.isArray(current) && current.length > 1) {
+                window.setGroupSelection(groupId, [current[0]]);
+            }
+        }
+        window.refreshTagEditControls();
+        window.markDirty?.("master", "groups", "upsert");
+        if (window.saveLocal) window.saveLocal();
+        window.renderChangedTagType(window.editingTagType);
     };
 
     // 수량(+/-)은 태그 하나만의 값이라 즉시 반영 + 바로 저장
