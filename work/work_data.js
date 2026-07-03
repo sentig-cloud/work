@@ -46,10 +46,12 @@ const DEFAULT_GROUPS = [
         order: 0,
         selectionMode: 'multi',   // multi: 다중선택, single: 단일선택, qty: 수량선택, tag: 메모태그
         remember: false,          // 켜면 새 작업일지를 열 때 이 그룹만 마지막 선택값을 자동 적용
+        showNumber: true,         // 그룹 전체 설정: 태그 옆에 [횟수] 표시할지
+        includeMonthly: true,     // 그룹 전체 설정: 그 횟수를 월별 집계에 포함할지
         tags: [
-            { name: '설치', count: 0, showNumber: true, includeMonthly: true },
-            { name: 'A/S', count: 0, showNumber: true, includeMonthly: true },
-            { name: '점검', count: 0, showNumber: true, includeMonthly: true }
+            { name: '설치', count: 0 },
+            { name: 'A/S', count: 0 },
+            { name: '점검', count: 0 }
         ]
     },
     {
@@ -59,6 +61,8 @@ const DEFAULT_GROUPS = [
         order: 1,
         selectionMode: 'multi',
         remember: false,
+        showNumber: true,
+        includeMonthly: true,
         tags: []
     },
     {
@@ -68,11 +72,13 @@ const DEFAULT_GROUPS = [
         order: 2,
         selectionMode: 'single',
         remember: false,
+        showNumber: true,
+        includeMonthly: true,
         tags: [
-            { name: '완료', count: 0, showNumber: true, includeMonthly: true },
-            { name: '취소', count: 0, showNumber: true, includeMonthly: true },
-            { name: '보류', count: 0, showNumber: true, includeMonthly: true },
-            { name: '일정변경', count: 0, showNumber: true, includeMonthly: true }
+            { name: '완료', count: 0 },
+            { name: '취소', count: 0 },
+            { name: '보류', count: 0 },
+            { name: '일정변경', count: 0 }
         ]
     },
     {
@@ -82,6 +88,8 @@ const DEFAULT_GROUPS = [
         order: 3,
         selectionMode: 'qty',
         remember: false,
+        showNumber: true,
+        includeMonthly: true,
         tags: [
             { name: '인' },
             { name: '티' },
@@ -95,6 +103,8 @@ const DEFAULT_GROUPS = [
         enabled: true,
         order: 4,
         selectionMode: 'tag',
+        showNumber: true,
+        includeMonthly: true,
         tags: []
     },
     {
@@ -312,6 +322,30 @@ window.getGroupValueFromLog = function (log, groupId) {
     return (log.customGroups && log.customGroups[groupId]) || [];
 };
 
+// ─── 숫자 표시 / 월별 집계 포함 여부: 태그 하나하나가 아니라 그룹 전체 설정 ───
+// (태그 편집창에서 하나를 켜고 끄면 그 그룹에 속한 모든 태그에 똑같이 적용된다)
+window.groupShowsNumber = function (groupId) {
+    const g = window.getGroupById(groupId);
+    return !g || g.showNumber !== false;
+};
+
+window.groupIncludesMonthly = function (groupId) {
+    const g = window.getGroupById(groupId);
+    return !g || g.includeMonthly !== false;
+};
+
+// 그룹의 "월별 집계 포함" 설정을 반영한, 이번 달 기준 태그 선택 횟수(또는 장비 수량 합)
+window.getGroupTagMonthlyCount = function (groupId, tagName) {
+    if (!window.groupIncludesMonthly(groupId)) return 0;
+    const logs = (window.logs || []).filter((l) => l && l.y === window.currentYear && l.m === window.curMonth);
+    return logs.reduce((sum, l) => {
+        const val = window.getGroupValueFromLog(l, groupId);
+        if (groupId === 'equipments') return sum + Number((val && val[tagName]) || 0);
+        if (Array.isArray(val)) return sum + (val.includes(tagName) ? 1 : 0);
+        return sum + (val === tagName ? 1 : 0);
+    }, 0);
+};
+
 // 로그에 그룹 데이터 쓰기
 window.setGroupValueToLog = function (log, groupId, value) {
     if (groupId === 'taskTypes') { log.taskType = Array.isArray(value) ? value.join(', ') : ''; return; }
@@ -335,6 +369,8 @@ window.addCustomGroup = function (title) {
         order: maxOrder + 1,
         selectionMode: 'multi',
         remember: false,
+        showNumber: true,
+        includeMonthly: true,
         tags: []
     };
     window.groups.push(newGroup);

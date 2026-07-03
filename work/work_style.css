@@ -442,8 +442,7 @@ input, textarea, [contenteditable="true"] {
 .tag-edit-name-row, .tag-edit-control-row { display: flex; align-items: center; gap: 6px; }
 .tag-edit-name-row { margin-bottom: 8px; }
 .tag-edit-name-row .m-input { flex: 1; min-width: 0; }
-.tag-save-delete-btn { width: 46px; height: 28px; flex-shrink: 0; font-weight: bold; color: var(--w-blue); }
-.tag-save-delete-btn.is-arming-delete { color: #fff; background: #d62828; }
+.tag-delete-btn { width: 46px; height: 28px; flex-shrink: 0; font-weight: bold; color: #dc2626; }
 .tag-edit-control-row .icon-btn { width: 28px; height: 26px; padding: 0; }
 #tagQtyDisplay { min-width: 18px; text-align: center; }
 .tag-toggle-btn { height: 26px; padding: 0 7px; font-size: 0.78rem; color: #777; }

@@ -14,30 +14,19 @@
     // 커스텀 그룹 id가 들어오면 무조건 "status"로 취급해 엉뚱한 그룹에 태그가 추가/삭제되던 버그가 있었음.
     const getTagArray = (type) => (window.getTagArray ? window.getTagArray(type) : []);
 
-    const getTag = (type, name) => getTagArray(type).find((t) => t.name === name);
-    const showsNumber = (tag) => !tag || tag.showNumber !== false;
-    const includesMonthly = (tag) => !tag || tag.includeMonthly !== false;
+    // 숫자 표시/월별 집계 포함 여부는 태그 하나하나가 아니라 "그룹 전체" 설정이다 —
+    // 편집창에서 하나를 켜고 끄면 그 그룹에 속한 모든 태그에 똑같이 적용된다.
+    const showsNumber = (type) => window.groupShowsNumber(window.typeToGroupId(type));
+    const includesMonthly = (type) => window.groupIncludesMonthly(window.typeToGroupId(type));
     const getSortCount = (tag) => Number(tag && tag.count) || 0;
 
     const replaceInList = (list, old, neu) =>
         Array.isArray(list) ? list.map((n) => n === old ? neu : n) : list;
 
-    const getMonthlyCount = (type, name) => {
-        const tag = getTag(type, name);
-        if (!includesMonthly(tag)) return 0;
-        const logs = (window.logs || []).filter((l) => l && l.y === window.currentYear && l.m === window.curMonth);
-        if (type === "equip") return logs.reduce((s, l) => s + Number(l.equips && l.equips[name] || 0), 0);
-        return logs.reduce((s, l) => {
-            if (type === "task") return s + (l.taskType && String(l.taskType).split(", ").includes(name) ? 1 : 0);
-            if (type === "coworker") return s + (l.coworkers && l.coworkers.includes(name) ? 1 : 0);
-            if (type === "status") return s + (l.status === name ? 1 : 0);
-            if (type === "memoTag") return s + (l.tags && l.tags.includes(name) ? 1 : 0);
-            return s;
-        }, 0);
-    };
+    const getMonthlyCount = (type, name) => window.getGroupTagMonthlyCount(window.typeToGroupId(type), name);
 
     const getTagLabel = (type, tag) => {
-        const monthly = showsNumber(tag) ? `[${getMonthlyCount(type, tag.name)}] ` : "";
+        const monthly = showsNumber(type) ? `[${getMonthlyCount(type, tag.name)}] ` : "";
         const qty = type === "equip" ? Number(window.activeEquips && window.activeEquips[tag.name] || 0) : 0;
         return `${monthly}${tag.name}${qty > 0 ? ` (${qty})` : ""}`;
     };
@@ -836,7 +825,7 @@
     document.addEventListener("dragstart", (e) => { if (!isText(e.target)) e.preventDefault(); });
 
     // ─── 대시보드 통계 ───
-    const countAllowed = (type, name) => includesMonthly(getTag(type, name));
+    const countAllowed = (type) => includesMonthly(type);
     const oldUpdateDash = window.updateDashboardStats;
     window.updateDashboardStats = () => {
         const orig = window.logs;
@@ -865,8 +854,8 @@
 
     // ─── 검색 필터 ───
     const optionLabel = (type, tag, logs) => {
-        if (!showsNumber(tag)) return tag.name;
-        if (!includesMonthly(tag)) return `[0] ${tag.name}`;
+        if (!showsNumber(type)) return tag.name;
+        if (!includesMonthly(type)) return `[0] ${tag.name}`;
         let count = 0;
         logs.forEach(l => {
             if (type === "task" && l.taskType && String(l.taskType).split(", ").includes(tag.name)) count++;
@@ -946,8 +935,6 @@
         window.tempTagQty = type === "equip"
             ? Number(window.activeEquips && window.activeEquips[tag.name] || tag.count || 0)
             : Number(tag.count || 0);
-        window.tempTagShowCount = tag.showNumber !== false;
-        window.tempTagMonthly = tag.includeMonthly !== false;
         document.getElementById("tagEditInput").value = tag.name;
         document.getElementById("tagEditModal").style.display = "flex";
         window.refreshTagEditControls();
@@ -958,82 +945,112 @@
         const qty = document.getElementById("tagQtyDisplay");
         const numberBtn = document.getElementById("tagShowCountBtn");
         const monthlyBtn = document.getElementById("tagMonthlyBtn");
+        const groupId = window.typeToGroupId(window.editingTagType);
         if (qty) qty.innerText = String(window.tempTagQty || 0);
-        if (numberBtn) numberBtn.className = `w95-btn tag-toggle-btn ${window.tempTagShowCount ? "is-on" : "is-off"}`;
-        if (monthlyBtn) monthlyBtn.className = `w95-btn tag-toggle-btn ${window.tempTagMonthly ? "is-on" : "is-off"}`;
+        if (numberBtn) numberBtn.className = `w95-btn tag-toggle-btn ${window.groupShowsNumber(groupId) ? "is-on" : "is-off"}`;
+        if (monthlyBtn) monthlyBtn.className = `w95-btn tag-toggle-btn ${window.groupIncludesMonthly(groupId) ? "is-on" : "is-off"}`;
     };
 
+    // 수량(+/-)은 태그 하나만의 값이라 즉시 반영 + 바로 저장
     window.changeTagQty = (delta) => {
-        window.tempTagQty = Math.max(0, Number(window.tempTagQty || 0) + delta);
-        window.refreshTagEditControls();
-    };
-    window.toggleTagShowCount = () => { window.tempTagShowCount = !window.tempTagShowCount; window.refreshTagEditControls(); };
-    window.toggleTagMonthly = () => { window.tempTagMonthly = !window.tempTagMonthly; window.refreshTagEditControls(); };
-
-    window.saveTagEdit = () => {
         const type = window.editingTagType;
+        const tag = getTagArray(type)[window.editingTagIndex];
+        if (!tag) return;
+        window.tempTagQty = Math.max(0, Number(window.tempTagQty || 0) + delta);
+        tag.count = window.tempTagQty;
+        if (type === "equip") {
+            window.activeEquips = window.activeEquips || {};
+            if (window.tempTagQty > 0) window.activeEquips[tag.name] = window.tempTagQty;
+            else delete window.activeEquips[tag.name];
+        }
+        window.refreshTagEditControls();
+        window.markDirty?.("master", "groups", "upsert");
+        if (window.saveLocal) window.saveLocal();
+        window.renderChangedTagType(type);
+    };
+
+    // 숫자 표시/월별 집계는 태그가 아니라 "그룹" 설정 — 켜고 끄면 그 그룹 전체에 바로 적용되고 저장됨
+    window.toggleTagShowCount = () => {
+        const groupId = window.typeToGroupId(window.editingTagType);
+        const g = window.getGroupById(groupId);
+        if (!g) return;
+        g.showNumber = !window.groupShowsNumber(groupId);
+        window.refreshTagEditControls();
+        window.markDirty?.("master", "groups", "upsert");
+        if (window.saveLocal) window.saveLocal();
+        window.renderChangedTagType(window.editingTagType);
+    };
+
+    window.toggleTagMonthly = () => {
+        const groupId = window.typeToGroupId(window.editingTagType);
+        const g = window.getGroupById(groupId);
+        if (!g) return;
+        g.includeMonthly = !window.groupIncludesMonthly(groupId);
+        window.refreshTagEditControls();
+        window.markDirty?.("master", "groups", "upsert");
+        if (window.saveLocal) window.saveLocal();
+        window.renderChangedTagType(window.editingTagType);
+    };
+
+    // 이름은 텍스트 입력이라 즉시 저장이 어려우므로, 포커스가 빠지거나(blur) 엔터를 누르면 그 순간 반영+저장
+    window.commitTagNameEdit = () => {
+        const type = window.editingTagType;
+        if (!type) return; // 모달이 이미 닫힌 뒤 뒤늦게 blur가 들어오는 경우 대비
         const arr = getTagArray(type);
         const tag = arr[window.editingTagIndex];
         if (!tag) return;
-        const newName = document.getElementById("tagEditInput").value.trim();
-        if (!newName) return alert("이름을 입력하세요.");
+        const input = document.getElementById("tagEditInput");
+        const newName = input.value.trim();
+
+        if (!newName || newName === tag.name) {
+            input.value = tag.name;
+            return;
+        }
         if (arr.some((item, index) => index !== window.editingTagIndex && item.name === newName)) {
-            return alert("같은 이름의 항목이 이미 있습니다.");
+            alert("같은 이름의 항목이 이미 있습니다.");
+            input.value = tag.name;
+            return;
         }
+
         const oldName = tag.name;
+        const groupId = window.typeToGroupId(type);
         if (window.pushWorkUndo) window.pushWorkUndo();
-        if (newName !== oldName) {
-            window.activeTaskTypes = replaceInList(window.activeTaskTypes, oldName, newName);
-            window.selectedCoworkers = replaceInList(window.selectedCoworkers, oldName, newName);
-            window.activeEditTags = replaceInList(window.activeEditTags, oldName, newName);
-            if (window.activeStatus === oldName) window.activeStatus = newName;
-            if (window.activeEquips && Object.prototype.hasOwnProperty.call(window.activeEquips, oldName)) {
-                window.activeEquips[newName] = window.activeEquips[oldName];
-                delete window.activeEquips[oldName];
-            }
-            (window.logs || []).forEach((log) => {
-                if (!log) return;
-                if (type === "task" && log.taskType)
-                    log.taskType = replaceInList(String(log.taskType).split(", "), oldName, newName).join(", ");
-                else if (type === "coworker" && log.coworkers)
-                    log.coworkers = replaceInList(log.coworkers, oldName, newName);
-                else if (type === "status" && log.status === oldName)
-                    log.status = newName;
-                else if (type === "memoTag" && log.tags)
-                    log.tags = replaceInList(log.tags, oldName, newName);
-                else if (type === "equip" && log.equips && Object.prototype.hasOwnProperty.call(log.equips, oldName)) {
-                    log.equips[newName] = log.equips[oldName];
-                    delete log.equips[oldName];
-                }
-            });
-            (window.trash || []).forEach((log) => {
-                if (!log) return;
-                if (type === "task" && log.taskType)
-                    log.taskType = replaceInList(String(log.taskType).split(", "), oldName, newName).join(", ");
-                else if (type === "coworker" && log.coworkers)
-                    log.coworkers = replaceInList(log.coworkers, oldName, newName);
-                else if (type === "status" && log.status === oldName)
-                    log.status = newName;
-                else if (type === "memoTag" && log.tags)
-                    log.tags = replaceInList(log.tags, oldName, newName);
-                else if (type === "equip" && log.equips && Object.prototype.hasOwnProperty.call(log.equips, oldName)) {
-                    log.equips[newName] = log.equips[oldName];
-                    delete log.equips[oldName];
-                }
-            });
+
+        window.activeTaskTypes = replaceInList(window.activeTaskTypes, oldName, newName);
+        window.selectedCoworkers = replaceInList(window.selectedCoworkers, oldName, newName);
+        window.activeEditTags = replaceInList(window.activeEditTags, oldName, newName);
+        if (window.activeStatus === oldName) window.activeStatus = newName;
+        if (window.activeEquips && Object.prototype.hasOwnProperty.call(window.activeEquips, oldName)) {
+            window.activeEquips[newName] = window.activeEquips[oldName];
+            delete window.activeEquips[oldName];
         }
+        if (window.activeCustomGroupSelections && window.activeCustomGroupSelections[groupId]) {
+            window.activeCustomGroupSelections[groupId] = replaceInList(window.activeCustomGroupSelections[groupId], oldName, newName);
+        }
+
+        // groupId 기반 공용 접근자를 써서 기본 그룹/커스텀 그룹 모두 동일하게 이름 치환
+        [window.logs, window.trash].forEach((collection) => {
+            (collection || []).forEach((log) => {
+                if (!log) return;
+                const val = window.getGroupValueFromLog(log, groupId);
+                if (groupId === "equipments") {
+                    if (val && Object.prototype.hasOwnProperty.call(val, oldName)) {
+                        val[newName] = val[oldName];
+                        delete val[oldName];
+                    }
+                } else if (Array.isArray(val)) {
+                    if (val.includes(oldName)) window.setGroupValueToLog(log, groupId, replaceInList(val, oldName, newName));
+                } else if (val === oldName) {
+                    window.setGroupValueToLog(log, groupId, newName);
+                }
+            });
+        });
+
         tag.name = newName;
-        tag.count = Number(window.tempTagQty || 0);
-        tag.showNumber = window.tempTagShowCount !== false;
-        tag.includeMonthly = window.tempTagMonthly !== false;
-        if (type === "equip") {
-            if (tag.count > 0) window.activeEquips[newName] = tag.count;
-            else delete window.activeEquips[newName];
-        }
+        window.markDirty?.("master", "groups", "upsert");
         if (window.saveLocal) window.saveLocal();
         window.renderChangedTagType(type);
         if (window.renderMain) window.renderMain();
-        window.closeTagEditModal();
     };
 
     window.deleteTagEdit = () => {
@@ -1041,13 +1058,19 @@
         const arr = getTagArray(type);
         const tag = arr[window.editingTagIndex];
         if (!tag) return;
+        if (!confirm(`"${tag.name}" 항목을 삭제하시겠습니까?`)) return;
         if (window.pushWorkUndo) window.pushWorkUndo();
         if (type === "task") window.activeTaskTypes = (window.activeTaskTypes || []).filter((i) => i !== tag.name);
         if (type === "coworker") window.selectedCoworkers = (window.selectedCoworkers || []).filter((i) => i !== tag.name);
         if (type === "status" && window.activeStatus === tag.name) window.activeStatus = null;
         if (type === "memoTag") window.activeEditTags = (window.activeEditTags || []).filter((i) => i !== tag.name);
         if (type === "equip" && window.activeEquips) delete window.activeEquips[tag.name];
+        const groupId = window.typeToGroupId(type);
+        if (window.activeCustomGroupSelections && window.activeCustomGroupSelections[groupId]) {
+            window.activeCustomGroupSelections[groupId] = window.activeCustomGroupSelections[groupId].filter((i) => i !== tag.name);
+        }
         arr.splice(window.editingTagIndex, 1);
+        window.markDirty?.("master", "groups", "upsert");
         if (window.saveLocal) window.saveLocal();
         window.renderChangedTagType(type);
         if (window.renderMain) window.renderMain();
@@ -1067,7 +1090,7 @@
         window.selectedCoworkers = window.selectedCoworkers || [];
         window.activeEquips = window.activeEquips || {};
         window.activeEditTags = window.activeEditTags || [];
-        arr.push({ name, count: 0, showNumber: true, includeMonthly: true });
+        arr.push({ name, count: 0 });
         if (type === "task" && !(window.activeTaskTypes || []).includes(name)) window.activeTaskTypes.push(name);
         else if (type === "coworker" && !(window.selectedCoworkers || []).includes(name)) window.selectedCoworkers.push(name);
         else if (type === "equip") window.activeEquips[name] = 1;
@@ -1081,29 +1104,6 @@
         }
         if (window.saveLocal) window.saveLocal();
         window.renderChangedTagType(type);
-    };
-
-    window.startTagSaveDelete = (event) => {
-        if (event) event.preventDefault();
-        window.tagDeleteTriggered = false;
-        const button = document.getElementById("tagSaveDeleteBtn");
-        window.tagDeleteTimer = setTimeout(() => {
-            window.tagDeleteTriggered = true;
-            if (button) button.classList.add("is-arming-delete");
-            if (navigator.vibrate) navigator.vibrate(40);
-            window.deleteTagEdit();
-        }, 3000);
-    };
-    window.cancelTagSaveDelete = () => {
-        clearTimeout(window.tagDeleteTimer);
-        const button = document.getElementById("tagSaveDeleteBtn");
-        if (button) button.classList.remove("is-arming-delete");
-    };
-    window.endTagSaveDelete = (event) => {
-        if (event) event.preventDefault();
-        clearTimeout(window.tagDeleteTimer);
-        if (!window.tagDeleteTriggered) window.saveTagEdit();
-        window.cancelTagSaveDelete();
     };
 
     // ═══════════════════════════════════════════

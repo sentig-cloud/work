@@ -508,13 +508,15 @@ window.renderCustomGroup = (groupId) => {
 
     const sel = window.activeCustomGroupSelections[groupId] || [];
     const tags = [...g.tags].sort((a, b) => (b.count || 0) - (a.count || 0));
+    const showNumber = window.groupShowsNumber(groupId);
 
     let html = tags.map((t, idx) => {
         let activeCls = sel.includes(t.name) ? 'active-btn' : '';
+        const numberPrefix = showNumber ? `[${window.getGroupTagMonthlyCount(groupId, t.name)}] ` : '';
         return `<button type="button" class="w95-btn ${activeCls}"
             onclick="window.toggleCustomGroupTag('${groupId}', '${t.name}')"
             oncontextmenu="event.preventDefault(); window.openTagEditBox('${groupId}', ${idx});"
-        >[${t.count || 0}] ${t.name}</button>`;
+        >${numberPrefix}${t.name}</button>`;
     }).join(' ');
     html += `<button type="button" class="w95-btn" onclick="window.addNewType('${groupId}')"><b>+</b></button>`;
     el.innerHTML = html;

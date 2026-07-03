@@ -310,13 +310,10 @@
             <div class="w95-titlebar"><span>항목 편집</span><button type="button" class="w95-btn" onclick="window.closeTagEditModal()">X</button></div>
             <div style="padding:10px; background:var(--w-gray);">
                 <div class="tag-edit-name-row">
-                    <input type="text" id="tagEditInput" class="m-input w95-in">
-                    <button type="button" id="tagSaveDeleteBtn" class="w95-btn tag-save-delete-btn"
-                        title="짧게 누르면 저장, 3초 이상 누르면 삭제"
-                        onpointerdown="window.startTagSaveDelete(event)"
-                        onpointerup="window.endTagSaveDelete(event)"
-                        onpointerleave="window.cancelTagSaveDelete()"
-                        onpointercancel="window.cancelTagSaveDelete()">저/삭</button>
+                    <input type="text" id="tagEditInput" class="m-input w95-in"
+                        onblur="window.commitTagNameEdit()"
+                        onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}">
+                    <button type="button" id="tagDeleteBtn" class="w95-btn tag-delete-btn" onclick="window.deleteTagEdit()">삭제</button>
                 </div>
                 <div class="tag-edit-control-row">
                     <button type="button" class="w95-btn icon-btn" onclick="window.changeTagQty(-1)">-</button>
