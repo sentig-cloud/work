@@ -48,6 +48,8 @@ const DEFAULT_GROUPS = [
         remember: false,          // 켜면 새 작업일지를 열 때 이 그룹만 마지막 선택값을 자동 적용
         showNumber: true,         // 그룹 전체 설정: 태그 옆에 [횟수] 표시할지
         includeMonthly: true,     // 그룹 전체 설정: 그 횟수를 월별 집계에 포함할지
+        showCount: false,         // 그룹 전체 설정: 태그 이름 뒤에 (갯수) 표시할지
+        active: true,             // 꺼지면 상자는 보이되 선택 불가 + 내보내기 제외(제목 색으로 표시)
         tags: [
             { name: '설치', count: 0 },
             { name: 'A/S', count: 0 },
@@ -63,6 +65,8 @@ const DEFAULT_GROUPS = [
         remember: false,
         showNumber: true,
         includeMonthly: true,
+        showCount: false,
+        active: true,
         tags: []
     },
     {
@@ -74,6 +78,8 @@ const DEFAULT_GROUPS = [
         remember: false,
         showNumber: true,
         includeMonthly: true,
+        showCount: false,
+        active: true,
         tags: [
             { name: '완료', count: 0 },
             { name: '취소', count: 0 },
@@ -90,6 +96,8 @@ const DEFAULT_GROUPS = [
         remember: false,
         showNumber: true,
         includeMonthly: true,
+        showCount: false,
+        active: true,
         tags: [
             { name: '인' },
             { name: '티' },
@@ -105,6 +113,8 @@ const DEFAULT_GROUPS = [
         selectionMode: 'tag',
         showNumber: true,
         includeMonthly: true,
+        showCount: false,
+        active: true,
         tags: []
     },
     {
@@ -248,6 +258,7 @@ window.tempCommuteOriginalName = "";
 window.isWorkDuty = false;
 window.workStartTime = null;
 window.workEndTime = null;
+window.workOTCount = 0;
 
 // ─── 기억(remember): 그룹별로 켜고 끄는 기능. 켜진 그룹만 마지막 선택값을 저장/복원한다.
 // 레이아웃 편집모드의 "기억" 버튼을 눌러 선택모드로 들어간 뒤, 원하는 그룹을 탭해서
@@ -334,6 +345,18 @@ window.groupIncludesMonthly = function (groupId) {
     return !g || g.includeMonthly !== false;
 };
 
+// 태그 이름 뒤에 (갯수) 접미사를 붙일지 — 새 기능이라 기존 설치와의 호환을 위해 기본값은 false
+window.groupShowsCount = function (groupId) {
+    const g = window.getGroupById(groupId);
+    return !!g && g.showCount === true;
+};
+
+// 그룹 활성/비활성 — 비활성이어도 상자는 계속 보이되 선택 불가 + 내보내기 컬럼에서 제외됨
+window.isGroupActive = function (groupId) {
+    const g = window.getGroupById(groupId);
+    return !g || g.active !== false;
+};
+
 // 그룹의 "월별 집계 포함" 설정을 반영한, 이번 달 기준 태그 선택 횟수(또는 장비 수량 합)
 window.getGroupTagMonthlyCount = function (groupId, tagName) {
     if (!window.groupIncludesMonthly(groupId)) return 0;
@@ -371,6 +394,8 @@ window.addCustomGroup = function (title) {
         remember: false,
         showNumber: true,
         includeMonthly: true,
+        showCount: false,
+        active: true,
         tags: []
     };
     window.groups.push(newGroup);

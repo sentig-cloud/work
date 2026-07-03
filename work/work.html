@@ -108,8 +108,8 @@
 
                     <div class="drag-item w95-out" data-id="1" style="display:flex; flex-direction:column; gap:2px; padding:2px;">
                         <div id="boxTitle_basicFields" class="box-title" title="길게 눌러 이름 변경"
-                            onmousedown="window.startTitlePress(event, 'basicFields')" onmouseup="window.endTitlePress()" onmouseleave="window.endTitlePress()"
-                            ontouchstart="window.startTitlePress(event, 'basicFields')" ontouchend="window.endTitlePress()" ontouchcancel="window.endTitlePress()"
+                            onmousedown="window.startTitlePress(event, 'basicFields')" onmouseup="window.endTitlePress('basicFields')" onmouseleave="window.cancelTitlePress()"
+                            ontouchstart="window.startTitlePress(event, 'basicFields')" ontouchend="window.endTitlePress('basicFields')" ontouchcancel="window.cancelTitlePress()"
                             >기본그룹</div>
                         <!-- 날짜 -->
                         <div class="work-obj-wrap" data-obj-id="date" data-obj-label="날짜" style="display:flex; align-items:center; position:relative;">
@@ -126,9 +126,13 @@
                         <div class="work-obj-wrap" data-obj-id="duty" data-obj-label="당직">
                             <button type="button" id="workDutyBtn" class="w95-btn" style="width:100%; height:28px;" onclick="window.toggleDuty()">당직</button>
                         </div>
-                        <!-- OT -->
+                        <!-- OT: 짧게 탭=1씩 증가, 길게 누르면 정확한 값 입력 -->
                         <div class="work-obj-wrap" data-obj-id="ot" data-obj-label="OT">
-                            <input type="text" id="workOT" inputmode="numeric" class="m-input w95-in" style="width:100%; text-align:center; height:28px;" placeholder="OT(00:00)" onblur="window.formatOTInput(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
+                            <button type="button" id="workOTBtn" class="w95-btn" style="width:100%; height:28px; white-space:nowrap; overflow:hidden;"
+                                title="짧게 탭: +1 · 길게 누르면 직접 입력"
+                                onmousedown="window.startOTPress(event)" onmouseup="window.endOTPress(event)" onmouseleave="window.cancelOTPress()"
+                                ontouchstart="window.startOTPress(event)" ontouchend="window.endOTPress(event)" ontouchcancel="window.cancelOTPress()"
+                                >OT</button>
                         </div>
                         <!-- 되돌리기 -->
                         <div class="work-obj-wrap" data-obj-id="undo" data-obj-label="되돌리기">
@@ -166,8 +170,8 @@
 
                     <div class="drag-item w95-in" data-id="8" data-group-ref="duration">
                         <div id="boxTitle_duration" class="box-title" title="길게 눌러 이름 변경"
-                            onmousedown="window.startTitlePress(event, 'duration')" onmouseup="window.endTitlePress()" onmouseleave="window.endTitlePress()"
-                            ontouchstart="window.startTitlePress(event, 'duration')" ontouchend="window.endTitlePress()" ontouchcancel="window.endTitlePress()"
+                            onmousedown="window.startTitlePress(event, 'duration')" onmouseup="window.endTitlePress('duration')" onmouseleave="window.cancelTitlePress()"
+                            ontouchstart="window.startTitlePress(event, 'duration')" ontouchend="window.endTitlePress('duration')" ontouchcancel="window.cancelTitlePress()"
                             >시작/종료</div>
                         <div class="btn-tag-area" style="justify-content:center;">
                             <button type="button" id="workStartBtn" class="w95-btn" style="flex:1; min-width:70px;" title="짧게 탭: 찍기/취소 토글 · 길게 누르면 시간 수정"
@@ -184,25 +188,25 @@
                     </div>
 
                     <div class="drag-item w95-in" data-id="3" data-group-ref="taskTypes">
-                        <div id="boxTitle_taskType" class="box-title" onmousedown="window.startTitlePress(event, 'taskType')" onmouseup="window.endTitlePress()" onmouseleave="window.endTitlePress()" ontouchstart="window.startTitlePress(event, 'taskType')" ontouchend="window.endTitlePress()" ontouchcancel="window.endTitlePress()">작업 유형</div>
+                        <div id="boxTitle_taskTypes" class="box-title" onmousedown="window.startTitlePress(event, 'taskTypes')" onmouseup="window.endTitlePress('taskTypes')" onmouseleave="window.cancelTitlePress()" ontouchstart="window.startTitlePress(event, 'taskTypes')" ontouchend="window.endTitlePress('taskTypes')" ontouchcancel="window.cancelTitlePress()">작업 유형</div>
                         <div id="taskTypeArea" class="btn-tag-area"></div>
                         <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>
                     </div>
 
                     <div class="drag-item w95-in" data-id="4" data-group-ref="coworkers">
-                        <div id="boxTitle_coworkers" class="box-title" onmousedown="window.startTitlePress(event, 'coworkers')" onmouseup="window.endTitlePress()" onmouseleave="window.endTitlePress()" ontouchstart="window.startTitlePress(event, 'coworkers')" ontouchend="window.endTitlePress()" ontouchcancel="window.endTitlePress()">매니저</div>
+                        <div id="boxTitle_coworkers" class="box-title" onmousedown="window.startTitlePress(event, 'coworkers')" onmouseup="window.endTitlePress('coworkers')" onmouseleave="window.cancelTitlePress()" ontouchstart="window.startTitlePress(event, 'coworkers')" ontouchend="window.endTitlePress('coworkers')" ontouchcancel="window.cancelTitlePress()">매니저</div>
                         <div id="coworkerArea" class="btn-tag-area"></div>
                         <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>
                     </div>
 
                     <div class="drag-item w95-in" data-id="5" data-group-ref="equipments">
-                        <div id="boxTitle_equips" class="box-title" onmousedown="window.startTitlePress(event, 'equips')" onmouseup="window.endTitlePress()" onmouseleave="window.endTitlePress()" ontouchstart="window.startTitlePress(event, 'equips')" ontouchend="window.endTitlePress()" ontouchcancel="window.endTitlePress()">사용 장비</div>
+                        <div id="boxTitle_equipments" class="box-title" onmousedown="window.startTitlePress(event, 'equipments')" onmouseup="window.endTitlePress('equipments')" onmouseleave="window.cancelTitlePress()" ontouchstart="window.startTitlePress(event, 'equipments')" ontouchend="window.endTitlePress('equipments')" ontouchcancel="window.cancelTitlePress()">사용 장비</div>
                         <div id="equipArea" class="btn-tag-area"></div>
                         <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>
                     </div>
 
                     <div class="drag-item w95-in" data-id="6" data-group-ref="statuses">
-                        <div id="boxTitle_status" class="box-title" onmousedown="window.startTitlePress(event, 'status')" onmouseup="window.endTitlePress()" onmouseleave="window.endTitlePress()" ontouchstart="window.startTitlePress(event, 'status')" ontouchend="window.endTitlePress()" ontouchcancel="window.endTitlePress()">상태</div>
+                        <div id="boxTitle_statuses" class="box-title" onmousedown="window.startTitlePress(event, 'statuses')" onmouseup="window.endTitlePress('statuses')" onmouseleave="window.cancelTitlePress()" ontouchstart="window.startTitlePress(event, 'statuses')" ontouchend="window.endTitlePress('statuses')" ontouchcancel="window.cancelTitlePress()">상태</div>
                         <div id="statusArea" class="btn-tag-area"></div>
                         <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>
                     </div>
@@ -283,6 +287,17 @@
         </div>
     </div>
 
+    <div id="otEditModal" class="modal-overlay" style="z-index: 2750;">
+        <div class="modal-box w95-window" style="max-width: 200px;">
+            <div class="w95-titlebar"><span>OT 개수 수정</span><button type="button" class="w95-btn" onclick="window.closeOTEditModal()">X</button></div>
+            <div style="padding:10px; background:var(--w-gray);">
+                <input type="text" id="otEditInput" inputmode="numeric" class="m-input w95-in" style="width:100%; text-align:center; margin-bottom:8px;" placeholder="0"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault(); window.saveOTEdit();}">
+                <button type="button" class="w95-btn" style="width:100%; color:var(--w-blue); font-weight:bold; height:32px;" onclick="window.saveOTEdit()">저장</button>
+            </div>
+        </div>
+    </div>
+
     <div id="durationTimeEditModal" class="modal-overlay" style="z-index: 2750;">
         <div class="modal-box w95-window" style="max-width: 220px;">
             <div class="w95-titlebar"><span id="durationTimeEditTitle">시간 수정</span><button type="button" class="w95-btn" onclick="window.closeDurationTimeEditModal()">X</button></div>
@@ -319,10 +334,20 @@
                     <button type="button" class="w95-btn icon-btn" onclick="window.changeTagQty(-1)">-</button>
                     <b id="tagQtyDisplay">0</b>
                     <button type="button" class="w95-btn icon-btn" onclick="window.changeTagQty(1)">+</button>
+                </div>
+                <div class="tag-edit-control-row" style="margin-top:6px;">
                     <button type="button" id="tagShowCountBtn" class="w95-btn tag-toggle-btn" onclick="window.toggleTagShowCount()">숫자</button>
                     <button type="button" id="tagMonthlyBtn" class="w95-btn tag-toggle-btn" onclick="window.toggleTagMonthly()">월별</button>
+                    <button type="button" id="tagCountSuffixBtn" class="w95-btn tag-toggle-btn" onclick="window.toggleTagShowQty()">갯수</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div id="tagRestoreModal" class="modal-overlay" style="z-index: 2650;">
+        <div class="modal-box w95-window" style="max-width: 250px;">
+            <div class="w95-titlebar"><span>삭제된 항목 복원</span><button type="button" class="w95-btn" onclick="window.closeTagRestoreModal()">X</button></div>
+            <div id="tagRestoreList" style="padding:10px; background:var(--w-gray); display:flex; flex-direction:column; gap:6px; max-height:300px; overflow-y:auto;"></div>
         </div>
     </div>
 

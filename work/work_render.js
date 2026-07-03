@@ -22,12 +22,8 @@ window.renderMain = () => {
             }
         });
 
-        let mOt = mLogs.reduce((s, c) => {
-            if (!c.ot) return s;
-            let parts = c.ot.split(':');
-            if (parts.length === 2) return s + (parseInt(parts[0] || 0) * 60 + parseInt(parts[1] || 0));
-            return s;
-        }, 0);
+        // OT는 이제 시간이 아니라 갯수 — 그냥 개수를 더한다(옛 시간 데이터인 log.ot는 집계에서 제외)
+        let mOt = mLogs.reduce((s, c) => s + (Number(c.otCount) || 0), 0);
 
         let mDuty = new Set(mLogs.filter(l => l.isDutyLog || l.cat === 'duty' || l.isDuty).map(l => l.d)).size;
 
@@ -39,14 +35,14 @@ window.renderMain = () => {
             <div class="month-card" onclick="window.openPop(${i})">
                 <b style="font-size:1.15rem;">${i}월<span style="font-size:0.85rem; color:var(--w-blue); margin-left:4px;">(${mWork}건)</span></b>
                 ${mStatusStr ? `<div class="m-stat" style="color:#0f766e; font-weight:bold; letter-spacing:0; margin-top:2px;">${mStatusStr}</div>` : ''}
-                <div class="m-stat" style="margin-top:4px;">🕒 ${Math.floor(mOt / 60)}:${(mOt % 60).toString().padStart(2, '0')} | 🎖️ ${mDuty}일</div>
+                <div class="m-stat" style="margin-top:4px;">🕒 OT ${mOt}회 | 🎖️ ${mDuty}일</div>
             </div>`;
     }
 
     let yStatusStr = Object.entries(yStatuses).filter(e => e[1] > 0).map(e => `${e[0]}:${e[1]}`).join(', ');
 
     document.getElementById('yearlySummary').innerHTML = `
-        [ ${window.currentYear}년 전체 누적 ] 📋 ${yWork}건 | 🕒 ${Math.floor(yOt / 60)}:${(yOt % 60).toString().padStart(2, '0')} | 🎖️ ${yDuty}일
+        [ ${window.currentYear}년 전체 누적 ] 📋 ${yWork}건 | 🕒 OT ${yOt}회 | 🎖️ ${yDuty}일
         ${yStatusStr ? `<br><span style="color:#0f766e;">상태: ${yStatusStr}</span>` : ''}
     `;
 
@@ -258,7 +254,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
             let eqStr = Object.entries(l.equips).filter(e => e[1] > 0).map(e => `${e[0]} ${e[1]}`).join(', ');
             if (eqStr) detailsHtml.push(`<div style="color:#0f766e; font-size:0.85rem; font-weight:bold;"><i class="fa-solid fa-box" style="width:16px;"></i> ${eqStr}</div>`);
         }
-        if (l.ot) detailsHtml.push(`<div style="color:#e11d48; font-size:0.85rem; font-weight:bold;"><i class="fa-solid fa-clock" style="width:16px;"></i> OT ${l.ot}</div>`);
+        if (l.otCount) detailsHtml.push(`<div style="color:#e11d48; font-size:0.85rem; font-weight:bold;"><i class="fa-solid fa-clock" style="width:16px;"></i> OT ${l.otCount}회</div>`);
         if (l.note) detailsHtml.push(`<div style="color:#d97706; font-size:0.85rem;"><i class="fa-solid fa-triangle-exclamation" style="width:16px;"></i> ${l.note}</div>`);
 
         // 시작/종료/총시간 (특수 그룹 — 태그 목록이 아니라 log.startTime/endTime/totalMin에 직접 저장)
@@ -509,16 +505,18 @@ window.renderCustomGroup = (groupId) => {
     const sel = window.activeCustomGroupSelections[groupId] || [];
     const tags = [...g.tags].sort((a, b) => (b.count || 0) - (a.count || 0));
     const showNumber = window.groupShowsNumber(groupId);
+    const showCount = window.groupShowsCount(groupId);
 
     let html = tags.map((t, idx) => {
         let activeCls = sel.includes(t.name) ? 'active-btn' : '';
         const numberPrefix = showNumber ? `[${window.getGroupTagMonthlyCount(groupId, t.name)}] ` : '';
+        const countSuffix = showCount ? ` (${t.count || 0})` : '';
         return `<button type="button" class="w95-btn ${activeCls}"
             onclick="window.toggleCustomGroupTag('${groupId}', '${t.name}')"
             oncontextmenu="event.preventDefault(); window.openTagEditBox('${groupId}', ${idx});"
-        >${numberPrefix}${t.name}</button>`;
+        >${numberPrefix}${t.name}${countSuffix}</button>`;
     }).join(' ');
-    html += `<button type="button" class="w95-btn" onclick="window.addNewType('${groupId}')"><b>+</b></button>`;
+    html += window.buildAddButtonHtml(groupId);
     el.innerHTML = html;
 };
 

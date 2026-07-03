@@ -322,6 +322,7 @@ window.toggleCustomGroupTag = (groupId, name) => {
     if (window.isWorkEditLocked) return;
     const g = window.getGroupById(groupId);
     if (!g) return;
+    if (!window.isGroupActive(groupId)) return; // 비활성 그룹은 선택 불가
 
     if (!window.activeCustomGroupSelections[groupId]) {
         window.activeCustomGroupSelections[groupId] = [];

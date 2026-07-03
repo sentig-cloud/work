@@ -31,11 +31,6 @@ window.formatTimeInput = (input) => {
     input.value = `${h}:${m}`;
 };
 
-window.formatOTInput = (input) => {
-    // OT 입력칸도 시간과 완전히 동일한 자동 변환(1430 -> 14:30) 적용 완료
-    window.formatTimeInput(input);
-};
-
 // 분(minute) 단위 총시간을 "H:MM" 문자열로 변환 (작업일지 시작/종료 총시간용)
 window.formatDurationMin = (min) => {
     const total = Math.max(0, Number(min) || 0);

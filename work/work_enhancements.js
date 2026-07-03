@@ -26,9 +26,12 @@
     const getMonthlyCount = (type, name) => window.getGroupTagMonthlyCount(window.typeToGroupId(type), name);
 
     const getTagLabel = (type, tag) => {
+        const groupId = window.typeToGroupId(type);
         const monthly = showsNumber(type) ? `[${getMonthlyCount(type, tag.name)}] ` : "";
         const qty = type === "equip" ? Number(window.activeEquips && window.activeEquips[tag.name] || 0) : 0;
-        return `${monthly}${tag.name}${qty > 0 ? ` (${qty})` : ""}`;
+        // 장비는 실제 선택된 수량이 있으면 그걸 우선 보여주고, 없으면 그룹의 "갯수" 설정을 따른다
+        const countSuffix = qty > 0 ? ` (${qty})` : (window.groupShowsCount(groupId) ? ` (${tag.count || 0})` : "");
+        return `${monthly}${tag.name}${countSuffix}`;
     };
 
     const tagButton = (type, tag, index, active) => `
@@ -41,6 +44,19 @@
             ontouchend="window.endPress(event,'${type}',${index})"
             ontouchcancel="window.cancelPress()">${esc(getTagLabel(type, tag))}</button>`;
 
+    // "+" 버튼: 짧게 탭하면 새 항목 추가(기존과 동일), 길게 누르면 그 그룹에서 삭제했던
+    // 항목을 다시 불러올 수 있는 복원 목록이 뜬다.
+    const addButtonHtml = (type, extraStyle) => `
+        <button type="button" class="w95-btn" style="${extraStyle || ""}"
+            onmousedown="window.startAddPress(event,'${type}')"
+            onmouseup="window.endAddPress(event,'${type}')"
+            onmouseleave="window.cancelAddPress()"
+            ontouchstart="window.startAddPress(event,'${type}')"
+            ontouchend="window.endAddPress(event,'${type}')"
+            ontouchcancel="window.cancelAddPress()"><b>+</b></button>`;
+    // work_render.js의 renderCustomGroup(다른 스코프)에서도 동일한 +버튼을 쓰기 위해 공개
+    window.buildAddButtonHtml = addButtonHtml;
+
     // ═══════════════════════════════════════════
     // 태그 렌더링
     // ═══════════════════════════════════════════
@@ -49,7 +65,7 @@
         const el = document.getElementById("taskTypeArea"); if (!el) return;
         el.innerHTML = window.taskTypes.map((t, i) =>
             tagButton("task", t, i, (window.activeTaskTypes || []).includes(t.name))
-        ).join("") + `<button type="button" class="w95-btn" onclick="window.addNewType('task')"><b>+</b></button>`;
+        ).join("") + addButtonHtml("task");
     };
 
     window.renderCoworkers = () => {
@@ -57,7 +73,7 @@
         const el = document.getElementById("coworkerArea"); if (!el) return;
         el.innerHTML = window.coworkers.map((c, i) =>
             tagButton("coworker", c, i, (window.selectedCoworkers || []).includes(c.name))
-        ).join("") + `<button type="button" class="w95-btn" onclick="window.addNewType('coworker')"><b>+</b></button>`;
+        ).join("") + addButtonHtml("coworker");
     };
 
     window.renderStatuses = () => {
@@ -65,13 +81,16 @@
         const el = document.getElementById("statusArea"); if (!el) return;
         el.innerHTML = window.statuses.map((s, i) =>
             tagButton("status", s, i, window.activeStatus === s.name)
-        ).join("") + `<button type="button" class="w95-btn" onclick="window.addNewType('status')"><b>+</b></button>`;
+        ).join("") + addButtonHtml("status");
     };
 
     window.renderEquips = () => {
+        (window.equipments = window.equipments || []).sort((a, b) => getSortCount(b) - getSortCount(a));
+        const showCount = window.groupShowsCount("equipments");
         const el = document.getElementById("equipArea"); if (!el) return;
-        el.innerHTML = (window.equipments || []).map((eq, i) => {
+        el.innerHTML = window.equipments.map((eq, i) => {
             const cnt = window.activeEquips && window.activeEquips[eq.name] || 0;
+            const suffix = cnt > 0 ? ` (${cnt})` : (showCount ? ` (${eq.count || 0})` : "");
             return `<button type="button" class="w95-btn layout-tag-button ${cnt > 0 ? "active-btn" : ""}"
                 data-tag-type="equip" data-tag-name="${esc(eq.name)}"
                 onmousedown="window.startPress(event,'equip',${i})"
@@ -79,8 +98,8 @@
                 onmouseleave="window.cancelPress()"
                 ontouchstart="window.startPress(event,'equip',${i})"
                 ontouchend="window.endPress(event,'equip',${i})"
-                ontouchcancel="window.cancelPress()">${esc(cnt > 0 ? `${eq.name} (${cnt})` : eq.name)}</button>`;
-        }).join("") + `<button type="button" class="w95-btn" onclick="window.addNewType('equip')"><b>+</b></button>`;
+                ontouchcancel="window.cancelPress()">${esc(`${eq.name}${suffix}`)}</button>`;
+        }).join("") + addButtonHtml("equip");
     };
 
     window.renderMemoTags = () => {
@@ -94,7 +113,7 @@
                 oncontextmenu="event.preventDefault();window.openTagEditBox('memoTag',${i});"
                 data-tag-type="memoTag" data-tag-name="${esc(t.name)}">${esc(t.name)}</button>`;
         }).join("") + (window.memoTags.length < 5
-            ? `<button type="button" class="w95-btn" style="height:30px;width:36px;" onclick="window.addNewType('memoTag')"><b>+</b></button>`
+            ? addButtonHtml("memoTag", "height:30px;width:36px;")
             : "");
     };
 
@@ -477,7 +496,7 @@
                 ["date", document.getElementById("workDateInput")?.parentElement, 2, 1],
                 ["time", document.getElementById("workTime"), 1, 1],
                 ["duty", document.getElementById("workDutyBtn"), 1, 1],
-                ["ot", document.getElementById("workOT"), 2, 1],
+                ["ot", document.getElementById("workOTBtn"), 2, 1],
                 ["taskNo", document.getElementById("taskNo"), 2, 1],
                 ["copy", document.getElementById("workCopyBtn"), 1, 1],
                 ["customer", document.getElementById("customerName"), 3, 1],
@@ -665,8 +684,8 @@
 
         groupEl.innerHTML = `
             <div id="boxTitle_${esc(groupId)}" class="box-title" title="길게 눌러 이름 변경"
-                onmousedown="window.startTitlePress(event, '${esc(groupId)}')" onmouseup="window.endTitlePress()" onmouseleave="window.endTitlePress()"
-                ontouchstart="window.startTitlePress(event, '${esc(groupId)}')" ontouchend="window.endTitlePress()" ontouchcancel="window.endTitlePress()"
+                onmousedown="window.startTitlePress(event, '${esc(groupId)}')" onmouseup="window.endTitlePress('${esc(groupId)}')" onmouseleave="window.cancelTitlePress()"
+                ontouchstart="window.startTitlePress(event, '${esc(groupId)}')" ontouchend="window.endTitlePress('${esc(groupId)}')" ontouchcancel="window.cancelTitlePress()"
                 >${esc(title.trim())}</div>
             <div id="customGroupArea_${esc(groupId)}" class="btn-tag-area"></div>
             <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>
@@ -906,6 +925,7 @@
 
     window.handleClick = (type, index) => {
         if (window.isWorkEditLocked) return;
+        if (!window.isGroupActive(window.typeToGroupId(type))) return; // 비활성 그룹은 선택 불가
         const tag = getTagArray(type)[index];
         if (!tag) return;
         if (document.activeElement && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) document.activeElement.blur();
@@ -945,10 +965,12 @@
         const qty = document.getElementById("tagQtyDisplay");
         const numberBtn = document.getElementById("tagShowCountBtn");
         const monthlyBtn = document.getElementById("tagMonthlyBtn");
+        const countBtn = document.getElementById("tagCountSuffixBtn");
         const groupId = window.typeToGroupId(window.editingTagType);
         if (qty) qty.innerText = String(window.tempTagQty || 0);
         if (numberBtn) numberBtn.className = `w95-btn tag-toggle-btn ${window.groupShowsNumber(groupId) ? "is-on" : "is-off"}`;
         if (monthlyBtn) monthlyBtn.className = `w95-btn tag-toggle-btn ${window.groupIncludesMonthly(groupId) ? "is-on" : "is-off"}`;
+        if (countBtn) countBtn.className = `w95-btn tag-toggle-btn ${window.groupShowsCount(groupId) ? "is-on" : "is-off"}`;
     };
 
     // 수량(+/-)은 태그 하나만의 값이라 즉시 반영 + 바로 저장
@@ -986,6 +1008,18 @@
         const g = window.getGroupById(groupId);
         if (!g) return;
         g.includeMonthly = !window.groupIncludesMonthly(groupId);
+        window.refreshTagEditControls();
+        window.markDirty?.("master", "groups", "upsert");
+        if (window.saveLocal) window.saveLocal();
+        window.renderChangedTagType(window.editingTagType);
+    };
+
+    // "갯수": 그룹 전체 설정 — 켜면 태그 이름 뒤에 (개수)가 붙는다(장비의 실사용 수량 표시와는 별개)
+    window.toggleTagShowQty = () => {
+        const groupId = window.typeToGroupId(window.editingTagType);
+        const g = window.getGroupById(groupId);
+        if (!g) return;
+        g.showCount = !window.groupShowsCount(groupId);
         window.refreshTagEditControls();
         window.markDirty?.("master", "groups", "upsert");
         if (window.saveLocal) window.saveLocal();
@@ -1070,11 +1104,95 @@
             window.activeCustomGroupSelections[groupId] = window.activeCustomGroupSelections[groupId].filter((i) => i !== tag.name);
         }
         arr.splice(window.editingTagIndex, 1);
+
+        // 삭제된 태그 보관 — "+" 버튼을 길게 눌러 나중에 복원할 수 있게 그룹당 최근 20개까지 보관.
+        // 같은 이름을 다시 삭제하면 오래된 기록 대신 최신 것으로 교체한다.
+        const g = window.getGroupById(groupId);
+        if (g) {
+            g.deletedTags = (g.deletedTags || []).filter((dt) => dt.name !== tag.name);
+            g.deletedTags.unshift({ name: tag.name, count: tag.count || 0 });
+            if (g.deletedTags.length > 20) g.deletedTags.length = 20;
+        }
+
         window.markDirty?.("master", "groups", "upsert");
         if (window.saveLocal) window.saveLocal();
         window.renderChangedTagType(type);
         if (window.renderMain) window.renderMain();
         window.closeTagEditModal();
+    };
+
+    // ─── "+" 버튼: 짧게 탭=추가, 길게 누르면 삭제했던 항목 복원 목록 ───
+    window.addPressTimer = null;
+    window.addPressLongPressed = false;
+
+    window.startAddPress = (event, type) => {
+        if (event) event.preventDefault();
+        window.addPressLongPressed = false;
+        clearTimeout(window.addPressTimer);
+        window.addPressTimer = setTimeout(() => {
+            window.addPressLongPressed = true;
+            if (navigator.vibrate) navigator.vibrate(30);
+            window.openTagRestoreModal(type);
+        }, 600);
+    };
+
+    window.endAddPress = (event, type) => {
+        if (event) event.preventDefault();
+        clearTimeout(window.addPressTimer);
+        if (window.addPressLongPressed) { window.addPressLongPressed = false; return; }
+        window.addNewType(type);
+    };
+
+    window.cancelAddPress = () => {
+        clearTimeout(window.addPressTimer);
+        window.addPressLongPressed = false;
+    };
+
+    window.editingRestoreType = null;
+
+    window.openTagRestoreModal = (type) => {
+        const groupId = window.typeToGroupId(type);
+        const g = window.getGroupById(groupId);
+        const deleted = (g && g.deletedTags) || [];
+        if (deleted.length === 0) {
+            alert("삭제된 항목이 없습니다.");
+            return;
+        }
+        window.editingRestoreType = type;
+        const listEl = document.getElementById("tagRestoreList");
+        listEl.innerHTML = deleted.map((dt, idx) => `
+            <button type="button" class="w95-btn" style="display:flex; justify-content:space-between; align-items:center;" onclick="window.restoreDeletedTag(${idx})">
+                <span>${esc(dt.name)}</span><span style="color:var(--w-blue); font-weight:bold;">복원</span>
+            </button>
+        `).join("");
+        document.getElementById("tagRestoreModal").style.display = "flex";
+    };
+
+    window.closeTagRestoreModal = () => {
+        document.getElementById("tagRestoreModal").style.display = "none";
+        window.editingRestoreType = null;
+    };
+
+    window.restoreDeletedTag = (idx) => {
+        const type = window.editingRestoreType;
+        const groupId = window.typeToGroupId(type);
+        const g = window.getGroupById(groupId);
+        if (!g || !g.deletedTags) return;
+        const entry = g.deletedTags[idx];
+        if (!entry) return;
+
+        const arr = getTagArray(type);
+        if (arr.some((t) => t.name === entry.name)) {
+            alert(`"${entry.name}" 항목이 이미 있습니다.`);
+            return;
+        }
+
+        arr.push({ name: entry.name, count: entry.count || 0 });
+        g.deletedTags.splice(idx, 1);
+        window.markDirty?.("master", "groups", "upsert");
+        if (window.saveLocal) window.saveLocal();
+        window.renderChangedTagType(type);
+        window.closeTagRestoreModal();
     };
 
     window.addNewType = (type) => {
@@ -1110,12 +1228,13 @@
     // Undo 스택 (완전판 - 태그/이미지/당직 포함)
     // ═══════════════════════════════════════════
     const snapshotWorkDraftFull = () => {
-        const ids = ["workDateInput", "workTime", "taskNo", "customerName", "workAddress", "workContent", "workNote", "workOT"];
+        const ids = ["workDateInput", "workTime", "taskNo", "customerName", "workAddress", "workContent", "workNote"];
         const fields = {};
         ids.forEach((id) => { const el = document.getElementById(id); if (el) fields[id] = el.value; });
         return {
             fields,
             isWorkDuty: !!window.isWorkDuty,
+            workOTCount: Number(window.workOTCount) || 0,
             workStartTime: window.workStartTime || null,
             workEndTime: window.workEndTime || null,
             activeTaskTypes: JSON.parse(JSON.stringify(window.activeTaskTypes || [])),
@@ -1151,6 +1270,7 @@
             if (el) el.value = value;
         });
         window.isWorkDuty = snapshot.isWorkDuty;
+        window.workOTCount = Number(snapshot.workOTCount) || 0;
         window.workStartTime = snapshot.workStartTime || null;
         window.workEndTime = snapshot.workEndTime || null;
         window.activeTaskTypes = snapshot.activeTaskTypes;
@@ -1169,6 +1289,7 @@
             duty.classList.toggle("active-btn", window.isWorkDuty);
         }
         window.renderWorkDuration && window.renderWorkDuration();
+        window.renderWorkOT && window.renderWorkOT();
         window.renderTaskTypes && window.renderTaskTypes();
         window.renderCoworkers && window.renderCoworkers();
         window.renderEquips && window.renderEquips();

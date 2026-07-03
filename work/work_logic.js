@@ -185,7 +185,7 @@ window.getWorkDraftText = () => {
     const address = document.getElementById("workAddress")?.value.trim() || "";
     const content = document.getElementById("workContent")?.value.trim() || "";
     const note = document.getElementById("workNote")?.value.trim() || "";
-    const ot = document.getElementById("workOT")?.value.trim() || "";
+    const otCount = Number(window.workOTCount) || 0;
     const equips = Object.entries(window.activeEquips || {})
         .filter((entry) => Number(entry[1]) > 0)
         .map((entry) => `${entry[0]} ${entry[1]}`)
@@ -204,7 +204,7 @@ window.getWorkDraftText = () => {
         equips ? `장비: ${equips}` : "",
         content ? `내용: ${content}` : "",
         note ? `특이사항: ${note}` : "",
-        ot ? `OT: ${ot}` : "",
+        otCount ? `OT: ${otCount}회` : "",
         window.isWorkDuty ? "당직: O" : "",
         (window.workStartTime || window.workEndTime)
             ? `시작/종료: ${window.workStartTime || "--:--"} ~ ${window.workEndTime || "--:--"}` +
@@ -316,19 +316,13 @@ window.saveWorkLog = async () => {
             workTime = window.getCurrentTimeString();
         }
 
-        const otInput = document.getElementById("workOT");
-
-        if (otInput) {
-            window.formatOTInput(otInput);
-        }
-
         const taskNo = document.getElementById("taskNo").value;
         const customerName = document.getElementById("customerName").value.trim();
         const addressElement = document.getElementById("workAddress");
         const address = addressElement ? addressElement.value.trim() : "";
         const content = document.getElementById("workContent").value;
         const note = document.getElementById("workNote").value;
-        const ot = document.getElementById("workOT").value.trim();
+        const otCount = Number(window.workOTCount) || 0;
         const id = window.currentWorkId || Date.now().toString();
         const dateValue = document.getElementById("workDateInput").value;
 
@@ -376,7 +370,9 @@ window.saveWorkLog = async () => {
             taskType: window.activeTaskTypes.join(", "),
             content,
             note,
-            ot,
+            // OT는 시간(HH:MM)이 아니라 갯수로 관리한다 — 기존 시간 데이터(log.ot)는 건드리지 않고
+            // 새 필드(otCount)로 분리해서, 옛 기록을 갯수로 잘못 해석하는 일이 없게 한다.
+            otCount,
             status: window.activeStatus,
             personalCheck: existingCheck,
             coworkers: [...window.selectedCoworkers],

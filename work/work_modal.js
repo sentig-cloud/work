@@ -149,6 +149,65 @@ window.saveDurationTimeEdit = () => {
     window.closeDurationTimeEditModal();
 };
 
+// ─── OT: 시간이 아니라 몇 번 했는지 세는 숫자 — 짧게 탭하면 +1, 길게 누르면 직접 입력 ───
+window.renderWorkOT = () => {
+    const btn = document.getElementById('workOTBtn');
+    if (!btn) return;
+    const count = Number(window.workOTCount) || 0;
+    btn.innerHTML = count > 0
+        ? `OT <span style="text-decoration:underline; text-decoration-color:var(--w-blue); text-decoration-thickness:2px; text-underline-offset:2px;">${count}</span>`
+        : 'OT';
+};
+
+window.workOTPressTimer = null;
+window.workOTLongPressed = false;
+
+window.startOTPress = (event) => {
+    if (window.isWorkEditLocked) return;
+    if (event) event.preventDefault();
+    window.workOTLongPressed = false;
+    clearTimeout(window.workOTPressTimer);
+    window.workOTPressTimer = setTimeout(() => {
+        window.workOTLongPressed = true;
+        if (navigator.vibrate) navigator.vibrate(30);
+        window.openOTEditModal();
+    }, 600);
+};
+
+window.endOTPress = (event) => {
+    if (event) event.preventDefault();
+    clearTimeout(window.workOTPressTimer);
+    if (window.workOTLongPressed) { window.workOTLongPressed = false; return; }
+    window.pushWorkUndo && window.pushWorkUndo();
+    window.workOTCount = (Number(window.workOTCount) || 0) + 1;
+    window.renderWorkOT();
+};
+
+window.cancelOTPress = () => {
+    clearTimeout(window.workOTPressTimer);
+    window.workOTLongPressed = false;
+};
+
+window.openOTEditModal = () => {
+    const input = document.getElementById('otEditInput');
+    input.value = String(Number(window.workOTCount) || 0);
+    document.getElementById('otEditModal').style.display = 'flex';
+    setTimeout(() => { input.focus(); input.select(); }, 50);
+};
+
+window.closeOTEditModal = () => {
+    document.getElementById('otEditModal').style.display = 'none';
+};
+
+window.saveOTEdit = () => {
+    const input = document.getElementById('otEditInput');
+    const value = Math.max(0, parseInt(input.value, 10) || 0);
+    window.pushWorkUndo && window.pushWorkUndo();
+    window.workOTCount = value;
+    window.renderWorkOT();
+    window.closeOTEditModal();
+};
+
 window.updateWorkDateLabel = () => {
     const dateVal = document.getElementById('workDateInput').value;
     const labelEl = document.getElementById('workDayLabel');
@@ -169,6 +228,7 @@ window.applyCustomTitles = () => {
     window.getAllGroupsSorted().forEach(g => {
         const el = document.getElementById('boxTitle_' + g.id);
         if (el) el.innerText = g.title;
+        window.applyGroupActiveStyle(g.id);
     });
 
     // 날짜/시간/당직 등 고정 필드 그룹(basicFields)은 groups 데이터가 아니라 별도 키로 저장
@@ -194,14 +254,52 @@ window.applyCustomTitles = () => {
 };
 
 window.titlePressTimer = null;
+window.titleLongPressed = false;
+
 window.startTitlePress = (e, id) => {
     e.preventDefault();
+    window.titleLongPressed = false;
+    clearTimeout(window.titlePressTimer);
     window.titlePressTimer = setTimeout(() => {
+        window.titleLongPressed = true;
         if (navigator.vibrate) navigator.vibrate(30);
         window.renameBoxTitle(id);
     }, 600);
 };
-window.endTitlePress = () => { clearTimeout(window.titlePressTimer); };
+
+// 짧게 탭하면(롱프레스가 안 일어났으면) 이름변경이 아니라 그 그룹의 활성/비활성을 토글한다
+window.endTitlePress = (id) => {
+    clearTimeout(window.titlePressTimer);
+    if (window.titleLongPressed) { window.titleLongPressed = false; return; }
+    if (id) window.toggleGroupActive(id);
+};
+
+window.cancelTitlePress = () => {
+    clearTimeout(window.titlePressTimer);
+    window.titleLongPressed = false;
+};
+
+// 시작/종료(duration)와 기본그룹(basicFields, 실제 groups 항목이 아님)은 활성/비활성 대상에서 제외
+window.toggleGroupActive = (id) => {
+    if (id === 'duration') return;
+    const g = window.getGroupById(id);
+    if (!g) return;
+    g.active = !window.isGroupActive(id);
+    window.markDirty?.('master', 'groups', 'upsert');
+    if (window.saveLocal) window.saveLocal();
+    window.applyGroupActiveStyle(id);
+    if (window.WorkExportUI && document.getElementById('exportConfigLayer')?.style.display === 'flex') {
+        window.WorkExportUI.render();
+    }
+};
+
+// 활성=기존 파란색, 비활성=대비되는 빨간색으로 그룹명 색을 바꿔 한눈에 상태를 알 수 있게 함
+window.applyGroupActiveStyle = (id) => {
+    if (id === 'duration' || id === 'basicFields') return;
+    const el = document.getElementById('boxTitle_' + id);
+    if (!el) return;
+    el.style.color = window.isGroupActive(id) ? 'var(--w-blue)' : '#dc2626';
+};
 
 window.renameBoxTitle = (id) => {
     const el = document.getElementById('boxTitle_' + id);
@@ -352,7 +450,7 @@ window.openWorkModal = (id = null) => {
         const addrEl = document.getElementById('workAddress'); if (addrEl) addrEl.value = log.address || "";
         document.getElementById('workContent').value = log.content || "";
         document.getElementById('workNote').value = log.note || "";
-        document.getElementById('workOT').value = log.ot || "";
+        window.workOTCount = Number(log.otCount) || 0;
         window.activeStatus = log.status || null;
         if (log.coworkers) window.selectedCoworkers = [...log.coworkers];
         if (log.imgs) window.workImgs = [...log.imgs];
@@ -375,7 +473,7 @@ window.openWorkModal = (id = null) => {
         const addrEl = document.getElementById('workAddress'); if (addrEl) addrEl.value = "";
         document.getElementById('workContent').value = "";
         const noteEl = document.getElementById('workNote'); if (noteEl) noteEl.value = "";
-        document.getElementById('workOT').value = "";
+        window.workOTCount = 0;
         const todayLogs = window.logs.filter(l => l.y === window.currentYear && l.m === window.curMonth && l.d === window.curDay);
         window.isWorkDuty = todayLogs.some(l => l.cat === 'work' && l.isDuty);
 
@@ -395,6 +493,7 @@ window.openWorkModal = (id = null) => {
     const dutyBtn = document.getElementById('workDutyBtn');
     if (window.isWorkDuty) { dutyBtn.style.color = 'red'; dutyBtn.classList.add('active-btn'); }
     else { dutyBtn.style.color = 'var(--w-black)'; dutyBtn.classList.remove('active-btn'); }
+    window.renderWorkOT();
 
     window.updateRememberModeBtn && window.updateRememberModeBtn();
     window.refreshRememberDots && window.refreshRememberDots();

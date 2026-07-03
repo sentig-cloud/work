@@ -16,6 +16,7 @@ window.WorkExportUI = {
         { id: 'note',      name: '특이사항',   customName: '특이사항' },
         { id: 'equips',    name: '장비/KM',    customName: '장비/KM' },
         { id: 'duty',      name: '당직여부',   customName: '당직여부' },
+        { id: 'otCount',   name: 'OT',         customName: 'OT' },
         { id: 'durationStart', name: '시작시간', customName: '시작시간' },
         { id: 'durationEnd',   name: '종료시간', customName: '종료시간' },
         { id: 'durationTotal', name: '총시간',   customName: '총시간' },
@@ -53,7 +54,20 @@ window.WorkExportUI = {
                 }
             });
         }
-        return cols;
+
+        // 비활성 그룹(active=false)은 선택 자체를 못 하므로 내보내기 목록에서도 완전히 뺀다
+        // (기본 제공 그룹은 고정 컬럼 id로 매핑, 커스텀 그룹은 groupId로 바로 확인)
+        const builtInColumnGroupId = {
+            taskType: 'taskTypes',
+            coworkers: 'coworkers',
+            status: 'statuses',
+            equips: 'equipments'
+        };
+        return cols.filter(col => {
+            const groupId = col.groupId || builtInColumnGroupId[col.id];
+            if (!groupId) return true;
+            return window.isGroupActive ? window.isGroupActive(groupId) : true;
+        });
     },
 
     state: {
