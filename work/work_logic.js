@@ -1042,6 +1042,15 @@ window.handleGeneralFiles = (input) => {
     input.value = "";
 };
 
+// 빠른입력 미리보기(previewArea)의 X 버튼이 호출하는데 정의가 아예 빠져 있어서
+// 눌러도 아무 반응 없이 사진이 안 지워지던 버그 — 함수를 추가한다.
+window.removeTemp = (id) => {
+    window.tempImgs = (window.tempImgs || []).filter((img) => img.id !== id);
+    if (window.renderTempImgs) {
+        window.renderTempImgs();
+    }
+};
+
 window.handleWorkFiles = (input) => {
     if (!input.files || input.files.length === 0) {
         return;
@@ -1132,4 +1141,19 @@ window.addFilesToEdit = (input) => {
     });
 
     input.value = "";
+};
+
+// 메모/사진 편집창의 X 버튼이 호출하는데 정의가 아예 빠져 있어서
+// 눌러도 아무 반응 없이 사진이 안 지워지던 버그 — 함수를 추가한다.
+// "저장" 버튼(saveEditLog)을 눌러야 실제로 커밋되는 건 메모/태그 수정과 동일하다.
+window.removePhotoFromEdit = (idx) => {
+    const log = window.logs.find((item) => item.id === window.editingLogId);
+    if (!log || !log.imgs) {
+        return;
+    }
+    log.imgs.splice(idx, 1);
+    log.updatedAt = new Date().toISOString();
+    if (window.renderEditPhotoGrid) {
+        window.renderEditPhotoGrid();
+    }
 };

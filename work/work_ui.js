@@ -234,8 +234,26 @@ window.startMicFor = (inputId, btnId) => {
         for (let i = evt.resultIndex; i < evt.results.length; ++i) { if (evt.results[i].isFinal) finalTranscript += evt.results[i][0].transcript + ' '; }
         if (finalTranscript.trim() !== '') { let targetInput = document.getElementById(inputId); targetInput.value = (targetInput.value + " " + finalTranscript).trim(); }
     };
-    window.globalRecognition.onend = window.stopMicUI; window.globalRecognition.onerror = window.stopMicUI;
-    window.globalRecognition.start(); window.isMicOn = true; window.activeInputId = inputId; window.activeMicBtnId = btnId;
+    window.globalRecognition.onend = window.stopMicUI;
+    // 예전엔 실패 이유를 그냥 버리고 조용히 꺼버려서, 마이크 버튼이 눌렀다가 바로 꺼지기만 하고
+    // 왜 안 되는지 전혀 알 수 없었음(특히 마이크 권한이 막힌 경우가 흔한 원인) — 원인을 알려준다.
+    window.globalRecognition.onerror = (evt) => {
+        console.warn('음성 인식 오류:', evt && evt.error);
+        if (evt && (evt.error === 'not-allowed' || evt.error === 'service-not-allowed')) {
+            alert('마이크 권한이 없어 음성 인식을 시작할 수 없습니다. 브라우저(또는 이 화면을 띄운 앱)의 마이크 권한을 확인해주세요.');
+        } else if (evt && evt.error && evt.error !== 'aborted' && evt.error !== 'no-speech') {
+            alert('음성 인식 중 오류가 발생했습니다: ' + evt.error);
+        }
+        window.stopMicUI();
+    };
+    try {
+        window.globalRecognition.start();
+    } catch (err) {
+        console.warn('음성 인식 시작 실패:', err);
+        window.stopMicUI();
+        return;
+    }
+    window.isMicOn = true; window.activeInputId = inputId; window.activeMicBtnId = btnId;
     let btn = document.getElementById(btnId); btn.classList.add('active-btn'); btn.style.color = 'var(--sun)';
 };
 
