@@ -365,6 +365,14 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
 .layout-edit-mode .work-layout-order-btn { display: inline-flex; }
 .layout-edit-mode .work-layout-group-btn { display: inline-flex; }
 .layout-edit-mode .work-layout-ungroup-btn { display: inline-flex; }
+.layout-edit-mode.delete-group-mode #workDragContainer > .drag-item[data-custom-group="1"] {
+    cursor: no-drop;
+    outline: 2px dashed #dc2626;
+    outline-offset: -3px;
+}
+.layout-edit-mode.delete-group-mode #workDragContainer > .drag-item[data-custom-group="1"] .box-title {
+    color: #dc2626 !important;
+}
 .layout-edit-mode .work-layout-remember-btn { display: inline-flex; }
 /* 온/오프 스위치처럼 눌려있을 때(켜짐) 색이 확실히 바뀌게 */
 .work-layout-remember-btn.active-btn { color: var(--w-white); }

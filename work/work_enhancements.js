@@ -281,10 +281,21 @@
 
         // 순서 모드도 기억 선택 모드도 아니면 그룹(블록) 탭은 아무 동작도 하지 않는다 —
         // 개별 객체(칸) 선택/이동/리사이즈는 initInnerReorderListeners가 별도로 계속 담당한다.
-        if (!window.isOrderMode && !window.isRememberSelectMode) return;
+        if (!window.isOrderMode && !window.isRememberSelectMode && !window.isDeleteGroupMode) return;
 
         const modal = document.getElementById("workModal");
         if (!modal || !modal.contains(e.target)) return;
+
+        // 삭제 모드: 편집모드를 나갈 때까지 유지되며, 탭한 커스텀 그룹을 바로 삭제한다.
+        if (window.isDeleteGroupMode) {
+            const groupEl = e.target.closest("#workDragContainer > .drag-item[data-group-ref]");
+            if (groupEl) {
+                e.preventDefault();
+                e.stopPropagation();
+                deleteGroupBlock(groupEl);
+            }
+            return;
+        }
 
         // 기억 선택 모드: 탭한 그룹의 기억 on/off만 토글하고 끝(이동/하이라이트 없음)
         if (window.isRememberSelectMode) {
@@ -326,6 +337,19 @@
             return;
         }
         window.markDirty?.("master", "groups", "upsert");
+
+        // 삭제 의미를 명확히 하기 위해 기존 일지/휴지통의 해당 커스텀 그룹 값과
+        // 집계 제외 참조도 함께 정리한다. group-delete 저장은 전체 스냅샷으로 동기화된다.
+        [...(window.logs || []), ...(window.trash || [])].forEach(log => {
+            if (log?.customGroups && Object.prototype.hasOwnProperty.call(log.customGroups, groupId)) {
+                delete log.customGroups[groupId];
+                log.updatedAt = new Date().toISOString();
+            }
+            if (Array.isArray(log?.excludedGroups)) {
+                log.excludedGroups = log.excludedGroups.filter(id => id !== groupId);
+            }
+        });
+        if (window.activeCustomGroupSelections) delete window.activeCustomGroupSelections[groupId];
 
         groupEl.remove();
         deselectBlock();
@@ -587,6 +611,13 @@
             deselectBlock();
             window.saveWorkLayout();
             window.applyWorkLayout();
+            window.isDeleteGroupMode = false;
+            window.isOrderMode = false;
+            window.isRememberSelectMode = false;
+            document.getElementById("workLayoutUngroupBtn")?.classList.remove("active-btn");
+            document.getElementById("workLayoutOrderBtn")?.classList.remove("active-btn");
+            document.getElementById("workRememberModeBtn")?.classList.remove("active-btn");
+            document.getElementById("workModal")?.classList.remove("order-mode", "delete-group-mode");
         }
 
         modal?.classList.toggle("layout-edit-mode", window.isWorkLayoutMode);
@@ -681,6 +712,7 @@
         groupEl.className = "drag-item w95-in";
         groupEl.dataset.id = groupId;
         groupEl.dataset.groupRef = groupId;
+        groupEl.dataset.customGroup = "1";
         setBlockSize(groupEl, GRID_COLS, 1);
 
         groupEl.innerHTML = `
@@ -709,17 +741,26 @@
         if (window.saveLocal) window.saveLocal("group-add");
     };
 
-    window.ungroupSelectedBlock = () => {
+    window.isDeleteGroupMode = false;
+    window.toggleDeleteGroupMode = () => {
         if (!window.isWorkLayoutMode) {
             alert("레이아웃 편집 모드에서 사용하세요.");
             return;
         }
-        if (!selectedBlock || !selectedBlock.el.dataset.groupRef) {
-            alert("삭제할 그룹(선택 태그 상자)을 탭해서 선택한 뒤 그룹- 을 누르세요.");
-            return;
+        window.isDeleteGroupMode = !window.isDeleteGroupMode;
+        if (window.isDeleteGroupMode) {
+            window.isOrderMode = false;
+            window.isRememberSelectMode = false;
         }
-        deleteGroupBlock(selectedBlock.el);
+        deselectBlock();
+        document.getElementById("workLayoutUngroupBtn")?.classList.toggle("active-btn", window.isDeleteGroupMode);
+        document.getElementById("workLayoutOrderBtn")?.classList.toggle("active-btn", window.isOrderMode);
+        document.getElementById("workRememberModeBtn")?.classList.toggle("active-btn", window.isRememberSelectMode);
+        document.getElementById("workModal")?.classList.toggle("delete-group-mode", window.isDeleteGroupMode);
     };
+
+    // 이전 마크업/호출과의 호환
+    window.ungroupSelectedBlock = window.toggleDeleteGroupMode;
 
     // ─── 순서 모드 토글 ───
     // 켜면: 객체(칸) 선택은 막히고 그룹(블록) 전체만 선택 가능 — 그 상태에서 이동(⠿)만 허용.
@@ -732,9 +773,13 @@
             return;
         }
         window.isOrderMode = !window.isOrderMode;
-        if (window.isOrderMode) window.isRememberSelectMode = false;
+        if (window.isOrderMode) {
+            window.isRememberSelectMode = false;
+            window.isDeleteGroupMode = false;
+        }
         deselectBlock();
         document.getElementById("workLayoutOrderBtn")?.classList.toggle("active-btn", window.isOrderMode);
+        document.getElementById("workLayoutUngroupBtn")?.classList.toggle("active-btn", window.isDeleteGroupMode);
         document.getElementById("workModal")?.classList.toggle("order-mode", window.isOrderMode);
         window.updateRememberModeBtn();
     };
@@ -750,9 +795,13 @@
             return;
         }
         window.isRememberSelectMode = !window.isRememberSelectMode;
-        if (window.isRememberSelectMode) window.isOrderMode = false;
+        if (window.isRememberSelectMode) {
+            window.isOrderMode = false;
+            window.isDeleteGroupMode = false;
+        }
         deselectBlock();
         document.getElementById("workLayoutOrderBtn")?.classList.toggle("active-btn", window.isOrderMode);
+        document.getElementById("workLayoutUngroupBtn")?.classList.toggle("active-btn", window.isDeleteGroupMode);
         document.getElementById("workModal")?.classList.toggle("order-mode", window.isOrderMode);
         window.updateRememberModeBtn();
     };

@@ -78,9 +78,11 @@ window.saveAllLocalOnly = function () {
     window.trash = (window.trash || []).filter(Boolean);
     window.groups = (window.groups || []).filter(Boolean);
 
+    // 사용자 정의 선택상자 정의를 먼저 기록한다. 사진이 많은 로그 저장 중 용량 오류가 나더라도
+    // 새 그룹 정의가 통째로 유실되는 문제를 막는다.
+    localStorage.setItem("wm_groups", JSON.stringify(window.groups));
     window.saveArrayToLocal("logs", window.logs);
     window.saveArrayToLocal("trash", window.trash);
-    localStorage.setItem("wm_groups", JSON.stringify(window.groups));
 
     // v1 하위 호환 키도 업데이트 (구 코드 참조 대비)
     window.saveArrayToLocal("taskTypes", window.taskTypes);
