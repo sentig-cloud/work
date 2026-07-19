@@ -227,7 +227,6 @@ window.activeCustomGroupSelections = {};
 // 현재 편집 중인 작업일지에서 집계 제외한 그룹 ID 목록.
 // 값이 없는 기존 로그는 모두 포함으로 처리한다.
 window.currentWorkExcludedGroups = [];
-window.currentWorkIncludedGroups = [];
 
 window.tempEquipQty = 0;
 window.tempImgs = [];
@@ -350,16 +349,11 @@ window.groupIncludesMonthly = function (groupId) {
 };
 
 window.isLogGroupExcluded = function (log, groupId) {
-    if (!log) return !window.isGroupActive(groupId);
-    if (Array.isArray(log.includedGroups) && log.includedGroups.includes(groupId)) return false;
-    if (Array.isArray(log.excludedGroups) && log.excludedGroups.includes(groupId)) return true;
-    return !window.isGroupActive(groupId);
+    return !!log && Array.isArray(log.excludedGroups) && log.excludedGroups.includes(groupId);
 };
 
 window.isCurrentWorkGroupExcluded = function (groupId) {
-    if (Array.isArray(window.currentWorkIncludedGroups) && window.currentWorkIncludedGroups.includes(groupId)) return false;
-    if (Array.isArray(window.currentWorkExcludedGroups) && window.currentWorkExcludedGroups.includes(groupId)) return true;
-    return !window.isGroupActive(groupId);
+    return Array.isArray(window.currentWorkExcludedGroups) && window.currentWorkExcludedGroups.includes(groupId);
 };
 
 // 태그 이름 뒤에 (갯수) 접미사를 붙일지 — 새 기능이라 기존 설치와의 호환을 위해 기본값은 false
@@ -370,8 +364,7 @@ window.groupShowsCount = function (groupId) {
 
 // 그룹 활성/비활성 — 비활성이어도 상자는 계속 보이되 선택 불가 + 내보내기 컬럼에서 제외됨
 window.isGroupActive = function (groupId) {
-    const g = window.getGroupById(groupId);
-    return !g || g.active !== false;
+    return true;
 };
 
 // 그룹의 "월별 집계 포함" 설정을 반영한, 이번 달 기준 태그 선택 횟수(또는 장비 수량 합)

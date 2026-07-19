@@ -186,6 +186,9 @@ window.updateUI = () => {
 };
 
 window.getLogCardHtml = (l, indexStr = '') => {
+    const excludedCardStyle = (groupId) => window.isLogGroupExcluded?.(l, groupId)
+        ? 'color:#dc2626 !important; text-decoration:line-through; text-decoration-color:#dc2626; text-decoration-thickness:2px;'
+        : '';
     let statusClass = '';
     if (l.status === '완료') statusClass = 'status-completed';
     else if (l.status === '취소') statusClass = 'status-canceled';
@@ -246,17 +249,17 @@ window.getLogCardHtml = (l, indexStr = '') => {
     if (isCommuteDetailCard || isCommuteCard || isMemoOrPhoto) taskNoHtml = '';
 
     if (l.cat === 'work') {
-        seqHtml = indexStr ? `<div class="log-seq" style="padding: 8px 96px 0 12px; font-size:1.1rem; line-height:1.35; word-break:break-word; color:red; font-weight:bold;">No.${indexStr} <span style="font-size:0.9rem; color:var(--w-black); font-weight:900;">[${l.taskType || '기본'}]</span></div>` : '';
+        seqHtml = indexStr ? `<div class="log-seq" style="padding: 8px 96px 0 12px; font-size:1.1rem; line-height:1.35; word-break:break-word; color:red; font-weight:bold;">No.${indexStr} <span style="font-size:0.9rem; color:var(--w-black); font-weight:900; ${excludedCardStyle('taskTypes')}">[${l.taskType || '기본'}]</span></div>` : '';
 
         let dutyBadge = l.isDuty ? `<span style="color:red; font-weight:bold; margin-right:4px;">[당직]</span>` : '';
-        let statusBadge = l.status ? `<span style="background:var(--w-blue); color:white; padding:1px 4px; font-size:0.75rem; border-radius:2px; margin-right:4px;">${l.status}</span>` : '';
+        let statusBadge = l.status ? `<span style="background:var(--w-blue); color:white; padding:1px 4px; font-size:0.75rem; border-radius:2px; margin-right:4px; ${excludedCardStyle('statuses')}">${l.status}</span>` : '';
 
         let detailsHtml = [];
         if (l.address) detailsHtml.push(`<div style="color:#475569; font-size:0.85rem;"><i class="fa-solid fa-map-marker-alt" style="width:16px;"></i> ${l.address}</div>`);
         if (l.customerName) detailsHtml.push(`<div style="color:#6366f1; font-size:0.85rem; font-weight:bold;"><i class="fa-solid fa-user" style="width:16px;"></i> ${l.customerName}</div>`);
         if (l.equips) {
             let eqStr = Object.entries(l.equips).filter(e => e[1] > 0).map(e => `${e[0]} ${e[1]}`).join(', ');
-            if (eqStr) detailsHtml.push(`<div style="color:#0f766e; font-size:0.85rem; font-weight:bold;"><i class="fa-solid fa-box" style="width:16px;"></i> ${eqStr}</div>`);
+            if (eqStr) detailsHtml.push(`<div style="color:#0f766e; font-size:0.85rem; font-weight:bold; ${excludedCardStyle('equipments')}"><i class="fa-solid fa-box" style="width:16px;"></i> ${eqStr}</div>`);
         }
         if (l.otCount) detailsHtml.push(`<div style="color:#e11d48; font-size:0.85rem; font-weight:bold;"><i class="fa-solid fa-clock" style="width:16px;"></i> OT</div>`);
         if (l.note) detailsHtml.push(`<div style="color:#d97706; font-size:0.85rem;"><i class="fa-solid fa-triangle-exclamation" style="width:16px;"></i> ${l.note}</div>`);
@@ -275,12 +278,12 @@ window.getLogCardHtml = (l, indexStr = '') => {
             const val = l.customGroups && l.customGroups[g.id];
             if (val && (Array.isArray(val) ? val.length > 0 : val)) {
                 const valStr = Array.isArray(val) ? val.join(', ') : String(val);
-                detailsHtml.push(`<div style="color:#7c3aed; font-size:0.85rem; font-weight:bold;"><i class="fa-solid fa-tag" style="width:16px;"></i> [${g.title}] ${valStr}</div>`);
+                detailsHtml.push(`<div style="color:#7c3aed; font-size:0.85rem; font-weight:bold; ${excludedCardStyle(g.id)}"><i class="fa-solid fa-tag" style="width:16px;"></i> [${g.title}] ${valStr}</div>`);
             }
         });
 
         if (l.coworkers && l.coworkers.length > 0) {
-            bottomManagerHtml = `<div style="color:var(--w-blue); font-size:0.8rem; font-weight:bold;"><i class="fa-solid fa-user-group"></i> ${l.coworkers.join(', ')}</div>`;
+            bottomManagerHtml = `<div style="color:var(--w-blue); font-size:0.8rem; font-weight:bold; ${excludedCardStyle('coworkers')}"><i class="fa-solid fa-user-group"></i> ${l.coworkers.join(', ')}</div>`;
         }
 
         workDetailsHtml = `

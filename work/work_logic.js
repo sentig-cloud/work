@@ -389,8 +389,7 @@ window.saveWorkLog = async () => {
                 ? { ...window.activeCustomGroupSelections }
                 : undefined,
             // 그룹별 집계 포함/제외는 이 작업일지에만 적용한다.
-            excludedGroups: [...(window.currentWorkExcludedGroups || [])],
-            includedGroups: [...(window.currentWorkIncludedGroups || [])]
+            excludedGroups: [...(window.currentWorkExcludedGroups || [])]
         };
 
         const index = window.logs.findIndex((log) => log.id === id);

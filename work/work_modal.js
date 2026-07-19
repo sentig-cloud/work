@@ -230,11 +230,11 @@ window.startTitlePress = (e, id) => {
     e.preventDefault();
     window.titleLongPressed = false;
     clearTimeout(window.titlePressTimer);
+    if (!window.isWorkLayoutMode) return;
     window.titlePressTimer = setTimeout(() => {
         window.titleLongPressed = true;
         if (navigator.vibrate) navigator.vibrate(30);
-        if (window.isWorkLayoutMode) window.renameBoxTitle(id);
-        else window.toggleGroupActive(id);
+        window.renameBoxTitle(id);
     }, 600);
 };
 
@@ -250,33 +250,17 @@ window.cancelTitlePress = () => {
     window.titleLongPressed = false;
 };
 
-// 시작/종료(duration)와 기본그룹(basicFields, 실제 groups 항목이 아님)은 활성/비활성 대상에서 제외
-window.toggleGroupActive = (id) => {
-    if (id === 'duration') return;
-    const g = window.getGroupById(id);
-    if (!g) return;
-    g.active = !window.isGroupActive(id);
-    window.markDirty?.('master', 'groups', 'upsert');
-    if (window.saveLocal) window.saveLocal();
-    window.applyGroupActiveStyle(id);
-    if (window.WorkExportUI && document.getElementById('exportConfigLayer')?.style.display === 'flex') {
-        window.WorkExportUI.render();
-    }
-};
-
 // 활성=기존 파란색, 비활성=대비되는 빨간색으로 그룹명 색을 바꿔 한눈에 상태를 알 수 있게 함
 window.applyGroupActiveStyle = (id) => {
     if (id === 'duration' || id === 'basicFields') return;
     const el = document.getElementById('boxTitle_' + id);
     if (!el) return;
-    const defaultExcluded = !window.isGroupActive(id);
     const logExcluded = !window.isWorkLayoutMode && window.isCurrentWorkGroupExcluded?.(id);
-    el.classList.toggle('is-group-default-excluded', defaultExcluded);
     el.classList.toggle('is-log-excluded', !!logExcluded);
     el.style.color = logExcluded ? '#dc2626' : 'var(--w-blue)';
     el.title = window.isWorkLayoutMode
-        ? `기본 ${defaultExcluded ? '제외' : '적용'} · 길게 눌러 이름 변경`
-        : `기본 ${defaultExcluded ? '제외' : '적용'}(빨간 밑줄) · 현재 일지 ${logExcluded ? '제외' : '적용'}(글자색) · 짧게: 현재 일지 변경 · 길게: 기본값 변경`;
+        ? '길게 눌러 이름 변경'
+        : `현재 일지 집계 ${logExcluded ? '제외' : '포함'} · 탭해서 변경`;
 };
 
 window.renameBoxTitle = (id) => {
@@ -413,7 +397,6 @@ window.openWorkModal = (id = null) => {
     window.activeEquips = {};
     window.activeCustomGroupSelections = {};
     window.currentWorkExcludedGroups = [];
-    window.currentWorkIncludedGroups = [];
 
     let y = window.currentYear, m = window.curMonth, d = window.curDay;
     window.isWorkDuty = false;
@@ -437,7 +420,6 @@ window.openWorkModal = (id = null) => {
         if (log.imgs) window.workImgs = [...log.imgs];
         if (log.equips) window.activeEquips = { ...log.equips };
         window.currentWorkExcludedGroups = Array.isArray(log.excludedGroups) ? [...log.excludedGroups] : [];
-        window.currentWorkIncludedGroups = Array.isArray(log.includedGroups) ? [...log.includedGroups] : [];
         window.isWorkDuty = log.isDuty || false;
         window.workStartTime = log.startTime || null;
         window.workEndTime = log.endTime || null;
@@ -770,15 +752,8 @@ window.toggleCurrentWorkGroupExcluded = (id) => {
     if (!id || id === 'duration' || id === 'basicFields') return;
     window.pushWorkUndo?.();
     const excluded = new Set(window.currentWorkExcludedGroups || []);
-    const included = new Set(window.currentWorkIncludedGroups || []);
-    if (window.isCurrentWorkGroupExcluded(id)) {
-        excluded.delete(id);
-        included.add(id);
-    } else {
-        included.delete(id);
-        excluded.add(id);
-    }
+    if (excluded.has(id)) excluded.delete(id);
+    else excluded.add(id);
     window.currentWorkExcludedGroups = [...excluded];
-    window.currentWorkIncludedGroups = [...included];
     window.applyGroupActiveStyle(id);
 };

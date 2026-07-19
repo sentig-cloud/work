@@ -1281,7 +1281,6 @@
             activeStatus: window.activeStatus || null,
             activeEquips: JSON.parse(JSON.stringify(window.activeEquips || {})),
             currentWorkExcludedGroups: JSON.parse(JSON.stringify(window.currentWorkExcludedGroups || [])),
-            currentWorkIncludedGroups: JSON.parse(JSON.stringify(window.currentWorkIncludedGroups || [])),
             workImgs: JSON.parse(JSON.stringify(window.workImgs || [])),
             taskTypes: JSON.parse(JSON.stringify(window.taskTypes || [])),
             coworkers: JSON.parse(JSON.stringify(window.coworkers || [])),
@@ -1319,7 +1318,6 @@
         window.activeStatus = snapshot.activeStatus;
         window.activeEquips = snapshot.activeEquips;
         window.currentWorkExcludedGroups = snapshot.currentWorkExcludedGroups || [];
-        window.currentWorkIncludedGroups = snapshot.currentWorkIncludedGroups || [];
         window.workImgs = snapshot.workImgs;
         window.taskTypes = snapshot.taskTypes;
         window.coworkers = snapshot.coworkers;
