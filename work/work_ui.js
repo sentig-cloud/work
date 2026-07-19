@@ -43,23 +43,64 @@ window.setupFAB = () => {
     if (!fab) return;
     const fabPositionKey = 'wm_fab_today_position';
 
-    // 작은 픽셀 로봇의 표정을 불규칙하게 바꾼다. 버튼을 다시 초기화해도 타이머는 하나만 유지한다.
+    // 작은 픽셀 로봇을 마스코트처럼 움직인다. 버튼을 다시 초기화해도 행동 타이머는 하나만 유지한다.
     const robot = fab.querySelector('.today-robot');
     if (robot && !fab.dataset.expressionTimerStarted) {
         fab.dataset.expressionTimerStarted = '1';
-        const faces = ['', 'face-happy', 'face-surprised', 'face-sleepy', 'face-wink'];
-        let previousFace = -1;
-        const changeRobotFace = () => {
-            if (!document.hidden) {
-                let nextFace = Math.floor(Math.random() * faces.length);
-                if (nextFace === previousFace) nextFace = (nextFace + 1) % faces.length;
-                previousFace = nextFace;
-                robot.classList.remove(...faces.filter(Boolean));
-                if (faces[nextFace]) robot.classList.add(faces[nextFace]);
+        const stateClasses = [
+            'face-happy', 'face-surprised', 'face-sleepy', 'face-wink', 'face-cry',
+            'action-walk', 'action-hop', 'action-spin', 'action-dance', 'action-sneak'
+        ];
+        const clearRobotState = () => robot.classList.remove(...stateClasses);
+        const modalIsBusy = () => document.getElementById('workModal')?.style.display === 'flex'
+            || document.getElementById('tagEditModal')?.style.display === 'flex';
+
+        const runRobotAction = () => {
+            if (document.hidden || fab.dataset.userTouching === '1' || modalIsBusy()) {
+                window.setTimeout(runRobotAction, 3500);
+                return;
             }
-            window.setTimeout(changeRobotFace, 2600 + Math.floor(Math.random() * 3400));
+
+            clearRobotState();
+            const actions = ['walk', 'happy', 'cry', 'hop', 'spin', 'dance', 'wink', 'sleepy', 'sneak'];
+            const action = actions[Math.floor(Math.random() * actions.length)];
+            let duration = 1800;
+
+            if (action === 'walk' || action === 'sneak') {
+                const rect = fab.getBoundingClientRect();
+                const maxLeft = Math.max(4, window.innerWidth - fab.offsetWidth - 4);
+                const maxTop = Math.max(4, window.innerHeight - fab.offsetHeight - 4);
+                const range = action === 'walk' ? 110 : 65;
+                const targetLeft = Math.min(maxLeft, Math.max(4, rect.left + (Math.random() * range * 2 - range)));
+                const targetTop = Math.min(maxTop, Math.max(4, rect.top + (Math.random() * 50 - 25)));
+                fab.style.right = 'auto';
+                fab.style.bottom = 'auto';
+                fab.style.left = `${rect.left}px`;
+                fab.style.top = `${rect.top}px`;
+                robot.classList.add(action === 'walk' ? 'action-walk' : 'action-sneak');
+                duration = action === 'walk' ? 2700 : 3300;
+                requestAnimationFrame(() => {
+                    fab.style.transition = `left ${duration}ms steps(10,end), top ${duration}ms linear`;
+                    fab.style.left = `${targetLeft}px`;
+                    fab.style.top = `${targetTop}px`;
+                });
+            } else {
+                const classMap = {
+                    happy: 'face-happy', cry: 'face-cry', hop: 'action-hop', spin: 'action-spin',
+                    dance: 'action-dance', wink: 'face-wink', sleepy: 'face-sleepy'
+                };
+                robot.classList.add(classMap[action]);
+                if (action === 'happy') robot.classList.add('action-hop');
+                duration = action === 'sleepy' ? 3200 : (action === 'cry' ? 2600 : 1900);
+            }
+
+            window.setTimeout(() => {
+                clearRobotState();
+                fab.style.transition = '0.2s';
+                window.setTimeout(runRobotAction, 2200 + Math.floor(Math.random() * 4200));
+            }, duration);
         };
-        window.setTimeout(changeRobotFace, 1200);
+        window.setTimeout(runRobotAction, 1400);
     }
 
     let isDragging = false;
@@ -96,6 +137,7 @@ window.setupFAB = () => {
     };
 
     const startPress = (clientX, clientY) => {
+        fab.dataset.userTouching = '1';
         isDragging = false;
         isTouching = true;
         isTodayLongPress = false;
@@ -156,6 +198,7 @@ window.setupFAB = () => {
         setTimeout(() => {
             isDragging = false;
             isTodayLongPress = false;
+            fab.dataset.userTouching = '0';
         }, 100);
     };
 

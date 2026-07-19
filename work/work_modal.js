@@ -355,10 +355,50 @@ window.renderGroupMenu = () => {
 // ─── 커스텀 그룹 섹션 동적 생성 (작업일지 모달 내) ───
 window.renderCustomGroupSections = () => {
     const container = document.getElementById('customGroupSections');
-    if (!container) return;
-
-    const builtIn = ['taskTypes', 'coworkers', 'statuses', 'equipments', 'memoTags'];
+    const dragContainer = document.getElementById('workDragContainer');
+    const builtIn = window.BUILT_IN_GROUP_IDS || ['taskTypes', 'coworkers', 'statuses', 'equipments', 'memoTags', 'duration'];
     const customGroups = window.getAllGroupsSorted().filter(g => !builtIn.includes(g.id));
+
+    // 현재 레이아웃은 별도 customGroupSections 없이 모든 선택상자를 workDragContainer에
+    // 같은 레벨로 둔다. 저장된 커스텀 그룹을 매번 그 위치에 복원해야 데이터 삭제/재렌더 후에도
+    // 그룹 상자 자체가 사라지지 않는다.
+    if (!container && dragContainer) {
+        const validIds = new Set(customGroups.map(g => g.id));
+        [...dragContainer.querySelectorAll(':scope > .drag-item[data-custom-group="1"]')].forEach(el => {
+            if (!validIds.has(el.dataset.groupRef)) el.remove();
+        });
+
+        customGroups.forEach(g => {
+            const safeTitle = window.escapeHtml ? window.escapeHtml(g.title) : String(g.title || '')
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            let groupEl = dragContainer.querySelector(`:scope > .drag-item[data-group-ref="${g.id}"]`);
+            if (g.enabled === false) {
+                if (groupEl) groupEl.remove();
+                return;
+            }
+            if (!groupEl) {
+                groupEl = document.createElement('div');
+                groupEl.className = 'drag-item w95-in';
+                groupEl.dataset.id = g.id;
+                groupEl.dataset.groupRef = g.id;
+                groupEl.dataset.customGroup = '1';
+                groupEl.dataset.cols = '4';
+                groupEl.dataset.rows = '1';
+                groupEl.innerHTML = `
+                    <div id="boxTitle_${g.id}" class="box-title" title="탭해서 집계 포함/제외"
+                        onmousedown="window.startTitlePress(event, '${g.id}')" onmouseup="window.endTitlePress('${g.id}')" onmouseleave="window.cancelTitlePress()"
+                        ontouchstart="window.startTitlePress(event, '${g.id}')" ontouchend="window.endTitlePress('${g.id}')" ontouchcancel="window.cancelTitlePress()">${safeTitle}</div>
+                    <div id="customGroupArea_${g.id}" class="btn-tag-area"></div>
+                    <div class="drag-handle"><i class="fa-solid fa-circle" style="font-size:5px;"></i></div>`;
+                dragContainer.appendChild(groupEl);
+            }
+            window.renderCustomGroup?.(g.id);
+        });
+        return;
+    }
+
+    if (!container) return;
 
     if (customGroups.length === 0) {
         container.innerHTML = '';

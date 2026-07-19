@@ -705,6 +705,8 @@
 
         deselectBlock();
         window.saveWorkLayout();
+        // 그룹 정의(wm_groups)와 레이아웃 위치를 동시에 영구 저장하고 서버 동기화를 예약한다.
+        if (window.saveLocal) window.saveLocal("group-add");
     };
 
     window.ungroupSelectedBlock = () => {
