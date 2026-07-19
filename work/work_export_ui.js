@@ -55,19 +55,8 @@ window.WorkExportUI = {
             });
         }
 
-        // 비활성 그룹(active=false)은 선택 자체를 못 하므로 내보내기 목록에서도 완전히 뺀다
-        // (기본 제공 그룹은 고정 컬럼 id로 매핑, 커스텀 그룹은 groupId로 바로 확인)
-        const builtInColumnGroupId = {
-            taskType: 'taskTypes',
-            coworkers: 'coworkers',
-            status: 'statuses',
-            equips: 'equipments'
-        };
-        return cols.filter(col => {
-            const groupId = col.groupId || builtInColumnGroupId[col.id];
-            if (!groupId) return true;
-            return window.isGroupActive ? window.isGroupActive(groupId) : true;
-        });
+        // 집계 제외 그룹도 내보내기 컬럼은 유지하고, 해당 셀을 '-'로 표시한다.
+        return cols;
     },
 
     state: {

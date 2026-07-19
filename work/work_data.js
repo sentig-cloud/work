@@ -224,6 +224,10 @@ window.activeEquips = {};
 window.activeEditTags = [];
 // 커스텀 그룹 선택 상태: { [groupId]: 선택된 tag 이름 배열 }
 window.activeCustomGroupSelections = {};
+// 현재 편집 중인 작업일지에서 집계 제외한 그룹 ID 목록.
+// 값이 없는 기존 로그는 모두 포함으로 처리한다.
+window.currentWorkExcludedGroups = [];
+window.currentWorkIncludedGroups = [];
 
 window.tempEquipQty = 0;
 window.tempImgs = [];
@@ -345,6 +349,19 @@ window.groupIncludesMonthly = function (groupId) {
     return !g || g.includeMonthly !== false;
 };
 
+window.isLogGroupExcluded = function (log, groupId) {
+    if (!log) return !window.isGroupActive(groupId);
+    if (Array.isArray(log.includedGroups) && log.includedGroups.includes(groupId)) return false;
+    if (Array.isArray(log.excludedGroups) && log.excludedGroups.includes(groupId)) return true;
+    return !window.isGroupActive(groupId);
+};
+
+window.isCurrentWorkGroupExcluded = function (groupId) {
+    if (Array.isArray(window.currentWorkIncludedGroups) && window.currentWorkIncludedGroups.includes(groupId)) return false;
+    if (Array.isArray(window.currentWorkExcludedGroups) && window.currentWorkExcludedGroups.includes(groupId)) return true;
+    return !window.isGroupActive(groupId);
+};
+
 // 태그 이름 뒤에 (갯수) 접미사를 붙일지 — 새 기능이라 기존 설치와의 호환을 위해 기본값은 false
 window.groupShowsCount = function (groupId) {
     const g = window.getGroupById(groupId);
@@ -362,6 +379,7 @@ window.getGroupTagMonthlyCount = function (groupId, tagName) {
     if (!window.groupIncludesMonthly(groupId)) return 0;
     const logs = (window.logs || []).filter((l) => l && l.y === window.currentYear && l.m === window.curMonth);
     return logs.reduce((sum, l) => {
+        if (window.isLogGroupExcluded(l, groupId)) return sum;
         const val = window.getGroupValueFromLog(l, groupId);
         if (groupId === 'equipments') return sum + Number((val && val[tagName]) || 0);
         if (Array.isArray(val)) return sum + (val.includes(tagName) ? 1 : 0);

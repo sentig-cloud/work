@@ -16,7 +16,7 @@ window.renderMain = () => {
 
         let mStatuses = {};
         mLogs.filter(l => l.cat === 'work').forEach(l => {
-            if (l.status) {
+            if (!window.isLogGroupExcluded(l, 'statuses') && l.status) {
                 mStatuses[l.status] = (mStatuses[l.status] || 0) + 1;
                 yStatuses[l.status] = (yStatuses[l.status] || 0) + 1;
             }
@@ -57,9 +57,9 @@ window.updateDashboardStats = () => {
 
     window.logs.forEach(l => {
         if (l.cat === 'work') {
-            if (l.taskType) l.taskType.split(', ').forEach(t => { ttCounts[t] = (ttCounts[t] || 0) + 1; });
-            if (l.coworkers) l.coworkers.forEach(cw => { cwCounts[cw] = (cwCounts[cw] || 0) + 1; });
-            if (l.status) stCounts[l.status] = (stCounts[l.status] || 0) + 1;
+            if (!window.isLogGroupExcluded(l, 'taskTypes') && l.taskType) l.taskType.split(', ').forEach(t => { ttCounts[t] = (ttCounts[t] || 0) + 1; });
+            if (!window.isLogGroupExcluded(l, 'coworkers') && l.coworkers) l.coworkers.forEach(cw => { cwCounts[cw] = (cwCounts[cw] || 0) + 1; });
+            if (!window.isLogGroupExcluded(l, 'statuses') && l.status) stCounts[l.status] = (stCounts[l.status] || 0) + 1;
         }
     });
 
@@ -172,7 +172,7 @@ window.updateUI = () => {
     const monthWorkLogs = mLogs.filter(l => l.cat === 'work');
     if (sumWorkEl) sumWorkEl.innerText = monthWorkLogs.length;
     const completedWorkEl = document.getElementById('popCompletedWork');
-    if (completedWorkEl) completedWorkEl.innerText = monthWorkLogs.filter(l => l.status === '완료').length;
+    if (completedWorkEl) completedWorkEl.innerText = monthWorkLogs.filter(l => !window.isLogGroupExcluded(l, 'statuses') && l.status === '완료').length;
 
     let commuteOtEl = document.getElementById('popCommuteOt');
     if (commuteOtEl) {
@@ -579,6 +579,8 @@ window.renderEditPhotoGrid = () => {
 window.updateSearchFilters = (targetMonth = null) => {
     const filteredLogs = targetMonth ? window.logs.filter(l => l.m === targetMonth) : window.logs;
     const getCount = (type, name) => filteredLogs.filter(l => {
+        const groupId = { task: 'taskTypes', manager: 'coworkers', status: 'statuses', equip: 'equipments', tag: 'memoTags' }[type];
+        if (groupId && window.isLogGroupExcluded(l, groupId)) return false;
         if (type === 'task') return l.taskType && l.taskType.includes(name);
         if (type === 'manager') return l.coworkers && l.coworkers.includes(name);
         if (type === 'status') return l.status === name;

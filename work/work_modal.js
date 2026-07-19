@@ -233,15 +233,16 @@ window.startTitlePress = (e, id) => {
     window.titlePressTimer = setTimeout(() => {
         window.titleLongPressed = true;
         if (navigator.vibrate) navigator.vibrate(30);
-        window.renameBoxTitle(id);
+        if (window.isWorkLayoutMode) window.renameBoxTitle(id);
+        else window.toggleGroupActive(id);
     }, 600);
 };
 
-// 짧게 탭하면(롱프레스가 안 일어났으면) 이름변경이 아니라 그 그룹의 활성/비활성을 토글한다
+// 일반 작성에서는 짧은 탭으로 집계 상태가 우발적으로 바뀌지 않게 한다.
 window.endTitlePress = (id) => {
     clearTimeout(window.titlePressTimer);
     if (window.titleLongPressed) { window.titleLongPressed = false; return; }
-    if (id) window.toggleGroupActive(id);
+    if (id && !window.isWorkLayoutMode) window.toggleCurrentWorkGroupExcluded(id);
 };
 
 window.cancelTitlePress = () => {
@@ -268,10 +269,18 @@ window.applyGroupActiveStyle = (id) => {
     if (id === 'duration' || id === 'basicFields') return;
     const el = document.getElementById('boxTitle_' + id);
     if (!el) return;
-    el.style.color = window.isGroupActive(id) ? 'var(--w-blue)' : '#dc2626';
+    const excluded = !window.isWorkLayoutMode && window.isCurrentWorkGroupExcluded?.(id);
+    el.classList.toggle('is-log-excluded', !!excluded);
+    el.style.color = excluded ? '#dc2626' : 'var(--w-blue)';
+    el.title = window.isWorkLayoutMode
+        ? '길게 눌러 이름 변경'
+        : (excluded
+            ? '현재 일지 집계 제외 · 짧게 눌러 현재 일지 포함 · 길게 눌러 전체 기본값 변경'
+            : '현재 일지 집계 포함 · 짧게 눌러 현재 일지 제외 · 길게 눌러 전체 기본값 변경');
 };
 
 window.renameBoxTitle = (id) => {
+    if (!window.isWorkLayoutMode) return;
     const el = document.getElementById('boxTitle_' + id);
     if (!el) return;
     document.getElementById('titleEditTargetId').value = id;
@@ -403,6 +412,8 @@ window.openWorkModal = (id = null) => {
     window.activeStatus = null;
     window.activeEquips = {};
     window.activeCustomGroupSelections = {};
+    window.currentWorkExcludedGroups = [];
+    window.currentWorkIncludedGroups = [];
 
     let y = window.currentYear, m = window.curMonth, d = window.curDay;
     window.isWorkDuty = false;
@@ -425,6 +436,8 @@ window.openWorkModal = (id = null) => {
         if (log.coworkers) window.selectedCoworkers = [...log.coworkers];
         if (log.imgs) window.workImgs = [...log.imgs];
         if (log.equips) window.activeEquips = { ...log.equips };
+        window.currentWorkExcludedGroups = Array.isArray(log.excludedGroups) ? [...log.excludedGroups] : [];
+        window.currentWorkIncludedGroups = Array.isArray(log.includedGroups) ? [...log.includedGroups] : [];
         window.isWorkDuty = log.isDuty || false;
         window.workStartTime = log.startTime || null;
         window.workEndTime = log.endTime || null;
@@ -751,4 +764,21 @@ window.closeImageViewer = () => {
     document.getElementById('imageViewer').style.display = 'none';
     document.getElementById('viewerImg').src = "";
     window.currentViewerIndex = -1;
+};
+
+window.toggleCurrentWorkGroupExcluded = (id) => {
+    if (!id || id === 'duration' || id === 'basicFields') return;
+    window.pushWorkUndo?.();
+    const excluded = new Set(window.currentWorkExcludedGroups || []);
+    const included = new Set(window.currentWorkIncludedGroups || []);
+    if (window.isCurrentWorkGroupExcluded(id)) {
+        excluded.delete(id);
+        included.add(id);
+    } else {
+        included.delete(id);
+        excluded.add(id);
+    }
+    window.currentWorkExcludedGroups = [...excluded];
+    window.currentWorkIncludedGroups = [...included];
+    window.applyGroupActiveStyle(id);
 };

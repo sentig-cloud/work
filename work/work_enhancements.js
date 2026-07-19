@@ -587,6 +587,7 @@
 
         modal?.classList.toggle("layout-edit-mode", window.isWorkLayoutMode);
         titlebar?.classList.toggle("is-layout-edit", window.isWorkLayoutMode);
+        window.applyCustomTitles?.();
     };
 
     // 예전엔 2000ms + onpointerleave(버튼 사각형을 살짝만 벗어나도 취소)라서
@@ -921,7 +922,6 @@
 
     window.handleClick = (type, index) => {
         if (window.isWorkEditLocked) return;
-        if (!window.isGroupActive(window.typeToGroupId(type))) return; // 비활성 그룹은 선택 불가
         const tag = getTagArray(type)[index];
         if (!tag) return;
         if (document.activeElement && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) document.activeElement.blur();
@@ -1280,6 +1280,8 @@
             selectedCoworkers: JSON.parse(JSON.stringify(window.selectedCoworkers || [])),
             activeStatus: window.activeStatus || null,
             activeEquips: JSON.parse(JSON.stringify(window.activeEquips || {})),
+            currentWorkExcludedGroups: JSON.parse(JSON.stringify(window.currentWorkExcludedGroups || [])),
+            currentWorkIncludedGroups: JSON.parse(JSON.stringify(window.currentWorkIncludedGroups || [])),
             workImgs: JSON.parse(JSON.stringify(window.workImgs || [])),
             taskTypes: JSON.parse(JSON.stringify(window.taskTypes || [])),
             coworkers: JSON.parse(JSON.stringify(window.coworkers || [])),
@@ -1316,6 +1318,8 @@
         window.selectedCoworkers = snapshot.selectedCoworkers;
         window.activeStatus = snapshot.activeStatus;
         window.activeEquips = snapshot.activeEquips;
+        window.currentWorkExcludedGroups = snapshot.currentWorkExcludedGroups || [];
+        window.currentWorkIncludedGroups = snapshot.currentWorkIncludedGroups || [];
         window.workImgs = snapshot.workImgs;
         window.taskTypes = snapshot.taskTypes;
         window.coworkers = snapshot.coworkers;
@@ -1334,6 +1338,7 @@
         window.renderEquips && window.renderEquips();
         window.renderStatuses && window.renderStatuses();
         window.renderWorkPhotoGrid && window.renderWorkPhotoGrid();
+        window.applyCustomTitles?.();
         if (masterBefore !== JSON.stringify([window.taskTypes, window.coworkers, window.equipments, window.statuses]) && window.saveLocal) window.saveLocal();
         window.updateWorkUndoButton();
     };

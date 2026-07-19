@@ -111,9 +111,20 @@ window.WorkExport = {
                         else value = grpVal || "";
                     }
 
+                    const groupId = col.groupId || {
+                        taskType: "taskTypes",
+                        status: "statuses",
+                        coworkers: "coworkers",
+                        equips: "equipments",
+                        tags: "memoTags"
+                    }[col.id];
+                    if (log.cat === "work" && groupId && window.isLogGroupExcluded?.(log, groupId)) {
+                        value = { type: "excluded", text: "-" };
+                    }
+
                     const textLength = value && (value.type === "image" || value.type === "over")
                         ? 6
-                        : String(value || "").length;
+                        : (value && value.type === "excluded" ? 1 : String(value || "").length);
 
                     if (textLength > maxLens[index]) maxLens[index] = textLength;
                     row.push(value);
@@ -345,6 +356,7 @@ window.WorkExport = {
             const rawRow = rows[rowIndex];
 
             const safeRow = rawRow.map(value => {
+                if (value && value.type === "excluded") return "-";
                 if (!value || (value.type !== "image" && value.type !== "over")) {
                     return value;
                 }
@@ -386,7 +398,7 @@ window.WorkExport = {
 
                 cell.alignment = {
                     vertical: "middle",
-                    horizontal: centered ? "center" : "left",
+                    horizontal: (centered || (value && value.type === "excluded")) ? "center" : "left",
                     wrapText: wrapped
                 };
 
@@ -625,7 +637,10 @@ window.WorkExport = {
             return row.map(value => {
                 let text = "";
 
-                if (value && (value.type === "image" || value.type === "over")) {
+                if (value && value.type === "excluded") {
+                    text = "-";
+                }
+                else if (value && (value.type === "image" || value.type === "over")) {
                     text = "O";
                 }
                 else {
