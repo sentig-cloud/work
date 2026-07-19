@@ -457,6 +457,8 @@ input, textarea, [contenteditable="true"] {
 .box-title:active { background: rgba(0,0,0,0.1); }
 .box-title.is-log-excluded {
     color: #dc2626;
+}
+.box-title.is-group-default-excluded {
     text-decoration-line: underline;
     text-decoration-color: #dc2626;
     text-decoration-thickness: 2px;

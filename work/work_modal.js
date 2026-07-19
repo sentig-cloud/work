@@ -269,14 +269,14 @@ window.applyGroupActiveStyle = (id) => {
     if (id === 'duration' || id === 'basicFields') return;
     const el = document.getElementById('boxTitle_' + id);
     if (!el) return;
-    const excluded = !window.isWorkLayoutMode && window.isCurrentWorkGroupExcluded?.(id);
-    el.classList.toggle('is-log-excluded', !!excluded);
-    el.style.color = excluded ? '#dc2626' : 'var(--w-blue)';
+    const defaultExcluded = !window.isGroupActive(id);
+    const logExcluded = !window.isWorkLayoutMode && window.isCurrentWorkGroupExcluded?.(id);
+    el.classList.toggle('is-group-default-excluded', defaultExcluded);
+    el.classList.toggle('is-log-excluded', !!logExcluded);
+    el.style.color = logExcluded ? '#dc2626' : 'var(--w-blue)';
     el.title = window.isWorkLayoutMode
-        ? '길게 눌러 이름 변경'
-        : (excluded
-            ? '현재 일지 집계 제외 · 짧게 눌러 현재 일지 포함 · 길게 눌러 전체 기본값 변경'
-            : '현재 일지 집계 포함 · 짧게 눌러 현재 일지 제외 · 길게 눌러 전체 기본값 변경');
+        ? `기본 ${defaultExcluded ? '제외' : '적용'} · 길게 눌러 이름 변경`
+        : `기본 ${defaultExcluded ? '제외' : '적용'}(빨간 밑줄) · 현재 일지 ${logExcluded ? '제외' : '적용'}(글자색) · 짧게: 현재 일지 변경 · 길게: 기본값 변경`;
 };
 
 window.renameBoxTitle = (id) => {
