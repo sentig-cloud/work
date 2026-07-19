@@ -36,8 +36,20 @@
 
     <div class="yearly-summary w95-out" id="yearlySummary"></div>
 
-    <div id="fabToday" style="position:fixed; bottom:110px; right:20px; width:45px; height:45px; background:#84cc16; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:2px 2px 8px rgba(0,0,0,0.5); z-index:4000; cursor:pointer; border:2px solid #fff;">
-        <i class="fa-solid fa-calendar-day" style="color:#fff; font-size:1.3rem;"></i>
+    <div id="fabToday" class="today-robot-fab" title="오늘 날짜로 이동 · 길게 누르면 강제 동기화" role="button" aria-label="오늘 날짜로 이동">
+        <div class="today-robot" aria-hidden="true">
+            <div class="robot-antenna"><span></span></div>
+            <div class="robot-head">
+                <span class="robot-eye robot-eye-left"></span>
+                <span class="robot-eye robot-eye-right"></span>
+                <span class="robot-mouth"></span>
+            </div>
+            <div class="robot-body"><span>오늘</span></div>
+            <span class="robot-arm robot-arm-left"></span>
+            <span class="robot-arm robot-arm-right"></span>
+            <span class="robot-foot robot-foot-left"></span>
+            <span class="robot-foot robot-foot-right"></span>
+        </div>
     </div>
 
     <div id="popupLayer" class="layer">

@@ -33,7 +33,11 @@
         const qty = type === "equip" ? Number(window.activeEquips && window.activeEquips[tag.name] || 0) : 0;
         // 장비는 실제 선택된 수량이 있으면 그걸 우선 보여주고, 없으면 그룹의 "갯수" 설정을 따른다(0이면 생략)
         const baseCount = Number(tag.count) || 0;
-        const countSuffix = qty > 0 ? ` (${qty})` : (window.groupShowsCount(groupId) && baseCount > 0 ? ` (${baseCount})` : "");
+        // 장비 수량은 현재 일지의 선택값만 표시한다. 마스터 tag.count를 기본 수량처럼 재사용하면
+        // 선택하지 않은 장비도 T(2)처럼 보이고 편집창에도 2가 들어가는 오류가 생긴다.
+        const countSuffix = qty > 0
+            ? ` (${qty})`
+            : (type !== "equip" && window.groupShowsCount(groupId) && baseCount > 0 ? ` (${baseCount})` : "");
         return `${monthly}${tag.name}${countSuffix}`;
     };
 
@@ -956,7 +960,7 @@
         window.editingTagType = type;
         window.editingTagIndex = index;
         window.tempTagQty = type === "equip"
-            ? Number(window.activeEquips && window.activeEquips[tag.name] || tag.count || 0)
+            ? Number(window.activeEquips && window.activeEquips[tag.name] || 0)
             : Number(tag.count || 0);
         document.getElementById("tagEditInput").value = tag.name;
         document.getElementById("tagEditModal").style.display = "flex";
@@ -1018,7 +1022,7 @@
         const tag = getTagArray(type)[window.editingTagIndex];
         if (!tag) return;
         window.tempTagQty = Math.max(0, Number(window.tempTagQty || 0) + delta);
-        tag.count = window.tempTagQty;
+        if (type !== "equip") tag.count = window.tempTagQty;
         if (type === "equip") {
             window.activeEquips = window.activeEquips || {};
             if (window.tempTagQty > 0) window.activeEquips[tag.name] = window.tempTagQty;

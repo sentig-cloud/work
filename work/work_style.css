@@ -72,6 +72,55 @@ html, body {
 .dashboard-tag { background: #e2e8f0; border: 1px solid #94a3b8; padding: 2px 6px; border-radius: 6px; font-size: 0.75rem; color: #1e293b; white-space: nowrap; font-weight: bold; }
 .yearly-summary { background: var(--w-gray); border-top: 2px solid var(--w-white); padding: 8px; font-size: 0.85rem; font-weight: bold; text-align: center; flex-shrink: 0; padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
 
+/* 오늘 이동 버튼: 별도 이미지가 필요 없는 Win95 픽셀 로봇 */
+.today-robot-fab {
+    position: fixed; bottom: 110px; right: 16px; width: 58px; height: 64px;
+    z-index: 4000; cursor: pointer; touch-action: none; user-select: none;
+    -webkit-user-select: none; filter: drop-shadow(3px 4px 2px rgba(0,0,0,.35));
+}
+.today-robot {
+    position: relative; width: 52px; height: 58px; margin: 2px auto 0;
+    animation: todayRobotBob 1.8s steps(2, end) infinite;
+}
+.robot-antenna { position:absolute; left:24px; top:0; width:4px; height:9px; background:#202020; }
+.robot-antenna span {
+    position:absolute; left:-3px; top:-3px; width:10px; height:8px; background:#ff3b30;
+    border:2px solid #202020; box-sizing:border-box; animation:robotBeacon 1.4s steps(1,end) infinite;
+}
+.robot-head {
+    position:absolute; left:7px; top:8px; width:38px; height:25px; box-sizing:border-box;
+    background:#c0c0c0; border:2px solid; border-color:#fff #404040 #404040 #fff;
+    box-shadow:inset -2px -2px #808080, inset 2px 2px #dfdfdf;
+}
+.robot-eye { position:absolute; top:7px; width:5px; height:5px; background:#0645ad; box-shadow:1px 1px #fff; }
+.robot-eye-left { left:8px; } .robot-eye-right { right:8px; }
+.robot-mouth { position:absolute; left:14px; bottom:4px; width:8px; height:2px; background:#202020; }
+.robot-body {
+    position:absolute; left:11px; top:32px; width:30px; height:20px; box-sizing:border-box;
+    display:flex; align-items:center; justify-content:center; background:#008080; color:#fff;
+    border:2px solid; border-color:#fff #303030 #303030 #fff; box-shadow:inset -2px -2px #006060;
+    font-size:9px; line-height:1; font-weight:900; font-family:"Gulim", "Tahoma", sans-serif;
+}
+.robot-arm { position:absolute; top:35px; width:7px; height:15px; background:#c0c0c0; border:2px solid #303030; box-sizing:border-box; transform-origin:top center; }
+.robot-arm-left { left:3px; animation:robotArmLeft 1.8s steps(2,end) infinite; }
+.robot-arm-right { right:3px; animation:robotArmRight 1.8s steps(2,end) infinite; }
+.robot-foot { position:absolute; top:51px; width:14px; height:6px; background:#c0c0c0; border:2px solid; border-color:#fff #303030 #303030 #fff; box-sizing:border-box; }
+.robot-foot-left { left:9px; } .robot-foot-right { right:9px; }
+.today-robot-fab:active .today-robot { transform:translateY(2px); filter:brightness(.9); }
+
+.today-robot.face-happy .robot-mouth { height:5px; bottom:3px; background:transparent; border-bottom:2px solid #202020; border-radius:0 0 8px 8px; }
+.today-robot.face-surprised .robot-mouth { left:16px; bottom:3px; width:5px; height:5px; border-radius:50%; background:#202020; }
+.today-robot.face-sleepy .robot-eye { top:9px; height:2px; box-shadow:none; }
+.today-robot.face-wink .robot-eye-left { top:9px; height:2px; box-shadow:none; }
+
+@keyframes todayRobotBob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
+@keyframes robotBeacon { 0%,60%{background:#ff3b30} 61%,100%{background:#ffff00} }
+@keyframes robotArmLeft { 0%,100%{transform:rotate(8deg)} 50%{transform:rotate(25deg)} }
+@keyframes robotArmRight { 0%,100%{transform:rotate(-8deg)} 50%{transform:rotate(-25deg)} }
+@media (prefers-reduced-motion: reduce) {
+    .today-robot, .robot-antenna span, .robot-arm { animation:none !important; }
+}
+
 .layer { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--w-bg); z-index: 1000; flex-direction: column; }
 
 .pop-nav { background: var(--w-gray); border-bottom: 2px solid var(--w-black); display: flex; align-items: center; padding: 8px 10px; flex-shrink: 0; justify-content: space-between; overflow-x: auto; white-space: nowrap; }

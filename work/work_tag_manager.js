@@ -124,7 +124,7 @@ window.saveTagEdit = () => {
     }
 
     tag.name = newName;
-    tag.count = Number(window.tempTagQty || 0);
+    if (groupId !== 'equipments') tag.count = Number(window.tempTagQty || 0);
     tag.showNumber = window.tempTagShowNumber;
     tag.includeMonthly = window.tempTagIncludeMonthly;
 
@@ -352,7 +352,7 @@ window.openTagEditBox = (type, index) => {
 
     const groupId = window.typeToGroupId(type);
     window.tempTagQty = groupId === 'equipments'
-        ? Number(window.activeEquips[tag.name] || tag.count || 0)
+        ? Number(window.activeEquips[tag.name] || 0)
         : Number(tag.count || 0);
 
     window.tempTagShowNumber = window.isTagNumberEnabled(tag);

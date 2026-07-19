@@ -43,6 +43,25 @@ window.setupFAB = () => {
     if (!fab) return;
     const fabPositionKey = 'wm_fab_today_position';
 
+    // 작은 픽셀 로봇의 표정을 불규칙하게 바꾼다. 버튼을 다시 초기화해도 타이머는 하나만 유지한다.
+    const robot = fab.querySelector('.today-robot');
+    if (robot && !fab.dataset.expressionTimerStarted) {
+        fab.dataset.expressionTimerStarted = '1';
+        const faces = ['', 'face-happy', 'face-surprised', 'face-sleepy', 'face-wink'];
+        let previousFace = -1;
+        const changeRobotFace = () => {
+            if (!document.hidden) {
+                let nextFace = Math.floor(Math.random() * faces.length);
+                if (nextFace === previousFace) nextFace = (nextFace + 1) % faces.length;
+                previousFace = nextFace;
+                robot.classList.remove(...faces.filter(Boolean));
+                if (faces[nextFace]) robot.classList.add(faces[nextFace]);
+            }
+            window.setTimeout(changeRobotFace, 2600 + Math.floor(Math.random() * 3400));
+        };
+        window.setTimeout(changeRobotFace, 1200);
+    }
+
     let isDragging = false;
     let isTouching = false;
     let isTodayLongPress = false;
