@@ -516,15 +516,21 @@ window.renderCustomGroup = (groupId) => {
 
     let html = tags.map((t, idx) => {
         let activeCls = sel.includes(t.name) ? 'active-btn' : '';
+        const safeName = window.escapeHtml ? window.escapeHtml(t.name) : String(t.name || '')
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         // 0은 표시하지 않는다(시인성 확보)
         const monthlyCount = window.getGroupTagMonthlyCount(groupId, t.name);
         const numberPrefix = (showNumber && monthlyCount > 0) ? `[${monthlyCount}] ` : '';
         const baseCount = Number(t.count) || 0;
         const countSuffix = (showCount && baseCount > 0) ? ` (${baseCount})` : '';
-        return `<button type="button" class="w95-btn ${activeCls}"
-            onclick="window.toggleCustomGroupTag('${groupId}', '${t.name}')"
-            oncontextmenu="event.preventDefault(); window.openTagEditBox('${groupId}', ${idx});"
-        >${numberPrefix}${t.name}${countSuffix}</button>`;
+        return `<button type="button" class="w95-btn layout-tag-button ${activeCls}"
+            onmousedown="window.startPress(event,'${groupId}',${idx})"
+            onmouseup="window.endPress(event,'${groupId}',${idx})"
+            onmouseleave="window.cancelPress()"
+            ontouchstart="window.startPress(event,'${groupId}',${idx})"
+            ontouchend="window.endPress(event,'${groupId}',${idx})"
+            ontouchcancel="window.cancelPress()"
+        >${numberPrefix}${safeName}${countSuffix}</button>`;
     }).join(' ');
     html += window.buildAddButtonHtml(groupId);
     el.innerHTML = html;

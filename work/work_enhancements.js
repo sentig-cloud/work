@@ -281,10 +281,29 @@
 
         // 순서 모드도 기억 선택 모드도 아니면 그룹(블록) 탭은 아무 동작도 하지 않는다 —
         // 개별 객체(칸) 선택/이동/리사이즈는 initInnerReorderListeners가 별도로 계속 담당한다.
-        if (!window.isOrderMode && !window.isRememberSelectMode && !window.isDeleteGroupMode) return;
+        if (!window.isOrderMode && !window.isRememberSelectMode && !window.isDeleteGroupMode && !window.isHideGroupMode) return;
 
         const modal = document.getElementById("workModal");
         if (!modal || !modal.contains(e.target)) return;
+
+        // 숨기기 모드: 데이터와 내보내기 컬럼은 유지하고 작업일지 작성 화면에서만 숨김/복원한다.
+        if (window.isHideGroupMode) {
+            const groupEl = e.target.closest("#workDragContainer > .drag-item[data-group-ref]");
+            const groupId = groupEl?.dataset.groupRef;
+            if (groupEl && groupId && groupId !== "duration") {
+                e.preventDefault();
+                e.stopPropagation();
+                const g = window.getGroupById?.(groupId);
+                if (g) {
+                    g.hiddenInWork = !g.hiddenInWork;
+                    window.markDirty?.("master", "groups", "upsert");
+                    window.saveLocal?.("group-visibility");
+                    window.refreshWorkGroupVisibility?.();
+                    if (navigator.vibrate) navigator.vibrate(20);
+                }
+            }
+            return;
+        }
 
         // 삭제 모드: 편집모드를 나갈 때까지 유지되며, 탭한 커스텀 그룹을 바로 삭제한다.
         if (window.isDeleteGroupMode) {
@@ -612,17 +631,20 @@
             window.saveWorkLayout();
             window.applyWorkLayout();
             window.isDeleteGroupMode = false;
+            window.isHideGroupMode = false;
             window.isOrderMode = false;
             window.isRememberSelectMode = false;
             document.getElementById("workLayoutUngroupBtn")?.classList.remove("active-btn");
+            document.getElementById("workLayoutHideBtn")?.classList.remove("active-btn");
             document.getElementById("workLayoutOrderBtn")?.classList.remove("active-btn");
             document.getElementById("workRememberModeBtn")?.classList.remove("active-btn");
-            document.getElementById("workModal")?.classList.remove("order-mode", "delete-group-mode");
+            document.getElementById("workModal")?.classList.remove("order-mode", "delete-group-mode", "hide-group-mode");
         }
 
         modal?.classList.toggle("layout-edit-mode", window.isWorkLayoutMode);
         titlebar?.classList.toggle("is-layout-edit", window.isWorkLayoutMode);
         window.applyCustomTitles?.();
+        window.refreshWorkGroupVisibility?.();
     };
 
     // 예전엔 2000ms + onpointerleave(버튼 사각형을 살짝만 벗어나도 취소)라서
@@ -751,16 +773,37 @@
         if (window.isDeleteGroupMode) {
             window.isOrderMode = false;
             window.isRememberSelectMode = false;
+            window.isHideGroupMode = false;
         }
         deselectBlock();
         document.getElementById("workLayoutUngroupBtn")?.classList.toggle("active-btn", window.isDeleteGroupMode);
         document.getElementById("workLayoutOrderBtn")?.classList.toggle("active-btn", window.isOrderMode);
         document.getElementById("workRememberModeBtn")?.classList.toggle("active-btn", window.isRememberSelectMode);
+        document.getElementById("workLayoutHideBtn")?.classList.toggle("active-btn", window.isHideGroupMode);
         document.getElementById("workModal")?.classList.toggle("delete-group-mode", window.isDeleteGroupMode);
+        document.getElementById("workModal")?.classList.toggle("hide-group-mode", window.isHideGroupMode);
     };
 
     // 이전 마크업/호출과의 호환
     window.ungroupSelectedBlock = window.toggleDeleteGroupMode;
+
+    window.isHideGroupMode = false;
+    window.toggleHideGroupMode = () => {
+        if (!window.isWorkLayoutMode) return;
+        window.isHideGroupMode = !window.isHideGroupMode;
+        if (window.isHideGroupMode) {
+            window.isOrderMode = false;
+            window.isRememberSelectMode = false;
+            window.isDeleteGroupMode = false;
+        }
+        deselectBlock();
+        document.getElementById("workLayoutHideBtn")?.classList.toggle("active-btn", window.isHideGroupMode);
+        document.getElementById("workLayoutUngroupBtn")?.classList.toggle("active-btn", window.isDeleteGroupMode);
+        document.getElementById("workLayoutOrderBtn")?.classList.toggle("active-btn", window.isOrderMode);
+        document.getElementById("workRememberModeBtn")?.classList.toggle("active-btn", window.isRememberSelectMode);
+        document.getElementById("workModal")?.classList.toggle("hide-group-mode", window.isHideGroupMode);
+        window.refreshWorkGroupVisibility?.();
+    };
 
     // ─── 순서 모드 토글 ───
     // 켜면: 객체(칸) 선택은 막히고 그룹(블록) 전체만 선택 가능 — 그 상태에서 이동(⠿)만 허용.
@@ -776,11 +819,15 @@
         if (window.isOrderMode) {
             window.isRememberSelectMode = false;
             window.isDeleteGroupMode = false;
+            window.isHideGroupMode = false;
         }
         deselectBlock();
         document.getElementById("workLayoutOrderBtn")?.classList.toggle("active-btn", window.isOrderMode);
         document.getElementById("workLayoutUngroupBtn")?.classList.toggle("active-btn", window.isDeleteGroupMode);
+        document.getElementById("workLayoutHideBtn")?.classList.toggle("active-btn", window.isHideGroupMode);
         document.getElementById("workModal")?.classList.toggle("order-mode", window.isOrderMode);
+        document.getElementById("workModal")?.classList.toggle("delete-group-mode", window.isDeleteGroupMode);
+        document.getElementById("workModal")?.classList.toggle("hide-group-mode", window.isHideGroupMode);
         window.updateRememberModeBtn();
     };
 
@@ -798,11 +845,15 @@
         if (window.isRememberSelectMode) {
             window.isOrderMode = false;
             window.isDeleteGroupMode = false;
+            window.isHideGroupMode = false;
         }
         deselectBlock();
         document.getElementById("workLayoutOrderBtn")?.classList.toggle("active-btn", window.isOrderMode);
         document.getElementById("workLayoutUngroupBtn")?.classList.toggle("active-btn", window.isDeleteGroupMode);
+        document.getElementById("workLayoutHideBtn")?.classList.toggle("active-btn", window.isHideGroupMode);
         document.getElementById("workModal")?.classList.toggle("order-mode", window.isOrderMode);
+        document.getElementById("workModal")?.classList.toggle("delete-group-mode", window.isDeleteGroupMode);
+        document.getElementById("workModal")?.classList.toggle("hide-group-mode", window.isHideGroupMode);
         window.updateRememberModeBtn();
     };
 
@@ -827,6 +878,16 @@
         (window.groups || []).forEach(g => {
             const el = document.querySelector(`#workDragContainer > .drag-item[data-group-ref="${g.id}"]`);
             if (el) el.classList.toggle("has-remember", !!g.remember && g.id !== "duration");
+        });
+    };
+
+    window.refreshWorkGroupVisibility = () => {
+        const editingLayout = !!window.isWorkLayoutMode;
+        document.querySelectorAll("#workDragContainer > .drag-item[data-group-ref]").forEach(el => {
+            const g = window.getGroupById?.(el.dataset.groupRef);
+            const hidden = !!g?.hiddenInWork;
+            el.classList.toggle("is-hidden-in-work", hidden);
+            el.style.display = hidden && !editingLayout ? "none" : "";
         });
     };
 
@@ -1001,6 +1062,9 @@
             else window.activeEquips[tag.name] = 1;
         } else if (type === "memoTag") {
             window.toggleTagSelection("memoTag", tag.name);
+        } else if (window.getGroupById?.(type)) {
+            // 추가로 만든 선택태그상자도 기본 그룹과 동일하게 짧은 탭 선택 / 롱탭 편집을 지원한다.
+            window.toggleCustomGroupTag(type, tag.name);
         }
         window.renderChangedTagType(type);
     };
@@ -1035,16 +1099,26 @@
         const countBtn = document.getElementById("tagCountSuffixBtn");
         const dupBtn = document.getElementById("tagDuplicateBtn");
         const groupId = window.typeToGroupId(window.editingTagType);
+        const paintToggle = (button, on, label, available = true, hint = '') => {
+            if (!button) return;
+            button.disabled = !available;
+            button.style.opacity = available ? '1' : '0.42';
+            button.className = `w95-btn tag-toggle-btn ${on && available ? "is-on" : "is-off"}`;
+            button.innerText = `${on && available ? '✓' : '□'} ${label}`;
+            button.setAttribute('aria-pressed', on && available ? 'true' : 'false');
+            button.title = hint || `${label} ${on ? '켜짐' : '꺼짐'}`;
+        };
         if (qty) qty.innerText = String(window.tempTagQty || 0);
-        if (numberBtn) numberBtn.className = `w95-btn tag-toggle-btn ${window.groupShowsNumber(groupId) ? "is-on" : "is-off"}`;
-        if (monthlyBtn) monthlyBtn.className = `w95-btn tag-toggle-btn ${window.groupIncludesMonthly(groupId) ? "is-on" : "is-off"}`;
-        if (countBtn) countBtn.className = `w95-btn tag-toggle-btn ${window.groupShowsCount(groupId) ? "is-on" : "is-off"}`;
+        paintToggle(numberBtn, window.groupShowsNumber(groupId), '숫자', true, '태그 앞에 이번 달 집계 숫자를 표시');
+        paintToggle(monthlyBtn, window.groupIncludesMonthly(groupId), '월별', true, '이 그룹을 월별 집계에 포함');
+        const countAvailable = groupId !== 'equipments';
+        paintToggle(countBtn, window.groupShowsCount(groupId), '갯수', countAvailable,
+            countAvailable ? '태그 뒤에 직접 설정한 갯수를 표시' : '장비는 현재 일지의 실제 수량을 자동 표시하므로 별도 갯수 기능을 사용하지 않음');
         if (dupBtn) {
             const toggleable = canToggleSelectionMode(groupId);
             const g = window.getGroupById(groupId);
-            dupBtn.disabled = !toggleable;
-            dupBtn.style.opacity = toggleable ? "1" : "0.4";
-            dupBtn.className = `w95-btn tag-toggle-btn ${toggleable && g && g.selectionMode === "multi" ? "is-on" : "is-off"}`;
+            paintToggle(dupBtn, !!g && g.selectionMode === "multi", '중복', toggleable,
+                toggleable ? '한 그룹에서 여러 항목을 동시에 선택' : '이 그룹은 단일값 또는 수량 방식이라 중복 선택을 지원하지 않음');
         }
     };
 
@@ -1063,7 +1137,7 @@
         }
         window.refreshTagEditControls();
         window.markDirty?.("master", "groups", "upsert");
-        if (window.saveLocal) window.saveLocal();
+        if (window.saveLocal) window.saveLocal("group-settings");
         window.renderChangedTagType(window.editingTagType);
     };
 
@@ -1081,7 +1155,7 @@
         }
         window.refreshTagEditControls();
         window.markDirty?.("master", "groups", "upsert");
-        if (window.saveLocal) window.saveLocal();
+        if (window.saveLocal) window.saveLocal("group-settings");
         window.renderChangedTagType(type);
     };
 
@@ -1093,7 +1167,7 @@
         g.showNumber = !window.groupShowsNumber(groupId);
         window.refreshTagEditControls();
         window.markDirty?.("master", "groups", "upsert");
-        if (window.saveLocal) window.saveLocal();
+        if (window.saveLocal) window.saveLocal("group-settings");
         window.renderChangedTagType(window.editingTagType);
     };
 
@@ -1104,7 +1178,7 @@
         g.includeMonthly = !window.groupIncludesMonthly(groupId);
         window.refreshTagEditControls();
         window.markDirty?.("master", "groups", "upsert");
-        if (window.saveLocal) window.saveLocal();
+        if (window.saveLocal) window.saveLocal("group-settings");
         window.renderChangedTagType(window.editingTagType);
     };
 
@@ -1116,7 +1190,7 @@
         g.showCount = !window.groupShowsCount(groupId);
         window.refreshTagEditControls();
         window.markDirty?.("master", "groups", "upsert");
-        if (window.saveLocal) window.saveLocal();
+        if (window.saveLocal) window.saveLocal("group-settings");
         window.renderChangedTagType(window.editingTagType);
     };
 

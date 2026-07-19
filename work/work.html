@@ -94,7 +94,9 @@
     <div id="workModal" class="modal-overlay">
         <div class="modal-box w95-window">
             <div id="workModalTitlebar" class="w95-titlebar">
-                <span>작업 일지 작성</span>
+                <button type="button" id="workLayoutHideBtn" class="w95-btn work-layout-hide-btn"
+                    title="켜 둔 동안 선택태그상자를 탭해서 작업일지에서 숨김/복원"
+                    onclick="window.toggleHideGroupMode()">숨기기</button>
                 <div class="work-layout-title-actions">
                     <button type="button" id="workRememberModeBtn" class="w95-btn work-layout-remember-btn"
                         title="켜고 그룹을 탭하면 그 그룹만 기억 on/off 토글(다시 탭하면 해제)" onclick="window.toggleRememberSelectMode()">기억</button>

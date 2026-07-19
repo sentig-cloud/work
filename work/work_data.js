@@ -179,6 +179,20 @@ window.ensureDefaultGroups = function () {
             window.groups.push({ ...defaultGroup, tags: [...defaultGroup.tags] });
         }
     });
+    window.groups.forEach((g, index) => {
+        if (!Array.isArray(g.tags)) g.tags = [];
+        if (typeof g.showNumber !== 'boolean') g.showNumber = true;
+        if (typeof g.includeMonthly !== 'boolean') g.includeMonthly = true;
+        if (typeof g.showCount !== 'boolean') g.showCount = false;
+        if (!g.selectionMode) {
+            if (g.id === 'statuses') g.selectionMode = 'single';
+            else if (g.id === 'equipments') g.selectionMode = 'qty';
+            else if (g.id === 'memoTags') g.selectionMode = 'tag';
+            else if (g.id === 'duration') g.selectionMode = 'duration';
+            else g.selectionMode = 'multi';
+        }
+        if (!Number.isFinite(Number(g.order))) g.order = index;
+    });
 };
 
 // groups 로드 (없으면 기본값)
