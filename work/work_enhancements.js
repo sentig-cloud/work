@@ -200,8 +200,9 @@
     // 두 후보 자리 사이를 오가며 파르르 떠는 것처럼 보였음. 아이폰 홈화면 아이콘 재배치처럼
     // 일정 간격(아래 REORDER_THROTTLE_MS)마다만 자리를 바꿔서 CSS transition이 끊기지 않고
     // 끝까지 재생되도록 한다.
-    let lastBlockReorderAt = 0;
-    const REORDER_THROTTLE_MS = 140;
+    let lastBlockReorderAt = 0, lastBlockReorderPoint = null;
+    const REORDER_THROTTLE_MS = 220;
+    const REORDER_RELEASE_DISTANCE = 22;
 
     // 순서 모드에서 이미 선택된(주황 사각) 블록의 몸체를 바로 누르면 그대로 끌어서 이동 —
     // 별도 손잡이 아이콘 없이 "누르고 있는 대상을 다른 대상 쪽으로 밀어넣는" 자연스러운 방식.
@@ -215,6 +216,7 @@
         blockDragParent = getDragScope(el);
         el.classList.add("is-block-dragging");
         lastBlockReorderAt = 0;
+        lastBlockReorderPoint = null;
         if (navigator.vibrate) navigator.vibrate(25);
     };
 
@@ -227,13 +229,22 @@
         if (!target || target === blockDragEl || target.parentElement !== blockDragParent) return;
         const rect = target.getBoundingClientRect();
         // 위/아래로 쌓인 블록이므로 세로 위치 기준으로 앞/뒤를 정한다
-        const before = point.clientY < rect.top + rect.height / 2;
+        // 가운데 경계에서는 순서를 바꾸지 않는다. 경계에 걸친 손가락의 미세한
+        // 흔들림으로 앞/뒤가 연속 교환되는 현상을 막고, 위/아래 35% 영역에서만 확정한다.
+        const ratioY = (point.clientY - rect.top) / Math.max(rect.height, 1);
+        if (ratioY >= 0.35 && ratioY <= 0.65) return;
+        const before = ratioY < 0.35;
         const desiredNext = before ? target : target.nextSibling;
         // 이미 그 자리면 아무것도 하지 않음(불필요한 재배치가 떨림의 절반 이상 원인이었음)
         if (blockDragEl.nextSibling === desiredNext) return;
         const now = Date.now();
         if (now - lastBlockReorderAt < REORDER_THROTTLE_MS) return;
+        if (lastBlockReorderPoint && Math.hypot(
+            point.clientX - lastBlockReorderPoint.x,
+            point.clientY - lastBlockReorderPoint.y
+        ) < REORDER_RELEASE_DISTANCE) return;
         lastBlockReorderAt = now;
+        lastBlockReorderPoint = { x: point.clientX, y: point.clientY };
         document.querySelectorAll(".is-block-drop-target").forEach(i => i.classList.remove("is-block-drop-target"));
         target.classList.add("is-block-drop-target");
         blockDragParent.insertBefore(blockDragEl, desiredNext);
@@ -1532,8 +1543,9 @@
         // move()에서 매 pointermove마다 재배치하면 두 후보 자리 사이를 오가며 파르르 떠는 것처럼
         // 보였음 — 아이폰 홈화면 아이콘처럼 일정 간격(REORDER_THROTTLE_MS)마다만 자리를 바꿔서
         // CSS transition이 끊기지 않고 끝까지 재생되게 한다.
-        let lastCellReorderAt = 0;
-        const REORDER_THROTTLE_MS = 140;
+        let lastCellReorderAt = 0, lastCellReorderPoint = null;
+        const REORDER_THROTTLE_MS = 220;
+        const REORDER_RELEASE_DISTANCE = 22;
 
         const selectCell = (cell) => {
             if (selectedCell && selectedCell !== cell) selectedCell.classList.remove("is-widget-selected");
@@ -1635,14 +1647,27 @@
             }
             if (!target || target === dragCell || target.parentElement !== dragGroup) return;
             const rect = target.getBoundingClientRect();
-            const before = point.clientY < rect.top + rect.height / 2 ||
-                (Math.abs(point.clientY - (rect.top + rect.height / 2)) < rect.height / 3 && point.clientX < rect.left + rect.width / 2);
+            const ratioX = (point.clientX - rect.left) / Math.max(rect.width, 1);
+            const ratioY = (point.clientY - rect.top) / Math.max(rect.height, 1);
+            // 대상 칸 중앙 30%는 중립 구간이다. 세로로 충분히 넘어갔거나,
+            // 같은 줄에서는 좌우로 충분히 넘어갔을 때만 이동을 확정한다.
+            let before;
+            if (ratioY < 0.35) before = true;
+            else if (ratioY > 0.65) before = false;
+            else if (ratioX < 0.35) before = true;
+            else if (ratioX > 0.65) before = false;
+            else return;
             const desiredNext = before ? target : target.nextSibling;
             // 이미 그 자리면 아무것도 하지 않음(불필요한 재배치가 떨림의 절반 이상 원인이었음)
             if (dragCell.nextSibling === desiredNext) return;
             const now = Date.now();
             if (now - lastCellReorderAt < REORDER_THROTTLE_MS) return;
+            if (lastCellReorderPoint && Math.hypot(
+                point.clientX - lastCellReorderPoint.x,
+                point.clientY - lastCellReorderPoint.y
+            ) < REORDER_RELEASE_DISTANCE) return;
             lastCellReorderAt = now;
+            lastCellReorderPoint = { x: point.clientX, y: point.clientY };
             dragGroup.insertBefore(dragCell, desiredNext);
         };
 
@@ -1653,6 +1678,7 @@
             if (dragCell || resizeCell) window.saveWorkLayout && window.saveWorkLayout();
             dragCell = null; dragGroup = null; resizeCell = null; resizeStart = null;
             pendingResizeCell = null; pendingResizeStart = null;
+            lastCellReorderPoint = null;
             resizeHandleLongPressed = false;
         };
 

@@ -35,14 +35,14 @@ html, body {
 .w95-btn:active { 
     border-color: var(--w-black) var(--w-white) var(--w-white) var(--w-black);
     box-shadow: inset 1px 1px var(--w-dark-gray);
-    padding: 1px 7px -1px 9px;
+    padding: 0 8px;
 }
 
 .active-btn { 
     background: var(--w-blue) !important; color: var(--w-white) !important; 
     border-color: var(--w-black) var(--w-white) var(--w-white) var(--w-black) !important; 
     box-shadow: inset 1px 1px var(--w-dark-gray) !important; 
-    padding: 1px 7px -1px 9px; 
+    padding: 0 8px; 
 }
 
 .w95-window { background: var(--w-gray); border: 2px solid; border-color: var(--w-white) var(--w-black) var(--w-black) var(--w-white); }
@@ -357,7 +357,35 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
     background: #d97706;
     box-shadow: inset 1px 1px 0 #7c2d12;
 }
-.work-layout-title-actions { display:flex; align-items:center; gap:4px; }
+#workModalTitlebar {
+    position: relative;
+    min-height: 30px;
+    padding-right: 38px;
+    box-sizing: border-box;
+}
+.work-layout-title-actions {
+    display:flex;
+    align-items:center;
+    gap:4px;
+    margin-left:auto;
+    min-width:0;
+}
+#workLayoutModeBtn {
+    position:absolute;
+    right:4px;
+    top:50%;
+    transform:translateY(-50%);
+    width:28px;
+    min-width:28px;
+    height:24px;
+    padding:0 !important;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    box-sizing:border-box;
+    touch-action:none;
+    z-index:30;
+}
 .work-layout-hide-btn {
     display:none;
     height:24px;
