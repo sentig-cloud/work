@@ -457,8 +457,10 @@ input, textarea, [contenteditable="true"] {
 .box-title:active { background: rgba(0,0,0,0.1); }
 .box-title.is-log-excluded {
     color: #dc2626;
-    text-decoration: line-through;
-    text-decoration-thickness: 1px;
+    text-decoration-line: underline;
+    text-decoration-color: #dc2626;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
 }
 
 /* 기억(remember) 켜진 그룹 표시 — 제목이 있는 줄(상자) 오른쪽 위에 초록 점(.drag-item은 이미 position:relative) */
