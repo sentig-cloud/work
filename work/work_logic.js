@@ -188,7 +188,7 @@ window.getWorkDraftText = () => {
     const otCount = Number(window.workOTCount) || 0;
     const equips = Object.entries(window.activeEquips || {})
         .filter((entry) => Number(entry[1]) > 0)
-        .map((entry) => `${entry[0]} ${entry[1]}`)
+        .map((entry) => Number(entry[1]) > 1 ? `${entry[0]} ${entry[1]}` : entry[0])
         .join(", ");
 
     return [

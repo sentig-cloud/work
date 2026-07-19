@@ -48,7 +48,7 @@ window.WorkExport = {
                         if (log.equips) {
                             value = Object.entries(log.equips)
                                 .filter(entry => entry[1] > 0)
-                                .map(entry => `${entry[0]} ${entry[1]}`)
+                                .map(entry => Number(entry[1]) > 1 ? `${entry[0]} ${entry[1]}` : entry[0])
                                 .join(", ");
                         }
 

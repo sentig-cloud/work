@@ -92,7 +92,7 @@ const DEFAULT_GROUPS = [
         title: '장비',
         enabled: true,
         order: 3,
-        selectionMode: 'qty',
+        selectionMode: 'multi',
         remember: false,
         showNumber: true,
         includeMonthly: true,
@@ -186,11 +186,15 @@ window.ensureDefaultGroups = function () {
         if (typeof g.showCount !== 'boolean') g.showCount = false;
         if (!g.selectionMode) {
             if (g.id === 'statuses') g.selectionMode = 'single';
-            else if (g.id === 'equipments') g.selectionMode = 'qty';
+            else if (g.id === 'equipments') g.selectionMode = 'multi';
             else if (g.id === 'memoTags') g.selectionMode = 'tag';
             else if (g.id === 'duration') g.selectionMode = 'duration';
             else g.selectionMode = 'multi';
         }
+        // 작업일지의 수량형 선택상자는 일반 다중 선택상자로 통일한다.
+        // 기존 log.equips 객체는 변환하지 않아 과거 수량 데이터와 내보내기 호환성을 보존한다.
+        if (g.selectionMode === 'qty') g.selectionMode = 'multi';
+        if (g.id === 'equipments') g.showCount = false;
         if (!Number.isFinite(Number(g.order))) g.order = index;
     });
 };
@@ -325,6 +329,11 @@ window.setGroupSelection = function (groupId, names) {
     if (groupId === 'taskTypes') { window.activeTaskTypes = names; return; }
     if (groupId === 'coworkers') { window.selectedCoworkers = names; return; }
     if (groupId === 'statuses') { window.activeStatus = names[0] || null; return; }
+    if (groupId === 'equipments') {
+        window.activeEquips = {};
+        (names || []).forEach(name => { window.activeEquips[name] = 1; });
+        return;
+    }
     if (groupId === 'memoTags') { window.activeEditTags = names; return; }
     window.activeCustomGroupSelections[groupId] = names;
 };
@@ -388,7 +397,9 @@ window.getGroupTagMonthlyCount = function (groupId, tagName) {
     return logs.reduce((sum, l) => {
         if (window.isLogGroupExcluded(l, groupId)) return sum;
         const val = window.getGroupValueFromLog(l, groupId);
-        if (groupId === 'equipments') return sum + Number((val && val[tagName]) || 0);
+        // 장비도 일반 선택태그처럼 일지 한 건당 최대 1회로 카운팅한다.
+        // 과거 수량 2 이상 값은 원본에 보존하되 월별 화면에서는 1건으로 센다.
+        if (groupId === 'equipments') return sum + (Number((val && val[tagName]) || 0) > 0 ? 1 : 0);
         if (Array.isArray(val)) return sum + (val.includes(tagName) ? 1 : 0);
         return sum + (val === tagName ? 1 : 0);
     }, 0);

@@ -35,9 +35,9 @@
         const baseCount = Number(tag.count) || 0;
         // 장비 수량은 현재 일지의 선택값만 표시한다. 마스터 tag.count를 기본 수량처럼 재사용하면
         // 선택하지 않은 장비도 T(2)처럼 보이고 편집창에도 2가 들어가는 오류가 생긴다.
-        const countSuffix = qty > 0
-            ? ` (${qty})`
-            : (type !== "equip" && window.groupShowsCount(groupId) && baseCount > 0 ? ` (${baseCount})` : "");
+        const countSuffix = type !== "equip" && window.groupShowsCount(groupId) && baseCount > 0
+            ? ` (${baseCount})`
+            : "";
         return `${monthly}${tag.name}${countSuffix}`;
     };
 
@@ -1058,8 +1058,15 @@
         } else if (type === "status") {
             window.activeStatus = window.activeStatus === tag.name ? null : tag.name;
         } else if (type === "equip") {
-            if (Number(window.activeEquips && window.activeEquips[tag.name] || 0) > 0) delete window.activeEquips[tag.name];
-            else window.activeEquips[tag.name] = 1;
+            window.activeEquips = window.activeEquips || {};
+            const group = window.getGroupById?.("equipments");
+            const selected = Number(window.activeEquips[tag.name] || 0) > 0;
+            if (selected) {
+                delete window.activeEquips[tag.name];
+            } else {
+                if (group?.selectionMode === "single") window.activeEquips = {};
+                window.activeEquips[tag.name] = 1;
+            }
         } else if (type === "memoTag") {
             window.toggleTagSelection("memoTag", tag.name);
         } else if (window.getGroupById?.(type)) {
@@ -1098,6 +1105,7 @@
         const monthlyBtn = document.getElementById("tagMonthlyBtn");
         const countBtn = document.getElementById("tagCountSuffixBtn");
         const dupBtn = document.getElementById("tagDuplicateBtn");
+        const qtyRow = document.getElementById("tagQtyControlRow");
         const groupId = window.typeToGroupId(window.editingTagType);
         const paintToggle = (button, on, label, available = true, hint = '') => {
             if (!button) return;
@@ -1109,6 +1117,7 @@
             button.title = hint || `${label} ${on ? '켜짐' : '꺼짐'}`;
         };
         if (qty) qty.innerText = String(window.tempTagQty || 0);
+        if (qtyRow) qtyRow.style.display = groupId === 'equipments' ? 'none' : 'flex';
         paintToggle(numberBtn, window.groupShowsNumber(groupId), '숫자', true, '태그 앞에 이번 달 집계 숫자를 표시');
         paintToggle(monthlyBtn, window.groupIncludesMonthly(groupId), '월별', true, '이 그룹을 월별 집계에 포함');
         const countAvailable = groupId !== 'equipments';
@@ -1148,11 +1157,6 @@
         if (!tag) return;
         window.tempTagQty = Math.max(0, Number(window.tempTagQty || 0) + delta);
         if (type !== "equip") tag.count = window.tempTagQty;
-        if (type === "equip") {
-            window.activeEquips = window.activeEquips || {};
-            if (window.tempTagQty > 0) window.activeEquips[tag.name] = window.tempTagQty;
-            else delete window.activeEquips[tag.name];
-        }
         window.refreshTagEditControls();
         window.markDirty?.("master", "groups", "upsert");
         if (window.saveLocal) window.saveLocal("group-settings");

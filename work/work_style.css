@@ -124,6 +124,30 @@ html, body {
 .today-robot.action-spin { animation:robotSpin .9s steps(8,end) 2; }
 .today-robot.action-dance { animation:robotDance .42s steps(2,end) infinite; }
 .today-robot.action-dance .robot-antenna span { animation:robotPartyLight .2s steps(1,end) infinite; }
+.today-robot.action-patrol { animation:robotPatrol .3s steps(2,end) infinite; filter:contrast(1.15); }
+.today-robot.action-charge { animation:robotCharge .45s steps(2,end) infinite; }
+.today-robot.action-charge .robot-body { background:#1d4ed8; }
+.today-robot.action-celebrate { animation:robotCelebrate .42s steps(2,end) infinite; }
+
+.robot-speech {
+    display:none; position:absolute; right:42px; top:-20px; min-width:34px; padding:3px 5px;
+    background:#ffffe1; color:#111; border:2px solid; border-color:#fff #404040 #404040 #fff;
+    font:900 9px/1.1 "Gulim","Tahoma",sans-serif; white-space:nowrap; pointer-events:none;
+}
+.robot-speech.is-visible { display:block; animation:robotSpeechPop .25s steps(2,end); }
+.robot-pet {
+    display:none; position:absolute; left:-22px; bottom:1px; width:22px; height:15px;
+    background:#b7793f; border:2px solid #302010; box-sizing:border-box; pointer-events:none;
+}
+.robot-pet.is-visible { display:block; animation:petWalk .28s steps(2,end) infinite; }
+.pet-ear { position:absolute; top:-7px; width:6px; height:8px; background:#8b572a; border:2px solid #302010; box-sizing:border-box; }
+.pet-ear-left { left:1px; transform:rotate(-18deg); } .pet-ear-right { right:1px; transform:rotate(18deg); }
+.pet-eye { position:absolute; left:5px; top:3px; width:3px; height:3px; background:#111; }
+.pet-nose { position:absolute; left:-5px; top:5px; width:5px; height:4px; background:#302010; }
+.pet-tail { position:absolute; right:-7px; top:1px; width:8px; height:3px; background:#8b572a; transform-origin:left center; animation:petTail .2s steps(2,end) infinite; }
+.robot-ball { display:none; position:absolute; left:-13px; bottom:0; width:9px; height:9px; border-radius:50%; background:#ff3b30; border:2px solid #501010; box-sizing:border-box; pointer-events:none; }
+.robot-ball.is-visible { display:block; animation:robotBallFetch .7s steps(5,end) infinite alternate; }
+.today-robot-fab.is-fetching .robot-pet { animation:petFetch .7s steps(4,end) infinite alternate; }
 
 @keyframes todayRobotBob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
 @keyframes robotBeacon { 0%,60%{background:#ff3b30} 61%,100%{background:#ffff00} }
@@ -136,8 +160,16 @@ html, body {
 @keyframes robotDance { 0%{transform:translate(-3px,-2px) rotate(-8deg)} 100%{transform:translate(3px,-2px) rotate(8deg)} }
 @keyframes robotTear { 0%{transform:translateY(0);opacity:1} 100%{transform:translateY(5px);opacity:.2} }
 @keyframes robotPartyLight { 0%{background:#ff3b30} 33%{background:#ffff00} 66%{background:#00ff66} 100%{background:#27a7ff} }
+@keyframes robotPatrol { 0%{transform:translateY(0) rotate(-3deg)} 100%{transform:translateY(-4px) rotate(3deg)} }
+@keyframes robotCharge { 0%{filter:brightness(.7)} 100%{filter:brightness(1.45)} }
+@keyframes robotCelebrate { 0%{transform:translate(-4px,-4px) rotate(-10deg)} 100%{transform:translate(4px,-8px) rotate(10deg)} }
+@keyframes robotSpeechPop { from{transform:scale(.5);opacity:0} to{transform:scale(1);opacity:1} }
+@keyframes petWalk { 0%{transform:translateY(0)} 100%{transform:translateY(-3px)} }
+@keyframes petTail { 0%{transform:rotate(-25deg)} 100%{transform:rotate(35deg)} }
+@keyframes robotBallFetch { from{transform:translate(0,0)} to{transform:translate(27px,-20px)} }
+@keyframes petFetch { from{transform:translateX(0)} to{transform:translateX(18px)} }
 @media (prefers-reduced-motion: reduce) {
-    .today-robot, .robot-antenna span, .robot-arm { animation:none !important; }
+    .today-robot, .robot-antenna span, .robot-arm, .robot-pet, .pet-tail, .robot-ball, .robot-speech { animation:none !important; }
 }
 
 .layer { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--w-bg); z-index: 1000; flex-direction: column; }

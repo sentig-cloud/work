@@ -258,7 +258,8 @@ window.getLogCardHtml = (l, indexStr = '') => {
         if (l.address) detailsHtml.push(`<div style="color:#475569; font-size:0.85rem;"><i class="fa-solid fa-map-marker-alt" style="width:16px;"></i> ${l.address}</div>`);
         if (l.customerName) detailsHtml.push(`<div style="color:#6366f1; font-size:0.85rem; font-weight:bold;"><i class="fa-solid fa-user" style="width:16px;"></i> ${l.customerName}</div>`);
         if (l.equips) {
-            let eqStr = Object.entries(l.equips).filter(e => e[1] > 0).map(e => `${e[0]} ${e[1]}`).join(', ');
+            let eqStr = Object.entries(l.equips).filter(e => e[1] > 0)
+                .map(e => Number(e[1]) > 1 ? `${e[0]} ${e[1]}` : e[0]).join(', ');
             if (eqStr) detailsHtml.push(`<div style="color:#0f766e; font-size:0.85rem; font-weight:bold; ${excludedCardStyle('equipments')}"><i class="fa-solid fa-box" style="width:16px;"></i> ${eqStr}</div>`);
         }
         if (l.otCount) detailsHtml.push(`<div style="color:#e11d48; font-size:0.85rem; font-weight:bold;"><i class="fa-solid fa-clock" style="width:16px;"></i> OT</div>`);

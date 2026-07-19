@@ -47,11 +47,29 @@ window.setupFAB = () => {
     const robot = fab.querySelector('.today-robot');
     if (robot && !fab.dataset.expressionTimerStarted) {
         fab.dataset.expressionTimerStarted = '1';
+        const pet = fab.querySelector('.robot-pet');
+        const ball = fab.querySelector('.robot-ball');
+        const speech = fab.querySelector('.robot-speech');
         const stateClasses = [
             'face-happy', 'face-surprised', 'face-sleepy', 'face-wink', 'face-cry',
-            'action-walk', 'action-hop', 'action-spin', 'action-dance', 'action-sneak'
+            'action-walk', 'action-hop', 'action-spin', 'action-dance', 'action-sneak',
+            'action-charge', 'action-patrol', 'action-celebrate'
         ];
-        const clearRobotState = () => robot.classList.remove(...stateClasses);
+        const personalities = [
+            ['dogwalk', 'fetch', 'walk', 'happy', 'hop', 'wink'],
+            ['patrol', 'sneak', 'walk', 'spin', 'surprised', 'charge'],
+            ['dance', 'celebrate', 'happy', 'hop', 'fetch', 'cry'],
+            ['sleepy', 'charge', 'wink', 'dogwalk', 'walk', 'happy']
+        ];
+        const sessionActions = personalities[Math.floor(Math.random() * personalities.length)];
+        fab.dataset.mascotPersonality = String(personalities.indexOf(sessionActions) + 1);
+        const clearRobotState = () => {
+            robot.classList.remove(...stateClasses);
+            fab.classList.remove('has-pet', 'is-fetching');
+            if (speech) { speech.textContent = ''; speech.classList.remove('is-visible'); }
+            if (pet) pet.classList.remove('is-visible');
+            if (ball) ball.classList.remove('is-visible');
+        };
         const modalIsBusy = () => document.getElementById('workModal')?.style.display === 'flex'
             || document.getElementById('tagEditModal')?.style.display === 'flex';
 
@@ -62,23 +80,36 @@ window.setupFAB = () => {
             }
 
             clearRobotState();
-            const actions = ['walk', 'happy', 'cry', 'hop', 'spin', 'dance', 'wink', 'sleepy', 'sneak'];
-            const action = actions[Math.floor(Math.random() * actions.length)];
+            const action = sessionActions[Math.floor(Math.random() * sessionActions.length)];
             let duration = 1800;
 
-            if (action === 'walk' || action === 'sneak') {
+            const sayings = {
+                dogwalk: '산책!', fetch: '공놀이!', patrol: '순찰 중', charge: '충전...',
+                celebrate: '완료!', happy: '히히', cry: '흑...', sleepy: 'Zzz',
+                sneak: '살금살금', walk: '총총', dance: '♬', spin: '빙글', hop: '폴짝', wink: '찡긋'
+            };
+            if (speech) {
+                speech.textContent = sayings[action] || '!';
+                speech.classList.add('is-visible');
+            }
+
+            if (action === 'walk' || action === 'sneak' || action === 'dogwalk' || action === 'patrol') {
                 const rect = fab.getBoundingClientRect();
                 const maxLeft = Math.max(4, window.innerWidth - fab.offsetWidth - 4);
                 const maxTop = Math.max(4, window.innerHeight - fab.offsetHeight - 4);
-                const range = action === 'walk' ? 110 : 65;
+                const range = action === 'patrol' ? 150 : (action === 'dogwalk' ? 125 : (action === 'walk' ? 110 : 65));
                 const targetLeft = Math.min(maxLeft, Math.max(4, rect.left + (Math.random() * range * 2 - range)));
                 const targetTop = Math.min(maxTop, Math.max(4, rect.top + (Math.random() * 50 - 25)));
                 fab.style.right = 'auto';
                 fab.style.bottom = 'auto';
                 fab.style.left = `${rect.left}px`;
                 fab.style.top = `${rect.top}px`;
-                robot.classList.add(action === 'walk' ? 'action-walk' : 'action-sneak');
-                duration = action === 'walk' ? 2700 : 3300;
+                robot.classList.add(action === 'sneak' ? 'action-sneak' : (action === 'patrol' ? 'action-patrol' : 'action-walk'));
+                if (action === 'dogwalk' && pet) {
+                    fab.classList.add('has-pet');
+                    pet.classList.add('is-visible');
+                }
+                duration = action === 'patrol' ? 3600 : (action === 'dogwalk' ? 3200 : (action === 'walk' ? 2500 : 3000));
                 requestAnimationFrame(() => {
                     fab.style.transition = `left ${duration}ms steps(10,end), top ${duration}ms linear`;
                     fab.style.left = `${targetLeft}px`;
@@ -87,20 +118,26 @@ window.setupFAB = () => {
             } else {
                 const classMap = {
                     happy: 'face-happy', cry: 'face-cry', hop: 'action-hop', spin: 'action-spin',
-                    dance: 'action-dance', wink: 'face-wink', sleepy: 'face-sleepy'
+                    dance: 'action-dance', wink: 'face-wink', sleepy: 'face-sleepy',
+                    charge: 'action-charge', celebrate: 'action-celebrate', surprised: 'face-surprised'
                 };
-                robot.classList.add(classMap[action]);
+                if (classMap[action]) robot.classList.add(classMap[action]);
                 if (action === 'happy') robot.classList.add('action-hop');
-                duration = action === 'sleepy' ? 3200 : (action === 'cry' ? 2600 : 1900);
+                if (action === 'fetch' && pet && ball) {
+                    fab.classList.add('has-pet', 'is-fetching');
+                    pet.classList.add('is-visible');
+                    ball.classList.add('is-visible');
+                }
+                duration = action === 'sleepy' ? 2800 : (action === 'charge' ? 3000 : (action === 'fetch' ? 2700 : (action === 'cry' ? 2300 : 1700)));
             }
 
             window.setTimeout(() => {
                 clearRobotState();
                 fab.style.transition = '0.2s';
-                window.setTimeout(runRobotAction, 2200 + Math.floor(Math.random() * 4200));
+                window.setTimeout(runRobotAction, 900 + Math.floor(Math.random() * 2300));
             }, duration);
         };
-        window.setTimeout(runRobotAction, 1400);
+        window.setTimeout(runRobotAction, 350 + Math.floor(Math.random() * 650));
     }
 
     let isDragging = false;

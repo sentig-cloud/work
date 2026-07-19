@@ -50,6 +50,12 @@
             <span class="robot-foot robot-foot-left"></span>
             <span class="robot-foot robot-foot-right"></span>
         </div>
+        <div class="robot-speech" aria-hidden="true"></div>
+        <div class="robot-pet" aria-hidden="true">
+            <span class="pet-ear pet-ear-left"></span><span class="pet-ear pet-ear-right"></span>
+            <span class="pet-eye"></span><span class="pet-nose"></span><span class="pet-tail"></span>
+        </div>
+        <div class="robot-ball" aria-hidden="true"></div>
     </div>
 
     <div id="popupLayer" class="layer">
@@ -329,7 +335,7 @@
                         onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}">
                     <button type="button" id="tagDeleteBtn" class="w95-btn tag-delete-btn" onclick="window.deleteTagEdit()">삭제</button>
                 </div>
-                <div class="tag-edit-control-row">
+                <div class="tag-edit-control-row" id="tagQtyControlRow">
                     <button type="button" class="w95-btn icon-btn" onclick="window.changeTagQty(-1)">-</button>
                     <b id="tagQtyDisplay">0</b>
                     <button type="button" class="w95-btn icon-btn" onclick="window.changeTagQty(1)">+</button>
