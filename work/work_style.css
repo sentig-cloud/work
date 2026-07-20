@@ -636,12 +636,33 @@ input, textarea, [contenteditable="true"] {
 #searchLayer.is-search-edit .search-edit-actions { display:flex; }
 #searchLayer.is-search-edit .search-filter-cell { cursor:grab; touch-action:none; }
 #searchLayer.is-search-edit .search-filter-cell.is-search-selected { outline:3px solid #f59e0b; outline-offset:1px; }
-#searchLayer.is-search-edit .search-filter-cell.is-search-excluded { background:#fee2e2; text-decoration:line-through; }
+#searchLayer.is-search-edit .search-filter-cell.is-search-excluded {
+    background:#ff3b30; color:#fff; outline:3px solid #7f1d1d; text-decoration:line-through;
+}
+#searchLayer.is-search-edit .search-filter-cell.is-search-excluded select { background:#ffb4ae; color:#5f0000; font-weight:900; }
+#searchLayer.is-search-edit .search-filter-cell.is-search-hidden { background:#4338ca; outline:3px solid #1e1b4b; }
+#searchLayer.is-search-edit .search-filter-cell.is-search-hidden select { background:#c7d2fe; color:#1e1b4b; font-weight:900; }
 #searchLayer.is-search-edit .search-filter-cell.is-search-hidden::after {
     content:'숨김'; position:absolute; right:2px; top:2px; padding:1px 3px;
     background:#7f1d1d; color:#fff; font-size:.62rem; font-weight:900; pointer-events:none;
 }
 #searchLayer.is-search-edit .search-filter-cell select { pointer-events:none; opacity:.88; }
+
+.log-card.is-card-multi-selected {
+    outline:4px solid #ff8c00 !important; outline-offset:-4px;
+    background:#fff7cc !important; box-shadow:0 0 0 3px #7c2d12 !important;
+}
+.log-card.is-card-multi-selected::after {
+    content:'선택됨'; position:absolute; left:8px; top:8px; z-index:80;
+    padding:3px 7px; background:#ff3b30; color:#fff; border:2px solid #7f1d1d;
+    font-size:.72rem; font-weight:900;
+}
+.card-multi-select-bar {
+    display:none; position:fixed; left:50%; bottom:16px; transform:translateX(-50%);
+    z-index:5000; align-items:center; gap:6px; padding:7px 9px; background:#c0c0c0;
+    box-shadow:4px 4px 0 rgba(0,0,0,.45); white-space:nowrap;
+}
+.card-multi-select-bar b { color:#000080; margin-right:3px; }
 
 /* 기억(remember) 켜진 그룹 표시 — 제목이 있는 줄(상자) 오른쪽 위에 초록 점(.drag-item은 이미 position:relative) */
 .drag-item[data-group-ref].has-remember::before {

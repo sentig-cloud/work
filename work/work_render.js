@@ -369,7 +369,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
         : `<div class="log-time" style="padding:0;">${l.m}/${l.d}(${dayStr}) ${l.time || ''}</div>`;
 
     return `
-    <div class="log-card w95-out ${cardClass}" style="${cardStyle}" onclick="window.handleCardClick('${l.id}', '${l.cat}')">
+    <div class="log-card w95-out ${cardClass}" data-log-id="${l.id}" data-log-cat="${l.cat}" style="${cardStyle}" onclick="window.handleCardClick('${l.id}', '${l.cat}')">
         ${oxWatermark}
         <button type="button" class="btn-del w95-btn" onclick="event.stopPropagation(); window.deleteEntry('${l.id}')">X</button>
         ${taskNoHtml}
@@ -511,7 +511,11 @@ window.renderCustomGroup = (groupId) => {
     if (!el) return;
 
     const sel = window.activeCustomGroupSelections[groupId] || [];
-    const tags = [...g.tags].sort((a, b) => (b.count || 0) - (a.count || 0));
+    const tags = g.tags.sort((a, b) => {
+        const bm = window.groupShowsNumber(groupId) ? window.getGroupTagMonthlyCount(groupId, b.name) : 0;
+        const am = window.groupShowsNumber(groupId) ? window.getGroupTagMonthlyCount(groupId, a.name) : 0;
+        return (bm || Number(b.count) || 0) - (am || Number(a.count) || 0);
+    });
     const showNumber = window.groupShowsNumber(groupId);
     const showCount = window.groupShowsCount(groupId);
 

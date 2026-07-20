@@ -18,7 +18,13 @@
     // 편집창에서 하나를 켜고 끄면 그 그룹에 속한 모든 태그에 똑같이 적용된다.
     const showsNumber = (type) => window.groupShowsNumber(window.typeToGroupId(type));
     const includesMonthly = (type) => window.groupIncludesMonthly(window.typeToGroupId(type));
-    const getSortCount = (tag) => Number(tag && tag.count) || 0;
+    const getSortCount = (type, tag) => {
+        const groupId = window.typeToGroupId(type);
+        const monthly = window.groupShowsNumber(groupId)
+            ? Number(window.getGroupTagMonthlyCount?.(groupId, tag?.name) || 0)
+            : 0;
+        return monthly || Number(tag && tag.count) || 0;
+    };
 
     const replaceInList = (list, old, neu) =>
         Array.isArray(list) ? list.map((n) => n === old ? neu : n) : list;
@@ -68,7 +74,7 @@
     // 태그 렌더링
     // ═══════════════════════════════════════════
     window.renderTaskTypes = () => {
-        (window.taskTypes = window.taskTypes || []).sort((a, b) => getSortCount(b) - getSortCount(a));
+        (window.taskTypes = window.taskTypes || []).sort((a, b) => getSortCount("task", b) - getSortCount("task", a));
         const el = document.getElementById("taskTypeArea"); if (!el) return;
         el.innerHTML = window.taskTypes.map((t, i) =>
             tagButton("task", t, i, (window.activeTaskTypes || []).includes(t.name))
@@ -76,7 +82,7 @@
     };
 
     window.renderCoworkers = () => {
-        (window.coworkers = window.coworkers || []).sort((a, b) => getSortCount(b) - getSortCount(a));
+        (window.coworkers = window.coworkers || []).sort((a, b) => getSortCount("coworker", b) - getSortCount("coworker", a));
         const el = document.getElementById("coworkerArea"); if (!el) return;
         el.innerHTML = window.coworkers.map((c, i) =>
             tagButton("coworker", c, i, (window.selectedCoworkers || []).includes(c.name))
@@ -84,7 +90,7 @@
     };
 
     window.renderStatuses = () => {
-        (window.statuses = window.statuses || []).sort((a, b) => getSortCount(b) - getSortCount(a));
+        (window.statuses = window.statuses || []).sort((a, b) => getSortCount("status", b) - getSortCount("status", a));
         const el = document.getElementById("statusArea"); if (!el) return;
         el.innerHTML = window.statuses.map((s, i) =>
             tagButton("status", s, i, window.activeStatus === s.name)
@@ -94,7 +100,7 @@
     window.renderEquips = () => {
         // 예전엔 여기서 라벨을 직접 만들어서 다른 그룹과 달리 숫자/월별 그룹 설정이 전혀 반영되지
         // 않는 버그가 있었음 — 다른 그룹과 동일하게 tagButton/getTagLabel을 그대로 재사용한다.
-        (window.equipments = window.equipments || []).sort((a, b) => getSortCount(b) - getSortCount(a));
+        (window.equipments = window.equipments || []).sort((a, b) => getSortCount("equip", b) - getSortCount("equip", a));
         const el = document.getElementById("equipArea"); if (!el) return;
         el.innerHTML = window.equipments.map((eq, i) => {
             const cnt = window.activeEquips && window.activeEquips[eq.name] || 0;
@@ -103,7 +109,7 @@
     };
 
     window.renderMemoTags = () => {
-        (window.memoTags = window.memoTags || []).sort((a, b) => getSortCount(b) - getSortCount(a));
+        (window.memoTags = window.memoTags || []).sort((a, b) => getSortCount("memoTag", b) - getSortCount("memoTag", a));
         const el = document.getElementById("editTagArea"); if (!el) return;
         el.innerHTML = window.memoTags.map((t, i) => {
             const active = (window.activeEditTags || []).includes(t.name);
@@ -924,7 +930,7 @@
     const searchSelectId = id => `searchGroup_${String(id).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
 
     window.isSearchEditMode = false;
-    window.selectedSearchGroupId = null;
+    window.selectedSearchGroupIds = new Set();
     window.renderDynamicSearchFilters = (targetMonth = null) => {
         const grid = document.getElementById('searchFilterGrid');
         if (!grid) return;
@@ -937,7 +943,7 @@
         grid.innerHTML = groups.map(g => {
             const value = oldValues[g.id] || '';
             const title = g.title || searchTypeLabels[g.id] || '선택태그';
-            const state = `${g.searchExcluded ? ' is-search-excluded' : ''}${g.searchHidden ? ' is-search-hidden' : ''}${window.selectedSearchGroupId === g.id ? ' is-search-selected' : ''}`;
+            const state = `${g.searchExcluded ? ' is-search-excluded' : ''}${g.searchHidden ? ' is-search-hidden' : ''}${window.selectedSearchGroupIds.has(g.id) ? ' is-search-selected' : ''}`;
             const options = (g.tags || []).map(tag => {
                 const count = searchOptionCount(logs, g.id, tag.name);
                 return `<option value="${esc(tag.name)}" ${value === tag.name ? 'selected' : ''}>[${count}] ${esc(tag.name)}</option>`;
@@ -964,17 +970,24 @@
         window.saveLocal?.('search-layout');
     };
     window.toggleSelectedSearchOption = mode => {
-        const g = window.getGroupById?.(window.selectedSearchGroupId);
-        if (!g) return alert('먼저 검색 칸을 선택하세요.');
-        if (mode === 'excluded') g.searchExcluded = !g.searchExcluded;
-        if (mode === 'hidden') g.searchHidden = !g.searchHidden;
+        const selected = [...window.selectedSearchGroupIds]
+            .map(id => window.getGroupById?.(id)).filter(Boolean);
+        if (!selected.length) return alert('먼저 검색 칸을 하나 이상 선택하세요.');
+        const key = mode === 'excluded' ? 'searchExcluded' : 'searchHidden';
+        const next = !selected.every(g => g[key] === true);
+        selected.forEach(g => {
+            g[key] = next;
+            // 한 칸이 두 상태가 되어 색 의미가 흐려지지 않도록 켤 때는 반대 상태를 해제한다.
+            if (next && key === 'searchExcluded') g.searchHidden = false;
+            if (next && key === 'searchHidden') g.searchExcluded = false;
+        });
         persistSearchLayout();
         const month = Number(document.getElementById('searchMonth')?.value) || null;
         window.renderDynamicSearchFilters(month);
     };
     window.setSearchEditMode = on => {
         window.isSearchEditMode = !!on;
-        window.selectedSearchGroupId = null;
+        window.selectedSearchGroupIds.clear();
         document.getElementById('searchLayer')?.classList.toggle('is-search-edit', !!on);
         const month = Number(document.getElementById('searchMonth')?.value) || null;
         window.renderDynamicSearchFilters(month);
@@ -998,7 +1011,12 @@
     window.cancelSearchResetPress = () => { clearTimeout(searchResetTimer); searchResetStart = null; };
     window.endSearchResetPress = event => {
         event?.preventDefault(); clearTimeout(searchResetTimer); searchResetStart = null;
-        if (!searchResetLong) window.resetSearchInput?.();
+        if (!searchResetLong) {
+            if (window.isSearchEditMode) {
+                persistSearchLayout();
+                window.setSearchEditMode(false);
+            } else window.resetSearchInput?.();
+        }
         searchResetLong = false;
     };
 
@@ -1009,10 +1027,11 @@
         const cell = event.target.closest('.search-filter-cell[data-search-group]');
         if (!cell) return;
         event.preventDefault();
-        window.selectedSearchGroupId = cell.dataset.searchGroup;
+        const id = cell.dataset.searchGroup;
+        if (window.selectedSearchGroupIds.has(id)) window.selectedSearchGroupIds.delete(id);
+        else window.selectedSearchGroupIds.add(id);
         searchDragCell = cell; lastSearchMove = 0;
-        searchGrid.querySelectorAll('.is-search-selected').forEach(el => el.classList.remove('is-search-selected'));
-        cell.classList.add('is-search-selected');
+        cell.classList.toggle('is-search-selected', window.selectedSearchGroupIds.has(id));
         cell.setPointerCapture?.(event.pointerId);
     });
     searchGrid?.addEventListener('pointermove', event => {
@@ -1083,6 +1102,120 @@
         summary.textContent = results.length ? `총 ${results.length}건 검색됨` : '조건에 맞는 기록이 없습니다.';
         summary.style.display = 'block';
     };
+
+    // ─── 카드 다중 선택 / 읽기 쉬운 텍스트 복사 / 시스템 공유(카카오톡 포함) ───
+    window.selectedCardLogIds = new Set();
+    window.isCardSelectionMode = false;
+    const ensureCardSelectionBar = () => {
+        let bar = document.getElementById('cardMultiSelectBar');
+        if (bar) return bar;
+        bar = document.createElement('div');
+        bar.id = 'cardMultiSelectBar';
+        bar.className = 'card-multi-select-bar w95-window';
+        bar.innerHTML = `<b id="cardMultiCount">0개 선택</b>
+            <button type="button" class="w95-btn" onclick="window.copySelectedCards()">복사</button>
+            <button type="button" class="w95-btn" onclick="window.shareSelectedCards()">공유</button>
+            <button type="button" class="w95-btn" onclick="window.closeCardSelectionMode()">취소</button>`;
+        document.body.appendChild(bar);
+        return bar;
+    };
+    const paintCardSelection = () => {
+        document.querySelectorAll('.log-card[data-log-id]').forEach(card => {
+            card.classList.toggle('is-card-multi-selected', window.selectedCardLogIds.has(String(card.dataset.logId)));
+        });
+        const bar = ensureCardSelectionBar();
+        bar.style.display = window.isCardSelectionMode ? 'flex' : 'none';
+        const count = document.getElementById('cardMultiCount');
+        if (count) count.textContent = `${window.selectedCardLogIds.size}개 선택`;
+    };
+    const toggleCardSelection = id => {
+        const key = String(id);
+        if (window.selectedCardLogIds.has(key)) window.selectedCardLogIds.delete(key);
+        else window.selectedCardLogIds.add(key);
+        paintCardSelection();
+    };
+    window.closeCardSelectionMode = () => {
+        window.isCardSelectionMode = false;
+        window.selectedCardLogIds.clear();
+        paintCardSelection();
+    };
+    const selectedCardLogs = () => (window.logs || []).filter(log => window.selectedCardLogIds.has(String(log.id)))
+        .sort((a, b) => `${a.y}-${String(a.m).padStart(2,'0')}-${String(a.d).padStart(2,'0')}-${a.workTime || a.time || ''}`
+            .localeCompare(`${b.y}-${String(b.m).padStart(2,'0')}-${String(b.d).padStart(2,'0')}-${b.workTime || b.time || ''}`));
+    const readableCardText = log => {
+        const category = { work:'작업일지', memo:'메모', photo:'사진', commute_in:'출근', commute_out:'퇴근' }[log.cat] || '기록';
+        const lines = [`[ ${log.y}년 ${log.m}월 ${log.d}일 · ${category} ]`];
+        const add = (label, value) => { if (value !== undefined && value !== null && String(value).trim()) lines.push(`• ${label}:  ( ${value} )`); };
+        add('시간', log.workTime || log.time || log.inTime || log.outTime);
+        add('작업유형', log.taskType);
+        add('상태', log.status);
+        add('Task 번호', log.taskNo);
+        add('고객명', log.customerName);
+        add('주소', log.address);
+        add('내용', log.content || log.memo || log.commuteNote);
+        if (log.equips) add('장비', Object.entries(log.equips).filter(([,n]) => Number(n) > 0)
+            .map(([name,n]) => Number(n) > 1 ? `${name} × ${n}` : name).join(', '));
+        add('매니저', (log.coworkers || []).join(', '));
+        add('태그', (log.tags || []).join(', '));
+        searchableGroups().filter(g => !['taskTypes','coworkers','statuses','equipments','memoTags','duration'].includes(g.id)).forEach(g => {
+            const value = log.customGroups?.[g.id];
+            add(g.title || '선택태그', Array.isArray(value) ? value.join(', ') : value);
+        });
+        if (Array.isArray(log.excludedGroups) && log.excludedGroups.length) lines.push('• 집계 제외 항목 있음');
+        return lines.join('\n');
+    };
+    window.getSelectedCardsText = () => selectedCardLogs().map(readableCardText)
+        .join('\n\n━━━━━━━━━━━━━━━━━━━━\n\n');
+    const writeClipboard = async textValue => {
+        if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(textValue);
+        const area = document.createElement('textarea');
+        area.value = textValue; area.style.position = 'fixed'; area.style.opacity = '0';
+        document.body.appendChild(area); area.select(); document.execCommand('copy'); area.remove();
+    };
+    window.copySelectedCards = async () => {
+        const textValue = window.getSelectedCardsText();
+        if (!textValue) return alert('복사할 카드를 선택하세요.');
+        try { await writeClipboard(textValue); alert(`${window.selectedCardLogIds.size}개 카드를 복사했습니다.`); }
+        catch (error) { alert('복사하지 못했습니다. 브라우저의 클립보드 권한을 확인하세요.'); }
+    };
+    window.shareSelectedCards = async () => {
+        const textValue = window.getSelectedCardsText();
+        if (!textValue) return alert('공유할 카드를 선택하세요.');
+        if (navigator.share) {
+            try { await navigator.share({ title:'작업일지', text:textValue }); return; }
+            catch (error) { if (error?.name === 'AbortError') return; }
+        }
+        await window.copySelectedCards();
+        alert('공유 기능을 지원하지 않아 복사했습니다. 카카오톡 대화창에 붙여 넣어 주세요.');
+    };
+    let cardPressTimer = null, cardPressStart = null, cardPressTarget = null, suppressNextCardClick = false;
+    document.addEventListener('pointerdown', event => {
+        if (event.target.closest('button,a,input,select,textarea,.log-img-list,.task-no-btn,#cardMultiSelectBar')) return;
+        const card = event.target.closest('.log-card[data-log-id]');
+        if (!card) return;
+        cardPressTarget = card;
+        cardPressStart = { x:event.clientX, y:event.clientY };
+        clearTimeout(cardPressTimer);
+        cardPressTimer = setTimeout(() => {
+            window.isCardSelectionMode = true;
+            suppressNextCardClick = true;
+            toggleCardSelection(card.dataset.logId);
+            navigator.vibrate?.(35);
+        }, 650);
+    });
+    document.addEventListener('pointermove', event => {
+        if (cardPressStart && Math.hypot(event.clientX-cardPressStart.x, event.clientY-cardPressStart.y) > 14) clearTimeout(cardPressTimer);
+    });
+    const cancelCardPress = () => { clearTimeout(cardPressTimer); cardPressStart = null; cardPressTarget = null; };
+    document.addEventListener('pointerup', cancelCardPress);
+    document.addEventListener('pointercancel', cancelCardPress);
+    document.addEventListener('click', event => {
+        const card = event.target.closest('.log-card[data-log-id]');
+        if (!card || !window.isCardSelectionMode || event.target.closest('button,.task-no-btn,#cardMultiSelectBar')) return;
+        event.preventDefault(); event.stopImmediatePropagation();
+        if (suppressNextCardClick) { suppressNextCardClick = false; return; }
+        toggleCardSelection(card.dataset.logId);
+    }, true);
 
     // 이벤트 리스너 초기화
     // ═══════════════════════════════════════════
