@@ -6,7 +6,8 @@ const MAX_FEED_EVENTS = 200;
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Accept",
+  "Access-Control-Allow-Headers": "Content-Type, Accept, X-Original-Name",
+  "Access-Control-Expose-Headers": "ETag, Content-Type, Content-Length, X-Original-Name, Content-Disposition",
 };
 
 function json(data, status = 200) {
@@ -26,6 +27,29 @@ function getImageExtension(contentType) {
   if (type === "image/webp") return "webp";
   if (type === "image/gif") return "gif";
   return "bin";
+}
+
+function decodeOriginalName(value) {
+  if (!value) return "";
+  try { return decodeURIComponent(value); } catch { return String(value); }
+}
+
+function sanitizeOriginalName(value, fallbackExtension = "jpg") {
+  let name = String(value || "").normalize("NFC")
+    .replace(/^.*[\\/]/, "")
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .replace(/[\\/:*?"<>|]/g, "_")
+    .replace(/[. ]+$/g, "")
+    .trim();
+  if (!name) return `image.${fallbackExtension}`;
+  if (!/\.[a-zA-Z0-9]{2,5}$/.test(name)) name += `.${fallbackExtension}`;
+  return name.slice(0, 180);
+}
+
+function asciiFileName(name) {
+  const extension = (String(name).match(/\.[a-zA-Z0-9]{2,5}$/) || [`.jpg`])[0];
+  const base = String(name).slice(0, -extension.length).replace(/[^a-zA-Z0-9._-]+/g, "_").replace(/^_+|_+$/g, "") || "image";
+  return `${base}${extension.toLowerCase()}`;
 }
 
 function createImageUrl(url, key) {
@@ -232,9 +256,16 @@ export default {
         if (!contentType.toLowerCase().startsWith("image/")) return json({ ok: false, error: "Only image upload is allowed" }, 400);
         if (!request.body) return json({ ok: false, error: "Image body is empty" }, 400);
         const extension = getImageExtension(contentType);
+        const originalName = sanitizeOriginalName(
+          decodeOriginalName(request.headers.get("X-Original-Name")),
+          extension
+        );
         const key = `images/${Date.now()}_${crypto.randomUUID()}.${extension}`;
-        await env.WORK_R2.put(key, request.body, { httpMetadata: { contentType } });
-        return json({ ok: true, key, url: createImageUrl(url, key) });
+        await env.WORK_R2.put(key, request.body, {
+          httpMetadata: { contentType },
+          customMetadata: { originalName }
+        });
+        return json({ ok: true, key, url: createImageUrl(url, key), originalName });
       } catch (e) {
         return json({ ok: false, error: e.message }, 500);
       }
@@ -250,6 +281,15 @@ export default {
         if (!object) return json({ ok: false, error: "Image not found" }, 404);
         const headers = new Headers(CORS_HEADERS);
         object.writeHttpMetadata(headers);
+        const extension = getImageExtension(headers.get("Content-Type"));
+        const originalName = sanitizeOriginalName(object.customMetadata?.originalName, extension);
+        headers.set("X-Original-Name", encodeURIComponent(originalName));
+        if (url.searchParams.get("download") === "1") {
+          headers.set(
+            "Content-Disposition",
+            `attachment; filename="${asciiFileName(originalName)}"; filename*=UTF-8''${encodeURIComponent(originalName)}`
+          );
+        }
         headers.set("ETag", object.httpEtag);
         headers.set("Cache-Control", "private, max-age=3600");
         return new Response(object.body, { status: 200, headers });

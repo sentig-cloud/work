@@ -279,6 +279,7 @@ window.startZipBackup = async function () {
         manifest.push({
           sourceUrl: entry.sourceUrl,
           zipPath,
+          originalName: entry.image.originalName || zipPath.split("/").pop() || "",
           logId: entry.log.id,
           imageId: entry.image.id,
           date: `${entry.log.y}-${entry.log.m}-${entry.log.d}`,
@@ -289,6 +290,7 @@ window.startZipBackup = async function () {
       } catch (e) {
         window.lastBackupFailures.push({
           sourceUrl: entry.sourceUrl,
+          originalName: entry.image.originalName || "",
           logId: entry.log.id,
           imageId: entry.image.id,
           date: `${entry.log.y}-${entry.log.m}-${entry.log.d}`,
@@ -384,13 +386,14 @@ window.startZipBackup = async function () {
   }
 };
 
-window.uploadBackupBlob = async function (blob) {
+window.uploadBackupBlob = async function (blob, originalName = "") {
   const response = await fetch(
     `${WORK_BACKUP_API_BASE}/api/upload`,
     {
       method: "POST",
       headers: {
         "Content-Type": blob.type || "image/jpeg",
+        "X-Original-Name": encodeURIComponent(originalName || ""),
       },
       body: blob,
     }
@@ -552,7 +555,8 @@ window.retryRestoreFailures = async function () {
     );
 
     try {
-      const url = await window.uploadBackupBlob(failure.blob);
+      const retryName = failure.originalName || String(failure.zipPath || "").split("/").pop() || "";
+      const url = await window.uploadBackupBlob(failure.blob, retryName);
 
       for (const log of window.logs || []) {
         for (const image of log.imgs || []) {
@@ -638,6 +642,7 @@ window.restoreZipFile = async function (file) {
   }
 
   const urlMap = new Map();
+  const originalNameMap = new Map();
   const failures = [];
   const images = backup.images || [];
 
@@ -662,8 +667,10 @@ window.restoreZipFile = async function (file) {
     const blob = await imageEntry.async("blob");
 
     try {
-      const newUrl = await window.uploadBackupBlob(blob);
+      const restoreName = imageInfo.originalName || String(imageInfo.zipPath || "").split("/").pop() || "";
+      const newUrl = await window.uploadBackupBlob(blob, restoreName);
       urlMap.set(imageInfo.sourceUrl, newUrl);
+      originalNameMap.set(imageInfo.sourceUrl, restoreName);
     } catch (e) {
       failures.push({
         ...imageInfo,
@@ -678,6 +685,7 @@ window.restoreZipFile = async function (file) {
   for (const log of restoredData.logs || []) {
     for (const image of log.imgs || []) {
       if (urlMap.has(image.src)) {
+        if (!image.originalName) image.originalName = originalNameMap.get(image.src) || "";
         image.src = urlMap.get(image.src);
       }
     }
@@ -815,8 +823,8 @@ window.exportBackupData = function () {
   window.openBackupDialog();
 };
 
-window.uploadFileToR2 = async function (blob) {
-  return await window.uploadBackupBlob(blob);
+window.uploadFileToR2 = async function (blob, originalName = "") {
+  return await window.uploadBackupBlob(blob, originalName);
 };
 
 window.resizeImage = function (file, callback) {

@@ -739,7 +739,7 @@ window.openImageViewer = (index, mode, refId = null) => {
     } else if (mode === "work") {
         imageArray = window.workImgs;
     } else if (mode === "tempCommute") {
-        imageArray = window.tempCommuteImg ? [{ src: window.tempCommuteImg }] : [];
+        imageArray = window.tempCommuteImg ? [{ src: window.tempCommuteImg, originalName: window.tempCommuteOriginalName || "" }] : [];
     } else if (mode === "log" || mode === "edit") {
         const log = window.logs.find((item) => item.id === refId);
 
@@ -825,8 +825,17 @@ window.downloadViewerImage = async () => {
         const sourcePath = String(image.src).split("?")[0];
         const sourceMatch = sourcePath.match(/\.([a-zA-Z0-9]{2,5})$/);
         const extension = mimeExtension[blob.type] || (sourceMatch ? sourceMatch[1].toLowerCase() : "jpg");
-        const defaultBaseName = "image";
-        const defaultFileName = `${defaultBaseName}.${extension}`;
+        let headerName = response.headers.get("X-Original-Name") || "";
+        try { headerName = decodeURIComponent(headerName); } catch (_) {}
+        const rawOriginalName = image.originalName || headerName || `image.${extension}`;
+        let defaultFileName = String(rawOriginalName)
+            .normalize("NFC")
+            .replace(/^.*[\\/]/, "")
+            .replace(/[\u0000-\u001f\u007f\\/:*?"<>|]/g, "_")
+            .replace(/[. ]+$/g, "")
+            .trim();
+        if (!defaultFileName) defaultFileName = `image.${extension}`;
+        if (!/\.[a-zA-Z0-9]{2,5}$/.test(defaultFileName)) defaultFileName += `.${extension}`;
 
         if (window.showSaveFilePicker) {
             try {
@@ -850,22 +859,11 @@ window.downloadViewerImage = async () => {
             }
         }
 
-        const requestedName = prompt(
-            `저장할 파일명을 입력하세요. 확장자 .${extension}는 자동으로 붙습니다.`,
-            defaultBaseName
-        );
-        if (!requestedName) return;
-        const safeRequestedName = String(requestedName)
-            .replace(/\.[a-zA-Z0-9]{2,5}$/i, "")
-            .replace(/[\\/:*?"<>|]/g, "_")
-            .trim();
-        if (!safeRequestedName) return;
-        const fileName = `${safeRequestedName}.${extension}`;
         const objectUrl = URL.createObjectURL(blob);
         const link = document.createElement("a");
 
         link.href = objectUrl;
-        link.download = fileName;
+        link.download = defaultFileName;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);

@@ -762,7 +762,7 @@ window.openImageViewer = (idx, mode, refId = null) => {
     let imgArray = [];
     if (mode === 'temp') imgArray = window.tempImgs;
     else if (mode === 'work') imgArray = window.workImgs;
-    else if (mode === 'tempCommute') imgArray = window.tempCommuteImg ? [{ src: window.tempCommuteImg }] : [];
+    else if (mode === 'tempCommute') imgArray = window.tempCommuteImg ? [{ src: window.tempCommuteImg, originalName: window.tempCommuteOriginalName || "" }] : [];
     else if (mode === 'log' || mode === 'edit') {
         const log = window.logs.find(l => l.id === refId);
         if (log) imgArray = log.imgs || [];

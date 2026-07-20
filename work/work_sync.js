@@ -149,12 +149,19 @@ window.dataUrlToBlob = function (dataUrl) {
     return new Blob([bytes], { type: mimeType });
 };
 
-window.uploadToStorage = async function (src) {
+window.uploadToStorage = async function (src, originalName = "") {
     if (!window.isInlineImageSrc(src)) return src;
     const blob = window.dataUrlToBlob(src);
     const response = await window.fetchWithTimeout(
         `${WORK_API_BASE}/api/upload`,
-        { method: "POST", headers: { "Content-Type": blob.type || "application/octet-stream" }, body: blob },
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": blob.type || "application/octet-stream",
+                "X-Original-Name": encodeURIComponent(originalName || "")
+            },
+            body: blob
+        },
         60000
     );
     const text = await response.text();
@@ -170,10 +177,11 @@ window.migrateImagesInItem = async function (item, uploadedBySource) {
     for (const image of item.imgs) {
         if (!image || !window.isInlineImageSrc(image.src)) continue;
         const originalSrc = image.src;
-        let url = uploadedBySource.get(originalSrc);
+        const uploadKey = `${originalSrc}\u0000${image.originalName || ""}`;
+        let url = uploadedBySource.get(uploadKey);
         if (!url) {
-            url = await window.uploadToStorage(originalSrc);
-            uploadedBySource.set(originalSrc, url);
+            url = await window.uploadToStorage(originalSrc, image.originalName || "");
+            uploadedBySource.set(uploadKey, url);
             uploadedCount++;
         }
         image.src = url;
