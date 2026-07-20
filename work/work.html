@@ -384,14 +384,20 @@
     <div id="searchLayer" class="layer">
         <div class="w95-titlebar" style="padding: 10px;">
             <span style="font-size:1.2rem; cursor:pointer;" onclick="window.closeSearch()"><i class="fa-solid fa-chevron-left" style="margin-right:8px;"></i> 검색 결과</span>
-            <button type="button" class="w95-btn icon-btn" onclick="window.resetSearchInput()"><i class="fa-solid fa-rotate-right"></i></button>
+            <div id="searchEditActions" class="search-edit-actions">
+                <button type="button" id="searchExcludeBtn" class="w95-btn" onclick="window.toggleSelectedSearchOption('excluded')">검색 제외</button>
+                <button type="button" id="searchHideBtn" class="w95-btn" onclick="window.toggleSelectedSearchOption('hidden')">숨기기</button>
+            </div>
+            <button type="button" id="searchResetBtn" class="w95-btn icon-btn" title="초기화 · 길게 눌러 검색칸 편집"
+                onpointerdown="window.startSearchResetPress(event)" onpointerup="window.endSearchResetPress(event)"
+                onpointermove="window.moveSearchResetPress(event)" onpointercancel="window.cancelSearchResetPress()"><i class="fa-solid fa-rotate-right"></i></button>
         </div>
         <div style="padding:8px; display:flex; flex-direction:column; gap:6px; background:var(--w-gray); border-bottom:2px solid var(--w-black);">
             <div style="display:flex; gap:4px;">
                 <select id="searchMonth" class="m-input w95-in" style="flex:0.3; padding:0 2px;" onchange="window.handleSelectChange(this)"></select>
                 <input type="text" id="searchInput" class="m-input w95-in" style="flex:0.7;" placeholder="검색어 실시간 입력..." oninput="window.doSearch()">
             </div>
-            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:4px;">
+            <div id="searchFilterGrid" class="search-filter-grid">
                 <select id="searchType" class="m-input w95-in" style="padding:0 2px; font-size:0.85rem !important;" onchange="window.handleSelectChange(this)"></select>
                 <select id="searchStatus" class="m-input w95-in" style="padding:0 2px; font-size:0.85rem !important;" onchange="window.handleSelectChange(this)"></select>
                 <select id="searchManager" class="m-input w95-in" style="padding:0 2px; font-size:0.85rem !important;" onchange="window.handleSelectChange(this)"></select>

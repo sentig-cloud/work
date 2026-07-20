@@ -628,6 +628,21 @@ input, textarea, [contenteditable="true"] {
     color: #dc2626;
 }
 
+/* 검색 필터: 3열 고정, 롱탭 편집 상태 */
+.search-filter-grid { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:4px; }
+.search-filter-cell { min-width:0; position:relative; }
+.search-filter-cell > select { width:100%; }
+.search-edit-actions { display:none; gap:4px; margin-left:auto; margin-right:4px; }
+#searchLayer.is-search-edit .search-edit-actions { display:flex; }
+#searchLayer.is-search-edit .search-filter-cell { cursor:grab; touch-action:none; }
+#searchLayer.is-search-edit .search-filter-cell.is-search-selected { outline:3px solid #f59e0b; outline-offset:1px; }
+#searchLayer.is-search-edit .search-filter-cell.is-search-excluded { background:#fee2e2; text-decoration:line-through; }
+#searchLayer.is-search-edit .search-filter-cell.is-search-hidden::after {
+    content:'숨김'; position:absolute; right:2px; top:2px; padding:1px 3px;
+    background:#7f1d1d; color:#fff; font-size:.62rem; font-weight:900; pointer-events:none;
+}
+#searchLayer.is-search-edit .search-filter-cell select { pointer-events:none; opacity:.88; }
+
 /* 기억(remember) 켜진 그룹 표시 — 제목이 있는 줄(상자) 오른쪽 위에 초록 점(.drag-item은 이미 position:relative) */
 .drag-item[data-group-ref].has-remember::before {
     content: "";

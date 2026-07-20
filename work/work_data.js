@@ -194,7 +194,7 @@ window.ensureDefaultGroups = function () {
         // 작업일지의 수량형 선택상자는 일반 다중 선택상자로 통일한다.
         // 기존 log.equips 객체는 변환하지 않아 과거 수량 데이터와 내보내기 호환성을 보존한다.
         if (g.selectionMode === 'qty') g.selectionMode = 'multi';
-        if (g.id === 'equipments') g.showCount = false;
+        // 장비도 일반 선택태그와 동일하게 (갯수) 표시를 사용할 수 있다.
         if (!Number.isFinite(Number(g.order))) g.order = index;
     });
 };

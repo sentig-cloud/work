@@ -35,7 +35,7 @@
         const baseCount = Number(tag.count) || 0;
         // 장비 수량은 현재 일지의 선택값만 표시한다. 마스터 tag.count를 기본 수량처럼 재사용하면
         // 선택하지 않은 장비도 T(2)처럼 보이고 편집창에도 2가 들어가는 오류가 생긴다.
-        const countSuffix = type !== "equip" && window.groupShowsCount(groupId) && baseCount > 0
+        const countSuffix = window.groupShowsCount(groupId) && baseCount > 0
             ? ` (${baseCount})`
             : "";
         return `${monthly}${tag.name}${countSuffix}`;
@@ -903,6 +903,187 @@
     };
 
     // ═══════════════════════════════════════════
+    // ─── 통합 검색: groups 기반 동적 3열 필터 + 롱탭 편집 ───
+    const searchTypeLabels = {
+        taskTypes: '작업유형', coworkers: '매니저', statuses: '상태',
+        equipments: '장비', memoTags: '태그'
+    };
+    const searchableGroups = () => (window.getAllGroupsSorted?.() || window.groups || [])
+        .filter(g => g && g.id !== 'duration')
+        .sort((a, b) => Number(a.searchOrder ?? a.order ?? 999) - Number(b.searchOrder ?? b.order ?? 999));
+    const groupSearchValue = (log, groupId) => window.getGroupValueFromLog?.(log, groupId);
+    const groupHasSearchValue = (log, groupId, name) => {
+        if (window.isLogGroupExcluded?.(log, groupId)) return false;
+        const value = groupSearchValue(log, groupId);
+        if (groupId === 'equipments') return Number(value && value[name] || 0) > 0;
+        if (Array.isArray(value)) return value.includes(name);
+        return value === name;
+    };
+    const searchOptionCount = (logs, groupId, name) =>
+        (logs || []).reduce((n, log) => n + (groupHasSearchValue(log, groupId, name) ? 1 : 0), 0);
+    const searchSelectId = id => `searchGroup_${String(id).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+
+    window.isSearchEditMode = false;
+    window.selectedSearchGroupId = null;
+    window.renderDynamicSearchFilters = (targetMonth = null) => {
+        const grid = document.getElementById('searchFilterGrid');
+        if (!grid) return;
+        const logs = targetMonth
+            ? (window.logs || []).filter(l => Number(l.m) === Number(targetMonth))
+            : (window.logs || []);
+        const oldValues = {};
+        grid.querySelectorAll('select[data-search-group]').forEach(el => { oldValues[el.dataset.searchGroup] = el.value; });
+        const groups = searchableGroups().filter(g => window.isSearchEditMode || (!g.searchExcluded && !g.searchHidden));
+        grid.innerHTML = groups.map(g => {
+            const value = oldValues[g.id] || '';
+            const title = g.title || searchTypeLabels[g.id] || '선택태그';
+            const state = `${g.searchExcluded ? ' is-search-excluded' : ''}${g.searchHidden ? ' is-search-hidden' : ''}${window.selectedSearchGroupId === g.id ? ' is-search-selected' : ''}`;
+            const options = (g.tags || []).map(tag => {
+                const count = searchOptionCount(logs, g.id, tag.name);
+                return `<option value="${esc(tag.name)}" ${value === tag.name ? 'selected' : ''}>[${count}] ${esc(tag.name)}</option>`;
+            }).join('');
+            return `<div class="search-filter-cell${state}" data-search-group="${esc(g.id)}">
+                <select id="${searchSelectId(g.id)}" data-search-group="${esc(g.id)}" class="m-input w95-in search-group-select" onchange="window.handleSelectChange(this)">
+                    <option value="">[ ${esc(title)} ]</option>${options}
+                </select></div>`;
+        }).join('') + `<div class="search-filter-cell search-fixed-filter">
+            <select id="searchOX" class="m-input w95-in" onchange="window.handleSelectChange(this)">
+                <option value="">[ O/X ]</option><option value="O">O 표시</option><option value="X">X 표시</option>
+            </select></div>`;
+    };
+    window.updateSearchFilters = (targetMonth = null) => window.renderDynamicSearchFilters(targetMonth);
+
+    const persistSearchLayout = () => {
+        const grid = document.getElementById('searchFilterGrid');
+        if (!grid) return;
+        [...grid.querySelectorAll('.search-filter-cell[data-search-group]')].forEach((cell, index) => {
+            const g = window.getGroupById?.(cell.dataset.searchGroup);
+            if (g) g.searchOrder = index;
+        });
+        window.markDirty?.('master', 'groups', 'upsert');
+        window.saveLocal?.('search-layout');
+    };
+    window.toggleSelectedSearchOption = mode => {
+        const g = window.getGroupById?.(window.selectedSearchGroupId);
+        if (!g) return alert('먼저 검색 칸을 선택하세요.');
+        if (mode === 'excluded') g.searchExcluded = !g.searchExcluded;
+        if (mode === 'hidden') g.searchHidden = !g.searchHidden;
+        persistSearchLayout();
+        const month = Number(document.getElementById('searchMonth')?.value) || null;
+        window.renderDynamicSearchFilters(month);
+    };
+    window.setSearchEditMode = on => {
+        window.isSearchEditMode = !!on;
+        window.selectedSearchGroupId = null;
+        document.getElementById('searchLayer')?.classList.toggle('is-search-edit', !!on);
+        const month = Number(document.getElementById('searchMonth')?.value) || null;
+        window.renderDynamicSearchFilters(month);
+    };
+    let searchResetTimer = null, searchResetLong = false, searchResetStart = null;
+    window.startSearchResetPress = event => {
+        event?.preventDefault(); searchResetLong = false;
+        searchResetStart = { x: event.clientX, y: event.clientY };
+        clearTimeout(searchResetTimer);
+        searchResetTimer = setTimeout(() => {
+            searchResetLong = true;
+            window.setSearchEditMode(!window.isSearchEditMode);
+            navigator.vibrate?.(35);
+        }, 700);
+    };
+    window.moveSearchResetPress = event => {
+        if (searchResetStart && Math.hypot(event.clientX - searchResetStart.x, event.clientY - searchResetStart.y) > 14) {
+            clearTimeout(searchResetTimer);
+        }
+    };
+    window.cancelSearchResetPress = () => { clearTimeout(searchResetTimer); searchResetStart = null; };
+    window.endSearchResetPress = event => {
+        event?.preventDefault(); clearTimeout(searchResetTimer); searchResetStart = null;
+        if (!searchResetLong) window.resetSearchInput?.();
+        searchResetLong = false;
+    };
+
+    let searchDragCell = null, lastSearchMove = 0;
+    const searchGrid = document.getElementById('searchFilterGrid');
+    searchGrid?.addEventListener('pointerdown', event => {
+        if (!window.isSearchEditMode) return;
+        const cell = event.target.closest('.search-filter-cell[data-search-group]');
+        if (!cell) return;
+        event.preventDefault();
+        window.selectedSearchGroupId = cell.dataset.searchGroup;
+        searchDragCell = cell; lastSearchMove = 0;
+        searchGrid.querySelectorAll('.is-search-selected').forEach(el => el.classList.remove('is-search-selected'));
+        cell.classList.add('is-search-selected');
+        cell.setPointerCapture?.(event.pointerId);
+    });
+    searchGrid?.addEventListener('pointermove', event => {
+        if (!window.isSearchEditMode || !searchDragCell) return;
+        event.preventDefault();
+        if (Date.now() - lastSearchMove < 180) return;
+        const over = document.elementFromPoint(event.clientX, event.clientY);
+        const target = over?.closest('.search-filter-cell[data-search-group]');
+        if (!target || target === searchDragCell || target.parentElement !== searchGrid) return;
+        const rect = target.getBoundingClientRect();
+        const x = (event.clientX - rect.left) / Math.max(1, rect.width);
+        const y = (event.clientY - rect.top) / Math.max(1, rect.height);
+        if (x > .35 && x < .65 && y > .35 && y < .65) return;
+        const before = y < .35 || (y <= .65 && x < .5);
+        searchGrid.insertBefore(searchDragCell, before ? target : target.nextSibling);
+        lastSearchMove = Date.now();
+    });
+    const endSearchDrag = () => { if (searchDragCell) persistSearchLayout(); searchDragCell = null; };
+    searchGrid?.addEventListener('pointerup', endSearchDrag);
+    searchGrid?.addEventListener('pointercancel', endSearchDrag);
+
+    const closeSearchBase = window.closeSearch;
+    window.closeSearch = () => {
+        if (window.isSearchEditMode) window.setSearchEditMode(false);
+        closeSearchBase?.();
+    };
+
+    window.removeFilter = selectId => {
+        const el = document.getElementById(selectId); if (el) el.value = '';
+        if (selectId === 'searchMonth') window.updateSearchFilters(null);
+        window.doSearch();
+    };
+    window.doSearch = () => {
+        if (window.isSearchEditMode) return;
+        const keyword = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+        const monthValue = document.getElementById('searchMonth')?.value || '';
+        const ox = document.getElementById('searchOX')?.value || '';
+        const selections = [...document.querySelectorAll('#searchFilterGrid select[data-search-group]')]
+            .filter(el => el.value).map(el => ({ groupId: el.dataset.searchGroup, value: el.value, id: el.id }));
+        const filtersArea = document.getElementById('activeFiltersArea');
+        const chips = [];
+        if (monthValue) chips.push(`<button class="w95-btn" onclick="window.removeFilter('searchMonth')">${monthValue}월 ×</button>`);
+        selections.forEach(s => chips.push(`<button class="w95-btn" onclick="window.removeFilter('${s.id}')">${esc(s.value)} ×</button>`));
+        if (ox) chips.push(`<button class="w95-btn" onclick="window.removeFilter('searchOX')">${ox} ×</button>`);
+        filtersArea.innerHTML = chips.join('');
+        const resultList = document.getElementById('searchResultList');
+        const summary = document.getElementById('searchSummary');
+        if (!keyword && !monthValue && !ox && !selections.length) { resultList.innerHTML = ''; summary.style.display = 'none'; return; }
+        const results = (window.logs || []).filter(log => {
+            const keywordText = [log.memo, log.content, log.taskNo, log.address, log.customerName, log.commuteNote,
+                log.taskType, log.status, ...(log.coworkers || []), ...(log.tags || []),
+                ...Object.keys(log.equips || {}), ...Object.values(log.customGroups || {}).flat()].filter(Boolean).join(' ').toLowerCase();
+            return (!keyword || keywordText.includes(keyword)) &&
+                (!monthValue || Number(log.m) === Number(monthValue)) &&
+                (!ox || log.personalCheck === ox) &&
+                selections.every(s => groupHasSearchValue(log, s.groupId, s.value));
+        });
+        const perDay = {};
+        (window.logs || []).filter(l => l?.cat === 'work').forEach(log => {
+            const key = `${log.y}-${log.m}-${log.d}`; perDay[key] = perDay[key] || [];
+            perDay[key].push(log);
+        });
+        resultList.innerHTML = results.map(log => {
+            const key = `${log.y}-${log.m}-${log.d}`;
+            const index = log.cat === 'work' ? (perDay[key] || []).findIndex(x => String(x.id) === String(log.id)) + 1 : '';
+            return window.getLogCardHtml(log, index || '');
+        }).join('');
+        summary.textContent = results.length ? `총 ${results.length}건 검색됨` : '조건에 맞는 기록이 없습니다.';
+        summary.style.display = 'block';
+    };
+
     // 이벤트 리스너 초기화
     // ═══════════════════════════════════════════
     window.hasInitDragListeners = false;
@@ -1010,7 +1191,7 @@
         return `[${count}] ${tag.name}`;
     };
 
-    window.updateSearchFilters = (targetMonth = null) => {
+    window.updateLegacySearchFilters = (targetMonth = null) => {
         const logs = targetMonth ? (window.logs || []).filter(l => l.m === targetMonth) : (window.logs || []);
         const fill = (id, title, type, tags) => {
             const el = document.getElementById(id); if (!el) return;
@@ -1092,9 +1273,7 @@
         if (!tag) return;
         window.editingTagType = type;
         window.editingTagIndex = index;
-        window.tempTagQty = type === "equip"
-            ? Number(window.activeEquips && window.activeEquips[tag.name] || 0)
-            : Number(tag.count || 0);
+        window.tempTagQty = Number(tag.count || 0);
         document.getElementById("tagEditInput").value = tag.name;
         document.getElementById("tagEditModal").style.display = "flex";
         window.refreshTagEditControls();
@@ -1128,12 +1307,11 @@
             button.title = hint || `${label} ${on ? '켜짐' : '꺼짐'}`;
         };
         if (qty) qty.innerText = String(window.tempTagQty || 0);
-        if (qtyRow) qtyRow.style.display = groupId === 'equipments' ? 'none' : 'flex';
+        if (qtyRow) qtyRow.style.display = 'flex';
         paintToggle(numberBtn, window.groupShowsNumber(groupId), '숫자', true, '태그 앞에 이번 달 집계 숫자를 표시');
         paintToggle(monthlyBtn, window.groupIncludesMonthly(groupId), '월별', true, '이 그룹을 월별 집계에 포함');
-        const countAvailable = groupId !== 'equipments';
-        paintToggle(countBtn, window.groupShowsCount(groupId), '갯수', countAvailable,
-            countAvailable ? '태그 뒤에 직접 설정한 갯수를 표시' : '장비는 현재 일지의 실제 수량을 자동 표시하므로 별도 갯수 기능을 사용하지 않음');
+        paintToggle(countBtn, window.groupShowsCount(groupId), '갯수', true,
+            '태그 뒤에 직접 설정한 갯수를 표시');
         if (dupBtn) {
             const toggleable = canToggleSelectionMode(groupId);
             const g = window.getGroupById(groupId);
@@ -1167,7 +1345,7 @@
         const tag = getTagArray(type)[window.editingTagIndex];
         if (!tag) return;
         window.tempTagQty = Math.max(0, Number(window.tempTagQty || 0) + delta);
-        if (type !== "equip") tag.count = window.tempTagQty;
+        tag.count = window.tempTagQty;
         window.refreshTagEditControls();
         window.markDirty?.("master", "groups", "upsert");
         if (window.saveLocal) window.saveLocal("group-settings");
