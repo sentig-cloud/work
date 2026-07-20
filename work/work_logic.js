@@ -827,7 +827,30 @@ window.downloadViewerImage = async () => {
         const extension = mimeExtension[blob.type] || (sourceMatch ? sourceMatch[1].toLowerCase() : "jpg");
         let headerName = response.headers.get("X-Original-Name") || "";
         try { headerName = decodeURIComponent(headerName); } catch (_) {}
-        const rawOriginalName = image.originalName || headerName || `image.${extension}`;
+        const owningLog = (window.logs || []).find(log => (log.imgs || []).some(item =>
+            item === image || (item.id && image.id && String(item.id) === String(image.id)) || item.src === image.src
+        ));
+        const meaningfulName = value => {
+            const name = String(value || "").trim();
+            const base = name.replace(/\.[a-zA-Z0-9]{2,5}$/i, "");
+            return name && !/^image$/i.test(base) && !/^\d{1,6}$/.test(base) ? name : "";
+        };
+        const pad = value => String(value || 0).padStart(2, "0");
+        const timestampFromImage = String(image.id || "").match(/(\d{13})/);
+        const createdDate = timestampFromImage ? new Date(Number(timestampFromImage[1])) : null;
+        const validCreatedDate = createdDate && !Number.isNaN(createdDate.getTime()) ? createdDate : null;
+        const ymd = owningLog
+            ? `${owningLog.y}${pad(owningLog.m)}${pad(owningLog.d)}`
+            : validCreatedDate
+                ? `${validCreatedDate.getFullYear()}${pad(validCreatedDate.getMonth() + 1)}${pad(validCreatedDate.getDate())}`
+                : "";
+        const logTime = String(owningLog?.workTime || owningLog?.time || owningLog?.inTime || owningLog?.outTime || "")
+            .replace(/\D/g, "").padEnd(6, "0").slice(0, 6);
+        const hms = validCreatedDate
+            ? `${pad(validCreatedDate.getHours())}${pad(validCreatedDate.getMinutes())}${pad(validCreatedDate.getSeconds())}`
+            : logTime || "000000";
+        const inferredName = ymd ? `${ymd}-${hms}.${extension}` : `image.${extension}`;
+        const rawOriginalName = meaningfulName(image.originalName) || meaningfulName(headerName) || inferredName;
         let defaultFileName = String(rawOriginalName)
             .normalize("NFC")
             .replace(/^.*[\\/]/, "")
@@ -858,6 +881,23 @@ window.downloadViewerImage = async () => {
                 console.warn("파일 저장 창 사용 실패:", error);
             }
         }
+
+        // 모바일 다운로드 관리자는 blob URL의 download 이름을 무시하고 2803 같은 임시 번호를
+        // 붙일 수 있다. R2 이미지라면 Worker의 Content-Disposition으로 이름을 강제한다.
+        try {
+            const directUrl = new URL(image.src, window.location.href);
+            if (directUrl.pathname.endsWith("/api/image") && directUrl.searchParams.get("key")) {
+                directUrl.searchParams.set("download", "1");
+                directUrl.searchParams.set("name", defaultFileName);
+                const directLink = document.createElement("a");
+                directLink.href = directUrl.toString();
+                directLink.download = defaultFileName;
+                document.body.appendChild(directLink);
+                directLink.click();
+                directLink.remove();
+                return;
+            }
+        } catch (_) {}
 
         const objectUrl = URL.createObjectURL(blob);
         const link = document.createElement("a");

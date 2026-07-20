@@ -282,7 +282,13 @@ export default {
         const headers = new Headers(CORS_HEADERS);
         object.writeHttpMetadata(headers);
         const extension = getImageExtension(headers.get("Content-Type"));
-        const originalName = sanitizeOriginalName(object.customMetadata?.originalName, extension);
+        const requestedDownloadName = url.searchParams.get("download") === "1"
+          ? decodeOriginalName(url.searchParams.get("name"))
+          : "";
+        const originalName = sanitizeOriginalName(
+          requestedDownloadName || object.customMetadata?.originalName,
+          extension
+        );
         headers.set("X-Original-Name", encodeURIComponent(originalName));
         if (url.searchParams.get("download") === "1") {
           headers.set(

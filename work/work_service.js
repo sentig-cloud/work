@@ -860,7 +860,7 @@ window.resizeImage = function (file, callback) {
       canvas.toBlob(
         async (blob) => {
           try {
-            const url = await window.uploadFileToR2(blob);
+            const url = await window.uploadFileToR2(blob, file.name || "");
             callback(url);
           } catch (e) {
             console.error("사진 업로드 실패:", e);
