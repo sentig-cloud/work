@@ -271,8 +271,10 @@ export default {
       }
     }
 
-    // ─── 이미지 조회 ───
-    if (url.pathname === "/api/image" && request.method === "GET") {
+    // ─── 이미지 조회 / 파일명 경로 기반 다운로드 ───
+    const isImageView = url.pathname === "/api/image";
+    const isNamedDownload = url.pathname.startsWith("/api/download/");
+    if ((isImageView || isNamedDownload) && request.method === "GET") {
       try {
         if (!env.WORK_R2) return json({ ok: false, error: "WORK_R2 binding is missing" }, 500);
         const key = url.searchParams.get("key");
@@ -282,22 +284,24 @@ export default {
         const headers = new Headers(CORS_HEADERS);
         object.writeHttpMetadata(headers);
         const extension = getImageExtension(headers.get("Content-Type"));
-        const requestedDownloadName = url.searchParams.get("download") === "1"
-          ? decodeOriginalName(url.searchParams.get("name"))
-          : "";
+        const requestedDownloadName = isNamedDownload
+          ? decodeOriginalName(url.pathname.slice("/api/download/".length))
+          : url.searchParams.get("download") === "1"
+            ? decodeOriginalName(url.searchParams.get("name"))
+            : "";
         const originalName = sanitizeOriginalName(
           requestedDownloadName || object.customMetadata?.originalName,
           extension
         );
         headers.set("X-Original-Name", encodeURIComponent(originalName));
-        if (url.searchParams.get("download") === "1") {
+        if (isNamedDownload || url.searchParams.get("download") === "1") {
           headers.set(
             "Content-Disposition",
             `attachment; filename="${asciiFileName(originalName)}"; filename*=UTF-8''${encodeURIComponent(originalName)}`
           );
         }
         headers.set("ETag", object.httpEtag);
-        headers.set("Cache-Control", "private, max-age=3600");
+        headers.set("Cache-Control", isNamedDownload ? "no-store" : "private, max-age=3600");
         return new Response(object.body, { status: 200, headers });
       } catch (e) {
         return json({ ok: false, error: e.message }, 500);

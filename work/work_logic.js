@@ -860,6 +860,26 @@ window.downloadViewerImage = async () => {
         if (!defaultFileName) defaultFileName = `image.${extension}`;
         if (!/\.[a-zA-Z0-9]{2,5}$/.test(defaultFileName)) defaultFileName += `.${extension}`;
 
+        // URL 경로 자체의 마지막 조각을 파일명으로 만든다. Android WebView가 download 속성과
+        // Content-Disposition을 무시해도 /api/download/파일명.jpg 경로에서 이름을 얻을 수 있다.
+        try {
+            const directUrl = new URL(image.src, window.location.href);
+            if (directUrl.pathname.endsWith("/api/image") && directUrl.searchParams.get("key")) {
+                const namedUrl = new URL(
+                    `/api/download/${encodeURIComponent(defaultFileName)}`,
+                    directUrl.origin
+                );
+                namedUrl.searchParams.set("key", directUrl.searchParams.get("key"));
+                const directLink = document.createElement("a");
+                directLink.href = namedUrl.toString();
+                directLink.download = defaultFileName;
+                document.body.appendChild(directLink);
+                directLink.click();
+                directLink.remove();
+                return;
+            }
+        } catch (_) {}
+
         if (window.showSaveFilePicker) {
             try {
                 const handle = await window.showSaveFilePicker({
@@ -881,23 +901,6 @@ window.downloadViewerImage = async () => {
                 console.warn("파일 저장 창 사용 실패:", error);
             }
         }
-
-        // 모바일 다운로드 관리자는 blob URL의 download 이름을 무시하고 2803 같은 임시 번호를
-        // 붙일 수 있다. R2 이미지라면 Worker의 Content-Disposition으로 이름을 강제한다.
-        try {
-            const directUrl = new URL(image.src, window.location.href);
-            if (directUrl.pathname.endsWith("/api/image") && directUrl.searchParams.get("key")) {
-                directUrl.searchParams.set("download", "1");
-                directUrl.searchParams.set("name", defaultFileName);
-                const directLink = document.createElement("a");
-                directLink.href = directUrl.toString();
-                directLink.download = defaultFileName;
-                document.body.appendChild(directLink);
-                directLink.click();
-                directLink.remove();
-                return;
-            }
-        } catch (_) {}
 
         const objectUrl = URL.createObjectURL(blob);
         const link = document.createElement("a");
