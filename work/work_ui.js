@@ -74,7 +74,7 @@ window.setupFAB = () => {
             || document.getElementById('tagEditModal')?.style.display === 'flex';
 
         const runRobotAction = () => {
-            if (document.hidden || fab.dataset.userTouching === '1' || modalIsBusy()) {
+            if (document.hidden || fab.dataset.userTouching === '1' || fab.classList.contains('is-robot-easter') || modalIsBusy()) {
                 window.setTimeout(runRobotAction, 3500);
                 return;
             }
@@ -146,6 +146,10 @@ window.setupFAB = () => {
     let todayPressTimer = null;
     let todayEasterTimer = null;
     let isRobotEasterEgg = false;
+    let easterMotionTimer = null;
+    let easterQuoteTimer = null;
+    let easterTypingTimer = null;
+    let easterRestorePosition = null;
     const mascotRobot = fab.querySelector('.today-robot');
     const mascotPet = fab.querySelector('.robot-pet');
     const mascotSpeech = fab.querySelector('.robot-speech');
@@ -185,8 +189,16 @@ window.setupFAB = () => {
         event?.preventDefault?.();
         event?.stopImmediatePropagation?.();
         isRobotEasterEgg = false;
+        clearInterval(easterMotionTimer);
+        clearInterval(easterQuoteTimer);
+        clearInterval(easterTypingTimer);
+        easterMotionTimer = easterQuoteTimer = easterTypingTimer = null;
         fab.classList.remove('is-robot-easter');
         document.body.classList.remove('robot-easter-active');
+        if (easterRestorePosition) {
+            Object.entries(easterRestorePosition).forEach(([key, value]) => fab.style[key] = value);
+            easterRestorePosition = null;
+        }
         mascotPet?.classList.remove('is-visible');
         mascotSpeech?.classList.remove('is-visible');
     };
@@ -195,14 +207,39 @@ window.setupFAB = () => {
         if (isDragging || isRobotEasterEgg) return;
         isTodayLongPress = true;
         isRobotEasterEgg = true;
+        easterRestorePosition = {
+            left:fab.style.left, top:fab.style.top, right:fab.style.right,
+            bottom:fab.style.bottom, transition:fab.style.transition
+        };
         fab.classList.add('is-robot-easter', 'has-pet');
         document.body.classList.add('robot-easter-active');
         mascotPet?.classList.add('is-visible');
-        if (mascotSpeech) {
-            const messages = ['같이 놀자!', '산책 갈까?', '비밀 모드!', '멍멍! 삐빅!', '오늘도 힘내!'];
-            mascotSpeech.textContent = messages[Math.floor(Math.random() * messages.length)];
+        const quotes = ['천천히 가도 괜찮아', '오늘도 한 걸음', '작은 일이 큰 힘', '쉬어가도 좋아', '끝까지 함께 가자', '지금도 잘하고 있어'];
+        const typeQuote = () => {
+            if (!mascotSpeech || !isRobotEasterEgg) return;
+            clearInterval(easterTypingTimer);
+            const quote = quotes[Math.floor(Math.random() * quotes.length)];
+            let index = 0;
+            mascotSpeech.textContent = '';
             mascotSpeech.classList.add('is-visible');
-        }
+            easterTypingTimer = setInterval(() => {
+                mascotSpeech.textContent = quote.slice(0, ++index);
+                if (index >= quote.length) clearInterval(easterTypingTimer);
+            }, 115);
+        };
+        const roam = () => {
+            if (!isRobotEasterEgg) return;
+            const marginX = Math.min(95, window.innerWidth * .23);
+            const marginY = Math.min(105, window.innerHeight * .2);
+            const x = marginX + Math.random() * Math.max(10, window.innerWidth - marginX * 2);
+            const y = marginY + Math.random() * Math.max(10, window.innerHeight - marginY * 2);
+            fab.style.setProperty('left', `${x}px`, 'important');
+            fab.style.setProperty('top', `${y}px`, 'important');
+        };
+        roam();
+        typeQuote();
+        easterMotionTimer = setInterval(roam, 2100);
+        easterQuoteTimer = setInterval(typeQuote, 3400);
         mascotRobot?.classList.add(['action-dance','action-celebrate','action-hop'][Math.floor(Math.random() * 3)]);
         navigator.vibrate?.([40,40,80]);
         setTimeout(() => document.addEventListener('pointerdown', exitRobotEasterEgg, { capture:true, once:true }), 250);

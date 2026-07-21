@@ -150,8 +150,8 @@ html, body {
 .today-robot-fab.is-fetching .robot-pet { animation:petFetch .7s steps(4,end) infinite alternate; }
 .robot-easter-active::before { content:''; position:fixed; inset:0; z-index:5900; background:rgba(4,8,25,.72); backdrop-filter:blur(2px); }
 .today-robot-fab.is-robot-easter {
-    position:fixed !important; left:50% !important; top:48% !important; right:auto !important; bottom:auto !important;
-    z-index:6000 !important; transform:translate(-50%,-50%) scale(2.35); transition:transform .35s steps(5,end) !important;
+    position:fixed !important; right:auto !important; bottom:auto !important;
+    z-index:6000 !important; transform:translate(-50%,-50%) scale(2.75); transition:left 1.8s ease-in-out,top 1.8s ease-in-out,transform .35s steps(5,end) !important;
     animation:robotEasterFloat 1.2s steps(4,end) infinite;
 }
 .today-robot-fab.is-robot-easter .today-robot { animation:robotEasterDance .55s steps(3,end) infinite !important; filter:drop-shadow(0 8px 4px rgba(0,0,0,.45)); }
@@ -606,6 +606,12 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
 .layout-edit-mode #workDragContainer .inner-layout-cell textarea,
 .layout-edit-mode #workDragContainer .inner-layout-cell button {
     pointer-events: auto !important;
+}
+.layout-edit-mode #workDragContainer .layout-tag-button {
+    pointer-events:auto !important;
+    opacity:.72;
+    cursor:pointer !important;
+    touch-action:manipulation;
 }
 
 /* 레이아웃 편집 모드: 선택 안 된 블록/객체는 평상시와 동일한 색으로 유지(시인성 확보) —
