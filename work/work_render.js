@@ -190,6 +190,13 @@ window.updateUI = () => {
     }
 };
 
+window.getWorkCardSectionOrder = (availableKeys = []) => {
+    let saved = [];
+    try { saved = JSON.parse(localStorage.getItem('wm_work_card_section_order') || '[]'); } catch (_) { saved = []; }
+    if (!Array.isArray(saved)) saved = [];
+    return [...saved.filter(key => availableKeys.includes(key)), ...availableKeys.filter(key => !saved.includes(key))];
+};
+
 window.getLogCardHtml = (l, indexStr = '') => {
     const excludedCardStyle = (groupId) => window.isLogGroupExcluded?.(l, groupId)
         ? 'color:#dc2626 !important; text-decoration:line-through; text-decoration-color:#dc2626; text-decoration-thickness:2px;'
@@ -298,13 +305,26 @@ window.getLogCardHtml = (l, indexStr = '') => {
             const val = l.customGroups && l.customGroups[g.id];
             if (val && (Array.isArray(val) ? val.length > 0 : val)) {
                 const valStr = Array.isArray(val) ? val.join(', ') : String(val);
-                customDetails.push(`<div class="work-info-line custom" style="${excludedCardStyle(g.id)}"><i class="fa-solid fa-tag"></i><span>${valStr}</span></div>`);
+                const safeGroupTitle = String(g.title || '선택태그').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                customDetails.push({
+                    key: `custom:${g.id}`,
+                    label: g.title || '선택태그',
+                    html: `<aside class="work-custom-panel work-card-section" data-card-section-key="custom:${g.id}" data-card-section-label="${safeGroupTitle}"><div class="work-info-line custom" style="${excludedCardStyle(g.id)}"><i class="fa-solid fa-tag"></i><span>${valStr}</span></div></aside>`
+                });
             }
         });
 
         if (l.coworkers && l.coworkers.length > 0) {
             bottomManagerHtml = `<div style="color:var(--w-blue); font-size:0.8rem; font-weight:bold; ${excludedCardStyle('coworkers')}"><i class="fa-solid fa-user-group"></i> ${l.coworkers.join(', ')}</div>`;
         }
+
+        const cardSections = [
+            { key: 'work', html: `<section class="work-main-panel work-card-section" data-card-section-key="work" data-card-section-label="작업정보">${workDetails.join('')}</section>` },
+            { key: 'customer', html: `<aside class="work-customer-panel work-card-section" data-card-section-key="customer" data-card-section-label="고객정보">${customerDetails.length ? customerDetails.join('') : '<div class="work-info-empty">등록 정보 없음</div>'}</aside>` },
+            ...customDetails
+        ];
+        const orderedCardSections = window.getWorkCardSectionOrder(cardSections.map(section => section.key))
+            .map(key => cardSections.find(section => section.key === key)).filter(Boolean);
 
         workDetailsHtml = `
             <div class="card-content-zone work-card-layout">
@@ -313,15 +333,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
                     <div class="work-card-alerts">${dutyBadge}${otBadge}</div>
                 </div>
                 <div class="work-card-status-row">${statusBadge}${inlineTaskNo}</div>
-                <div class="work-card-columns${customDetails.length ? ' has-custom-column' : ''}">
-                    <section class="work-main-panel">
-                        ${workDetails.join('')}
-                    </section>
-                    <aside class="work-customer-panel">
-                        ${customerDetails.length ? customerDetails.join('') : '<div class="work-info-empty">등록 정보 없음</div>'}
-                    </aside>
-                    ${customDetails.length ? `<aside class="work-custom-panel">${customDetails.join('')}</aside>` : ''}
-                </div>
+                <div class="work-card-columns${customDetails.length ? ' has-custom-column' : ''}">${orderedCardSections.map(section => section.html).join('')}</div>
             </div>
         `;
     } else if (l.cat === 'commute_in' || l.cat === 'commute_out') {

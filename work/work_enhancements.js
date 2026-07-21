@@ -2120,3 +2120,117 @@
     window.initTagReorderListeners();
     window.initInnerReorderListeners();
 })();
+
+// 작업 카드 내부 칸 순서 편집: 카드 순서/업무 데이터와 분리된 공통 화면 설정이다.
+(() => {
+    const STORAGE_KEY = 'wm_work_card_section_order';
+    let pressTimer = null;
+    let pressCard = null;
+    let pressX = 0;
+    let pressY = 0;
+    let suppressCardId = '';
+    let suppressUntil = 0;
+
+    const isIgnoredTarget = target => !!target.closest('button, a, img, input, textarea, select, .log-img-list');
+    const closeEditor = () => document.getElementById('workCardLayoutEditor')?.remove();
+    const saveEditorOrder = list => {
+        const visibleOrder = [...list.querySelectorAll('.card-layout-edit-item')].map(item => item.dataset.key);
+        let previous = [];
+        try { previous = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch (_) { previous = []; }
+        const hiddenKeys = Array.isArray(previous) ? previous.filter(key => !visibleOrder.includes(key)) : [];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([...visibleOrder, ...hiddenKeys]));
+        window.updateUI?.();
+    };
+
+    const openEditor = card => {
+        closeEditor();
+        const sections = [...card.querySelectorAll('.work-card-section')];
+        if (!sections.length) return;
+        const overlay = document.createElement('div');
+        overlay.id = 'workCardLayoutEditor';
+        overlay.className = 'card-layout-editor-layer';
+        overlay.innerHTML = `<div class="card-layout-editor w95-out" role="dialog" aria-modal="true">
+            <div class="w95-titlebar"><span>카드 내부 배치</span><button type="button" class="w95-btn card-layout-close">X</button></div>
+            <div class="card-layout-help">손잡이를 끌거나 ▲ ▼ 버튼으로 가로 칸의 위·아래 순서를 바꾸세요.</div>
+            <div class="card-layout-edit-list"></div>
+            <div class="card-layout-editor-actions"><button type="button" class="w95-btn card-layout-reset">기본 순서</button><button type="button" class="w95-btn card-layout-done">저장·닫기</button></div>
+        </div>`;
+        const list = overlay.querySelector('.card-layout-edit-list');
+        sections.forEach((section, index) => {
+            const item = document.createElement('div');
+            item.className = 'card-layout-edit-item w95-out';
+            item.dataset.key = section.dataset.cardSectionKey;
+            item.innerHTML = `<span class="card-layout-drag-handle" title="끌어서 이동">⠿</span><span class="card-layout-edit-label"></span><button type="button" class="w95-btn card-layout-up" aria-label="위로">▲</button><button type="button" class="w95-btn card-layout-down" aria-label="아래로">▼</button>`;
+            item.querySelector('.card-layout-edit-label').textContent = section.dataset.cardSectionLabel || `칸 ${index + 1}`;
+            list.appendChild(item);
+        });
+        overlay.addEventListener('click', event => {
+            const item = event.target.closest('.card-layout-edit-item');
+            if (event.target.closest('.card-layout-close,.card-layout-done')) return closeEditor();
+            if (event.target.closest('.card-layout-reset')) {
+                const byKey = new Map([...list.children].map(el => [el.dataset.key, el]));
+                ['work', 'customer'].forEach(key => byKey.get(key) && list.appendChild(byKey.get(key)));
+                [...byKey.keys()].filter(key => key.startsWith('custom:')).forEach(key => list.appendChild(byKey.get(key)));
+                saveEditorOrder(list);
+                return;
+            }
+            if (!item) return;
+            if (event.target.closest('.card-layout-up') && item.previousElementSibling) list.insertBefore(item, item.previousElementSibling);
+            if (event.target.closest('.card-layout-down') && item.nextElementSibling) list.insertBefore(item.nextElementSibling, item);
+            saveEditorOrder(list);
+        });
+        overlay.addEventListener('click', event => { if (event.target === overlay) closeEditor(); });
+
+        let dragged = null;
+        const stopDrag = () => { dragged?.classList.remove('is-moving'); dragged = null; };
+        list.addEventListener('pointerdown', event => {
+            const handle = event.target.closest('.card-layout-drag-handle');
+            if (!handle) return;
+            dragged = handle.closest('.card-layout-edit-item');
+            dragged.classList.add('is-moving');
+            handle.setPointerCapture?.(event.pointerId);
+            event.preventDefault();
+        });
+        list.addEventListener('pointermove', event => {
+            if (!dragged) return;
+            const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('.card-layout-edit-item');
+            if (!target || target === dragged || target.parentElement !== list) return;
+            const rect = target.getBoundingClientRect();
+            list.insertBefore(dragged, event.clientY < rect.top + rect.height / 2 ? target : target.nextElementSibling);
+        });
+        list.addEventListener('pointerup', () => { if (dragged) saveEditorOrder(list); stopDrag(); });
+        list.addEventListener('pointercancel', stopDrag);
+        document.body.appendChild(overlay);
+    };
+
+    const cancelPress = () => { clearTimeout(pressTimer); pressTimer = null; pressCard = null; };
+    document.addEventListener('pointerdown', event => {
+        const card = event.target.closest('.log-card[data-log-cat="work"]');
+        if (!card || isIgnoredTarget(event.target) || document.getElementById('workCardLayoutEditor')) return;
+        cancelPress();
+        pressCard = card;
+        pressX = event.clientX;
+        pressY = event.clientY;
+        pressTimer = setTimeout(() => {
+            const id = pressCard?.dataset.logId || '';
+            if (!pressCard) return;
+            suppressCardId = id;
+            suppressUntil = Date.now() + 900;
+            navigator.vibrate?.(35);
+            openEditor(pressCard);
+            cancelPress();
+        }, 800);
+    }, true);
+    document.addEventListener('pointermove', event => {
+        if (pressTimer && Math.hypot(event.clientX - pressX, event.clientY - pressY) > 10) cancelPress();
+    }, true);
+    document.addEventListener('pointerup', cancelPress, true);
+    document.addEventListener('pointercancel', cancelPress, true);
+    document.addEventListener('click', event => {
+        const card = event.target.closest('.log-card[data-log-cat="work"]');
+        if (card && card.dataset.logId === suppressCardId && Date.now() < suppressUntil) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        }
+    }, true);
+})();
