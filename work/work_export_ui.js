@@ -5,24 +5,24 @@ window.WorkExportUI = {
     systemColumns: [
         { id: 'date',      name: '날짜',       customName: '날짜' },
         { id: 'time',      name: '시간',       customName: '시간' },
-        { id: 'cat',       name: '분류',       customName: '분류' },
-        { id: 'taskNo',    name: 'Task번호',   customName: 'Task번호' },
-        { id: 'customer',  name: '고객명',     customName: '고객명' },
         { id: 'taskType',  name: '작업유형',   customName: '작업유형' },
+        { id: 'taskNo',    name: 'Task',       customName: 'Task' },
         { id: 'status',    name: '상태',       customName: '상태' },
-        { id: 'coworkers', name: '매니저',     customName: '매니저' },
-        { id: 'address',   name: '주소',       customName: '주소' },
-        { id: 'content',   name: '내용',       customName: '내용' },
+        { id: 'content',   name: '작업내용',   customName: '작업내용' },
         { id: 'note',      name: '특이사항',   customName: '특이사항' },
-        { id: 'equips',    name: '장비/KM',    customName: '장비/KM' },
-        { id: 'duty',      name: '당직여부',   customName: '당직여부' },
+        { id: 'customer',  name: '고객명',     customName: '고객명' },
+        { id: 'address',   name: '주소',       customName: '주소' },
+        { id: 'equips',    name: '장비',       customName: '장비' },
+        { id: 'coworkers', name: '매니저',     customName: '매니저' },
+        { id: 'duty',      name: '당직',       customName: '당직' },
         { id: 'otCount',   name: 'OT',         customName: 'OT' },
         { id: 'durationStart', name: '시작시간', customName: '시작시간' },
         { id: 'durationEnd',   name: '종료시간', customName: '종료시간' },
         { id: 'durationTotal', name: '총시간',   customName: '총시간' },
-        { id: 'oxDisplay', name: 'O/X표시',    customName: 'O/X표시' },
+        { id: 'cat',       name: '분류',       customName: '분류' },
+        { id: 'oxDisplay', name: 'O/X',        customName: 'O/X' },
         { id: 'tags',      name: '태그',       customName: '태그' },
-        { id: 'hasPhoto',  name: '사진유무',   customName: '사진유무' },
+        { id: 'hasPhoto',  name: '사진',       customName: '사진' },
         { id: 'inTime',    name: '출근시간',   customName: '출근시간' },
         { id: 'outTime',   name: '퇴근시간',   customName: '퇴근시간' },
         { id: 'driveKm',   name: '주행거리',   customName: '주행거리' },
@@ -75,9 +75,28 @@ window.WorkExportUI = {
             document.body.insertAdjacentHTML('beforeend', window.WorkExportHTML);
         }
         this.loadConfig();
+        this.applyRecommendedOrderOnce();
         if (this.state.selectedOrder.length === 0) {
             this.state.selectedOrder = this.columnsMaster.map(c => c.id);
         }
+    },
+
+    applyRecommendedOrderOnce: function () {
+        if (localStorage.getItem('wm_export_layout_v4') === '1') return;
+        const recommended = [
+            'date','time','taskType','taskNo','status','content','note',
+            'customer','address','equips','coworkers','duty','otCount',
+            'durationStart','durationEnd','durationTotal','tags','hasPhoto','cat','oxDisplay',
+            'inTime','outTime','driveKm','commuteOt','inNote','outNote'
+        ];
+        const current = this.state.selectedOrder.length
+            ? [...this.state.selectedOrder]
+            : this.columnsMaster.map(c => c.id);
+        const selected = new Set(current);
+        this.state.selectedOrder = recommended.filter(id => selected.has(id))
+            .concat(current.filter(id => !recommended.includes(id)));
+        localStorage.setItem('wm_export_layout_v4', '1');
+        this.saveConfig();
     },
 
     loadConfig: function () {
@@ -225,11 +244,15 @@ window.WorkExportUI = {
         // 3번째 칸: 일반 항목
         // 4번째 칸: 출퇴근 항목
         // 5번째 칸(신규): 커스텀 그룹 항목
-        let generalHtml = '';
+        let workHtml = '';
+        let customerHtml = '';
+        let otherHtml = '';
         let commuteHtml = '';
         let customGroupHtml = '';
 
         const commuteIds = ['inTime', 'outTime', 'driveKm', 'commuteOt', 'inNote', 'outNote'];
+        const customerIds = ['customer', 'address', 'equips', 'coworkers'];
+        const workIds = ['date','time','taskType','taskNo','status','content','note','duty','otCount','durationStart','durationEnd','durationTotal'];
 
         cols.forEach(col => {
             const isSelected = this.state.selectedOrder.includes(col.id);
@@ -262,12 +285,18 @@ window.WorkExportUI = {
                 customGroupHtml += itemHtml;
             } else if (commuteIds.includes(col.id)) {
                 commuteHtml += itemHtml;
+            } else if (customerIds.includes(col.id)) {
+                customerHtml += itemHtml;
+            } else if (workIds.includes(col.id)) {
+                workHtml += itemHtml;
             } else {
-                generalHtml += itemHtml;
+                otherHtml += itemHtml;
             }
         });
 
-        document.getElementById('expColGridGeneral').innerHTML = generalHtml;
+        document.getElementById('expColGridWork').innerHTML = workHtml;
+        document.getElementById('expColGridCustomer').innerHTML = customerHtml;
+        document.getElementById('expColGridOther').innerHTML = otherHtml;
         document.getElementById('expColGridCommute').innerHTML = commuteHtml;
 
         // 커스텀 그룹 섹션 (있을 때만 표시)

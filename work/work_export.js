@@ -141,7 +141,7 @@ window.WorkExport = {
                 this.buildCsv([headers, ...rows], fileName);
             }
             else {
-                await this.buildXlsx(headers, rows, maxLens, fileName, state.selectedWidth);
+                await this.buildXlsx(headers, rows, maxLens, fileName, state.selectedWidth, cols);
             }
         }
         catch (error) {
@@ -313,7 +313,16 @@ window.WorkExport = {
         };
     },
 
-    buildXlsx: async function(headers, rows, maxLens, fileName, widthMode) {
+    getColumnVisualGroup: function(column) {
+        const id = column && column.id;
+        if (column && column.isCustomGroup) return "custom";
+        if (["customer","address","equips","coworkers"].includes(id)) return "customer";
+        if (["inTime","outTime","driveKm","commuteOt","inNote","outNote"].includes(id)) return "commute";
+        if (["date","time","taskType","taskNo","status","content","note","duty","otCount","durationStart","durationEnd","durationTotal"].includes(id)) return "work";
+        return "other";
+    },
+
+    buildXlsx: async function(headers, rows, maxLens, fileName, widthMode, cols = []) {
         await this.ensureLibraries();
         this.imageCache = new Map();
         this.failedImageSources = [];
@@ -331,7 +340,11 @@ window.WorkExport = {
         const header = dataSheet.addRow(headers);
         header.height = 28;
 
-        header.eachCell(cell => {
+        const headerColors = { work:"FFDCEBFF", customer:"FFDDF7EE", commute:"FFFCE7F3", custom:"FFEDE9FE", other:"FFF1F5F9" };
+        const bodyColors = { work:"FFF8FBFF", customer:"FFF5FCF9", commute:"FFFFF8FB", custom:"FFFAF8FF", other:"FFFFFFFF" };
+
+        header.eachCell((cell, colNumber) => {
+            const visualGroup = this.getColumnVisualGroup(cols[colNumber - 1]);
             cell.font = {
                 bold: true,
                 color: { argb: "FF1F2937" }
@@ -340,7 +353,7 @@ window.WorkExport = {
             cell.fill = {
                 type: "pattern",
                 pattern: "solid",
-                fgColor: { argb: "FFF1F5F9" }
+                fgColor: { argb: headerColors[visualGroup] }
             };
 
             cell.alignment = {
@@ -370,31 +383,13 @@ window.WorkExport = {
             for (let colIndex = 0; colIndex < rawRow.length; colIndex++) {
                 const value = rawRow[colIndex];
                 const cell = excelRow.getCell(colIndex + 1);
-                const columnName = headers[colIndex];
+                const column = cols[colIndex] || {};
+                const columnId = column.id;
+                const visualGroup = this.getColumnVisualGroup(column);
 
-                const centered = [
-                    "시간",
-                    "출근시간",
-                    "퇴근시간",
-                    "날짜",
-                    "분류",
-                    "O/X표시",
-                    "당직여부",
-                    "사진유무",
-                    "Task번호",
-                    "OT",
-                    "시작시간",
-                    "종료시간",
-                    "총시간"
-                ].includes(columnName);
+                const centered = ["time","inTime","outTime","date","cat","oxDisplay","duty","hasPhoto","taskNo","otCount","durationStart","durationEnd","durationTotal"].includes(columnId);
 
-                const wrapped = [
-                    "주소",
-                    "내용",
-                    "특이사항",
-                    "출근특이사항",
-                    "퇴근특이사항"
-                ].includes(columnName);
+                const wrapped = ["address","content","note","inNote","outNote"].includes(columnId);
 
                 cell.alignment = {
                     vertical: "middle",
@@ -403,6 +398,11 @@ window.WorkExport = {
                 };
 
                 cell.border = this.getBorder("FFCBD5E1");
+                cell.fill = {
+                    type: "pattern",
+                    pattern: "solid",
+                    fgColor: { argb: bodyColors[visualGroup] }
+                };
 
                 if (value && value.type === "image") {
                     for (let imageIndex = 0; imageIndex < value.images.length; imageIndex++) {

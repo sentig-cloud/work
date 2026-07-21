@@ -254,26 +254,30 @@ window.getLogCardHtml = (l, indexStr = '') => {
     if (isCommuteDetailCard || isCommuteCard || isMemoOrPhoto) taskNoHtml = '';
 
     if (l.cat === 'work') {
-        seqHtml = indexStr ? `<div class="log-seq" style="padding: 8px 96px 0 12px; font-size:1.1rem; line-height:1.35; word-break:break-word; color:red; font-weight:bold;">No.${indexStr} <span style="font-size:0.9rem; color:var(--w-black); font-weight:900; ${excludedCardStyle('taskTypes')}">[${l.taskType || '기본'}]</span></div>` : '';
+        seqHtml = '';
+        taskNoHtml = '';
+        const dutyBadge = l.isDuty ? `<span class="work-alert-badge">당직</span>` : '';
+        const otBadge = Number(l.otCount) > 0 ? `<span class="work-alert-badge">OT${Number(l.otCount) > 1 ? ` ${Number(l.otCount)}` : ''}</span>` : '';
+        const statusBadge = l.status
+            ? `<span class="work-status-sticker ${statusClass}" style="${excludedCardStyle('statuses')}">${l.status}</span>`
+            : `<span class="work-status-sticker is-empty">상태 없음</span>`;
+        const inlineTaskNo = l.taskNo
+            ? `<button type="button" class="task-no-btn work-task-no" onclick="event.stopPropagation(); window.toggleLogOx('${l.id}')">${l.taskNo}</button>`
+            : `<button type="button" class="task-no-btn work-task-no" onclick="event.stopPropagation(); window.toggleLogOx('${l.id}')">O/X</button>`;
 
-        let dutyBadge = l.isDuty ? `<span style="color:red; font-weight:bold; margin-right:4px;">[당직]</span>` : '';
-        let statusBadge = l.status ? `<span style="background:var(--w-blue); color:white; padding:1px 4px; font-size:0.75rem; border-radius:2px; margin-right:4px; ${excludedCardStyle('statuses')}">${l.status}</span>` : '';
-
-        let detailsHtml = [];
-        if (l.address) detailsHtml.push(`<div style="color:#475569; font-size:0.85rem;"><i class="fa-solid fa-map-marker-alt" style="width:16px;"></i> ${l.address}</div>`);
-        if (l.customerName) detailsHtml.push(`<div style="color:#6366f1; font-size:0.85rem; font-weight:bold;"><i class="fa-solid fa-user" style="width:16px;"></i> ${l.customerName}</div>`);
+        let customerDetails = [];
+        if (l.customerName) customerDetails.push(`<div class="work-info-line customer"><i class="fa-solid fa-user"></i><span>${l.customerName}</span></div>`);
+        if (l.address) customerDetails.push(`<div class="work-info-line address"><i class="fa-solid fa-map-marker-alt"></i><span>${l.address}</span></div>`);
         if (l.equips) {
             let eqStr = Object.entries(l.equips).filter(e => e[1] > 0)
                 .map(e => Number(e[1]) > 1 ? `${e[0]} ${e[1]}` : e[0]).join(', ');
-            if (eqStr) detailsHtml.push(`<div style="color:#0f766e; font-size:0.85rem; font-weight:bold; ${excludedCardStyle('equipments')}"><i class="fa-solid fa-box" style="width:16px;"></i> ${eqStr}</div>`);
+            if (eqStr) customerDetails.push(`<div class="work-info-line equipment" style="${excludedCardStyle('equipments')}"><i class="fa-solid fa-box"></i><span>${eqStr}</span></div>`);
         }
-        if (l.otCount) detailsHtml.push(`<div style="color:#e11d48; font-size:0.85rem; font-weight:bold;"><i class="fa-solid fa-clock" style="width:16px;"></i> OT</div>`);
-        if (l.note) detailsHtml.push(`<div style="color:#d97706; font-size:0.85rem;"><i class="fa-solid fa-triangle-exclamation" style="width:16px;"></i> ${l.note}</div>`);
 
         // 시작/종료/총시간 (특수 그룹 — 태그 목록이 아니라 log.startTime/endTime/totalMin에 직접 저장)
         if (l.startTime || l.endTime) {
             const totalStr = l.totalMin ? window.formatDurationMin(l.totalMin) : '--:--';
-            detailsHtml.push(`<div style="color:#0f766e; font-size:0.85rem; font-weight:bold;"><i class="fa-solid fa-hourglass-half" style="width:16px;"></i> ${l.startTime || '--:--'} ~ ${l.endTime || '--:--'} (${totalStr})</div>`);
+            customerDetails.push(`<div class="work-info-line duration"><i class="fa-solid fa-hourglass-half"></i><span>${l.startTime || '--:--'}~${l.endTime || '--:--'} (${totalStr})</span></div>`);
         }
 
         // 커스텀 그룹 값 카드에 표시
@@ -284,7 +288,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
             const val = l.customGroups && l.customGroups[g.id];
             if (val && (Array.isArray(val) ? val.length > 0 : val)) {
                 const valStr = Array.isArray(val) ? val.join(', ') : String(val);
-                detailsHtml.push(`<div style="color:#7c3aed; font-size:0.85rem; font-weight:bold; ${excludedCardStyle(g.id)}"><i class="fa-solid fa-tag" style="width:16px;"></i> [${g.title}] ${valStr}</div>`);
+                customerDetails.push(`<div class="work-info-line custom" style="${excludedCardStyle(g.id)}"><i class="fa-solid fa-tag"></i><span><b>${g.title}</b> ${valStr}</span></div>`);
             }
         });
 
@@ -293,14 +297,26 @@ window.getLogCardHtml = (l, indexStr = '') => {
         }
 
         workDetailsHtml = `
-            <div class="card-content-zone">
-                <div style="display:flex; align-items:center; gap:2px; margin-bottom:6px; flex-wrap:wrap; padding-right:85px;">
-                    ${dutyBadge}${statusBadge}
-                    <span style="font-size:1.1rem; font-weight:900; color:var(--w-blue); letter-spacing:0.5px;">${l.workTime || '00:00'}</span>
-                    <span style="font-weight:bold; color:#475569; font-size:0.85rem; margin-left:4px;">${headerDateStr}</span>
+            <div class="card-content-zone work-card-layout">
+                <div class="work-card-head">
+                    <div class="work-card-date"><b>No.${indexStr || '-'}</b><span>${headerDateStr}</span><strong>${l.workTime || '00:00'}</strong></div>
+                    <div class="work-card-alerts">${dutyBadge}${otBadge}</div>
                 </div>
-                <div class="log-content">${(l.content || '내용 없음')}</div>
-                ${detailsHtml.length > 0 ? `<div style="display:flex; flex-direction:column; background:rgba(255,255,255,0.7); padding:8px 10px; border:1px solid #cbd5e1; border-radius:4px; margin-top:8px; margin-bottom:4px; gap:4px;">${detailsHtml.join('')}</div>` : ''}
+                <div class="work-card-status-row">${statusBadge}</div>
+                <div class="work-task-row" style="${excludedCardStyle('taskTypes')}">
+                    <span class="work-task-type">${l.taskType || '기본'}</span>${inlineTaskNo}
+                </div>
+                <div class="work-card-columns">
+                    <section class="work-main-panel">
+                        <div class="work-panel-title"><i class="fa-solid fa-screwdriver-wrench"></i> 작업</div>
+                        <div class="work-content-box">${l.content || '내용 없음'}</div>
+                        ${l.note ? `<div class="work-note-box"><i class="fa-solid fa-triangle-exclamation"></i><span>${l.note}</span></div>` : ''}
+                    </section>
+                    <aside class="work-customer-panel">
+                        <div class="work-panel-title"><i class="fa-solid fa-address-card"></i> 고객정보</div>
+                        ${customerDetails.length ? customerDetails.join('') : '<div class="work-info-empty">등록 정보 없음</div>'}
+                    </aside>
+                </div>
             </div>
         `;
     } else if (l.cat === 'commute_in' || l.cat === 'commute_out') {
@@ -369,7 +385,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
         `;
     }
 
-    let bottomTimeHtml = (isCommuteDetailCard || isCommuteCard)
+    let bottomTimeHtml = (l.cat === 'work' || isCommuteDetailCard || isCommuteCard)
         ? ''
         : `<div class="log-time" style="padding:0;">${l.m}/${l.d}(${dayStr}) ${l.time || ''}</div>`;
 

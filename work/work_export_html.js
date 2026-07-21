@@ -35,8 +35,18 @@ window.WorkExportHTML = `
             </div>
 
             <div class="exp-section">
-                <div style="font-size:0.7rem; color:#64748b; font-weight:bold; margin-bottom:2px;">일반 항목</div>
-                <div class="exp-tag-grid" id="expColGridGeneral"></div>
+                <div style="font-size:0.72rem; color:#1d4ed8; font-weight:900; margin-bottom:2px;"><i class="fa-solid fa-screwdriver-wrench"></i> 작업정보</div>
+                <div class="exp-tag-grid" id="expColGridWork"></div>
+            </div>
+
+            <div class="exp-section">
+                <div style="font-size:0.72rem; color:#0f766e; font-weight:900; margin-bottom:2px;"><i class="fa-solid fa-address-card"></i> 고객정보</div>
+                <div class="exp-tag-grid" id="expColGridCustomer"></div>
+            </div>
+
+            <div class="exp-section">
+                <div style="font-size:0.7rem; color:#64748b; font-weight:bold; margin-bottom:2px;">기타</div>
+                <div class="exp-tag-grid" id="expColGridOther"></div>
             </div>
 
             <div class="exp-section">

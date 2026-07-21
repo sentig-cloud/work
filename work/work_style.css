@@ -226,6 +226,65 @@ html, body {
 }
 .task-no-btn:active { background: #cbd5e1; transform: scale(0.95); }
 
+/* 작업 카드: 왼쪽 작업정보 / 오른쪽 고객정보 */
+.work-card-layout { padding:8px 10px 3px; }
+.work-card-head { display:flex; align-items:center; justify-content:space-between; gap:6px; padding-right:29px; }
+.work-card-date { display:flex; align-items:center; flex-wrap:wrap; gap:5px; min-width:0; color:#475569; font-size:.76rem; font-weight:800; }
+.work-card-date b { color:#dc2626; font-size:1rem; }
+.work-card-date strong { color:var(--w-blue); font-size:.9rem; }
+.work-card-alerts { display:flex; gap:3px; flex-shrink:0; }
+.work-alert-badge {
+    display:inline-flex; align-items:center; min-height:21px; padding:1px 5px;
+    background:linear-gradient(#ff8a8a,#dc2626); color:#fff; border:1px solid #7f1d1d;
+    box-shadow:inset 1px 1px rgba(255,255,255,.65),1px 1px rgba(0,0,0,.25);
+    font-size:.67rem; font-weight:900;
+}
+.work-card-status-row { display:flex; margin:5px 0 4px; }
+.work-status-sticker {
+    display:inline-flex; align-items:center; justify-content:center; min-width:47px; min-height:23px;
+    padding:2px 8px; background:#000080; color:#fff; border:2px solid #fff;
+    outline:1px solid #1e293b; box-shadow:2px 2px 0 rgba(0,0,0,.28); font-size:.75rem; font-weight:900;
+}
+.work-status-sticker.is-empty { background:#64748b; opacity:.8; }
+.work-task-row {
+    display:flex; align-items:center; justify-content:space-between; gap:7px;
+    margin-bottom:6px; padding:5px 7px; background:#e0e7ff; border:1px solid #818cf8;
+}
+.work-task-type { min-width:0; color:#1e3a8a; font-size:.9rem; font-weight:900; word-break:break-word; }
+.task-no-btn.work-task-no {
+    position:static; width:auto; min-width:58px; min-height:25px; height:25px;
+    padding:2px 7px; flex-shrink:0; font-size:.75rem; border-radius:2px;
+}
+.work-card-columns { display:grid; grid-template-columns:minmax(0, 1.35fr) minmax(108px, .9fr); gap:6px; align-items:stretch; }
+.work-main-panel,.work-customer-panel {
+    min-width:0; padding:6px; background:rgba(255,255,255,.78); border:1px solid #94a3b8;
+    box-shadow:inset 1px 1px #fff;
+}
+.work-main-panel { border-left:3px solid #2563eb; }
+.work-customer-panel { border-left:3px solid #0f766e; background:rgba(240,253,250,.82); }
+.work-panel-title { margin-bottom:4px; color:#334155; font-size:.7rem; font-weight:900; }
+.work-main-panel .work-panel-title { color:#1d4ed8; }
+.work-customer-panel .work-panel-title { color:#0f766e; }
+.work-content-box {
+    min-height:34px; padding:5px 6px; background:#fff; border:1px solid #cbd5e1;
+    color:#111827; font-size:.88rem; line-height:1.38; font-weight:900; white-space:pre-wrap; word-break:break-word;
+}
+.work-note-box { display:flex; gap:4px; margin-top:5px; padding:4px 5px; background:#fff7ed; border:1px solid #fb923c; color:#9a3412; font-size:.75rem; line-height:1.3; font-weight:800; word-break:break-word; }
+.work-info-line { display:flex; align-items:flex-start; gap:4px; padding:3px 1px; border-bottom:1px dotted #cbd5e1; font-size:.72rem; line-height:1.28; font-weight:800; word-break:break-word; }
+.work-info-line:last-child { border-bottom:0; }
+.work-info-line i { width:13px; margin-top:1px; flex-shrink:0; text-align:center; }
+.work-info-line.customer { color:#4338ca; }
+.work-info-line.address { color:#475569; }
+.work-info-line.equipment,.work-info-line.duration { color:#0f766e; }
+.work-info-line.custom { color:#7c3aed; }
+.work-info-empty { padding:8px 2px; color:#94a3b8; font-size:.7rem; text-align:center; }
+
+@media (max-width:360px) {
+    .work-card-columns { grid-template-columns:minmax(0, 1.2fr) minmax(98px, .8fr); gap:4px; }
+    .work-main-panel,.work-customer-panel { padding:5px; }
+    .work-card-date span { font-size:.7rem; }
+}
+
 .card-content-zone { padding: 10px 12px 2px 12px; box-sizing: border-box; width: 100%; }
 
 .log-content { 
