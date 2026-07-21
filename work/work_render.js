@@ -110,7 +110,12 @@ window.renderCal = (year, month) => {
         let numColor = isHoliday ? "var(--sun)" : (isSaturday ? "var(--sat)" : "var(--w-black)");
 
         let workCount = dayLogs.filter(l => l.cat === 'work').length;
-        let otherCount = dayLogs.filter(l => l.cat !== 'work' && l.cat !== 'commute_in' && l.cat !== 'commute_out').length;
+        // 출·퇴근 한 쌍에서 자동 생성되는 상세 메모는 기록/내보내기에는 남기되
+        // 달력의 일반 일정 건수에는 포함하지 않는다.
+        let otherCount = dayLogs.filter(l =>
+            l.cat !== 'work' && l.cat !== 'commute_in' && l.cat !== 'commute_out' &&
+            !String(l.id || '').startsWith('calc_commute_')
+        ).length;
 
         let hasDuty = dayLogs.some(l => l.isDutyLog || l.cat === 'duty' || l.isDuty);
         let hasOT = dayLogs.some(l => Number(l.otCount) > 0);

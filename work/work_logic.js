@@ -127,18 +127,7 @@ window.openSpecificMap = (appType) => {
         fallbackUrl = `https://map.kakao.com/link/search/${encodedAddress}`;
     }
 
-    if (url) {
-        const openedAt = Date.now();
-        window.top.location.href = url;
-
-        if (fallbackUrl) {
-            setTimeout(() => {
-                if (Date.now() - openedAt < 1800 && !document.hidden) {
-                    window.top.location.href = fallbackUrl;
-                }
-            }, 1200);
-        }
-    }
+    if (url) window.launchWorkExternalApp?.(url, fallbackUrl, appType);
 };
 
 window.saveGeneralEntry = async () => {

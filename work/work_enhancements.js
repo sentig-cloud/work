@@ -307,7 +307,7 @@
         if (window.isHideGroupMode) {
             const groupEl = e.target.closest("#workDragContainer > .drag-item[data-group-ref]");
             const groupId = groupEl?.dataset.groupRef;
-            if (groupEl && groupId && groupId !== "duration") {
+            if (groupEl && groupId) {
                 e.preventDefault();
                 e.stopPropagation();
                 const g = window.getGroupById?.(groupId);
@@ -1216,6 +1216,113 @@
         if (suppressNextCardClick) { suppressNextCardClick = false; return; }
         toggleCardSelection(card.dataset.logId);
     }, true);
+
+    // ─── 뒤로가기 보호 / 외부 지도 앱 복귀 ───
+    window.showWorkNavigationToast = message => {
+        let toast = document.getElementById('workNavigationToast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'workNavigationToast';
+            toast.style.cssText = 'position:fixed;left:50%;bottom:84px;transform:translateX(-50%);z-index:10000;background:#000080;color:#fff;border:2px solid #fff;box-shadow:2px 2px 0 #000;padding:8px 12px;font-weight:900;font-size:.82rem;white-space:nowrap;pointer-events:none;';
+            document.body.appendChild(toast);
+        }
+        toast.textContent = message;
+        toast.style.display = 'block';
+        clearTimeout(window.workNavigationToastTimer);
+        window.workNavigationToastTimer = setTimeout(() => { toast.style.display = 'none'; }, 1800);
+    };
+
+    let externalLaunch = null;
+    const finishExternalLaunch = () => {
+        if (!externalLaunch || Date.now() - externalLaunch.startedAt < 350) return;
+        externalLaunch.frame?.remove();
+        externalLaunch = null;
+        window.hideLoading?.();
+        window.closeMapAppModal?.();
+    };
+    window.launchWorkExternalApp = (schemeUrl, fallbackUrl = '', appType = '') => {
+        window.hideLoading?.();
+        window.closeMapAppModal?.();
+        externalLaunch?.frame?.remove();
+        const frame = document.createElement('iframe');
+        frame.setAttribute('aria-hidden', 'true');
+        frame.style.cssText = 'position:fixed;width:1px;height:1px;left:-9999px;top:-9999px;border:0;opacity:0;';
+        externalLaunch = { startedAt: Date.now(), frame, hidden: false, appType };
+        document.body.appendChild(frame);
+        frame.src = schemeUrl;
+        setTimeout(() => {
+            if (!externalLaunch || externalLaunch.frame !== frame) return;
+            if (!externalLaunch.hidden && fallbackUrl) {
+                const fallbackWindow = window.open(fallbackUrl, '_blank', 'noopener');
+                if (!fallbackWindow) window.showWorkNavigationToast('지도 앱이 없으면 카카오맵 웹을 새 탭에서 열어주세요.');
+            }
+            setTimeout(finishExternalLaunch, 800);
+        }, 1500);
+    };
+    document.addEventListener('visibilitychange', () => {
+        if (!externalLaunch) return;
+        if (document.hidden) externalLaunch.hidden = true;
+        else finishExternalLaunch();
+    });
+    window.addEventListener('focus', finishExternalLaunch);
+    window.addEventListener('pageshow', finishExternalLaunch);
+
+    const closeTopWorkLayer = () => {
+        const visible = id => {
+            const el = document.getElementById(id);
+            return el && getComputedStyle(el).display !== 'none';
+        };
+        const actions = [
+            ['imageViewer', () => window.closeImageViewer?.()],
+            ['durationTimeEditModal', () => window.closeDurationTimeEditModal?.()],
+            ['titleEditModal', () => { document.getElementById('titleEditModal').style.display = 'none'; }],
+            ['tagRestoreModal', () => window.closeTagRestoreModal?.()],
+            ['tagEditModal', () => window.closeTagEditModal?.()],
+            ['mapAppModal', () => window.closeMapAppModal?.()],
+            ['commuteModal', () => window.closeCommuteModal?.()],
+            ['editModal', () => window.closeEditModal?.()],
+            ['searchLayer', () => window.closeSearch?.()],
+            ['trashLayer', () => window.closeTrash?.()],
+            ['popupLayer', () => window.closePop?.()]
+        ];
+        const match = actions.find(([id]) => visible(id));
+        if (!match) return false;
+        match[1]();
+        return true;
+    };
+
+    let allowWorkExit = false;
+    let workExitArmedUntil = 0;
+    const armWorkHistoryGuard = () => {
+        if (history.state?.workMasterGuard) return;
+        history.replaceState({ ...(history.state || {}), workMasterRoot: true }, document.title);
+        history.pushState({ workMasterGuard: true }, document.title);
+    };
+    armWorkHistoryGuard();
+    window.addEventListener('popstate', () => {
+        if (allowWorkExit) return;
+        if (closeTopWorkLayer()) {
+            history.pushState({ workMasterGuard: true }, document.title);
+            window.showWorkNavigationToast('이전 화면으로 돌아왔습니다.');
+            return;
+        }
+        const now = Date.now();
+        if (now < workExitArmedUntil) {
+            allowWorkExit = true;
+            history.back();
+            return;
+        }
+        workExitArmedUntil = now + 2200;
+        history.pushState({ workMasterGuard: true }, document.title);
+        window.showWorkNavigationToast('한 번 더 뒤로가면 워크를 종료합니다.');
+    });
+    window.addEventListener('beforeunload', event => {
+        const workOpen = document.getElementById('workModal')?.style.display === 'flex';
+        if (!allowWorkExit && (workOpen || window.hasDirtyChanges?.())) {
+            event.preventDefault();
+            event.returnValue = '';
+        }
+    });
 
     // 이벤트 리스너 초기화
     // ═══════════════════════════════════════════
