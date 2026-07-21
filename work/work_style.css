@@ -151,13 +151,13 @@ html, body {
 .robot-easter-active::before { content:''; position:fixed; inset:0; z-index:5900; background:rgba(4,8,25,.72); backdrop-filter:blur(2px); }
 .today-robot-fab.is-robot-easter {
     position:fixed !important; right:auto !important; bottom:auto !important;
-    z-index:6000 !important; transform:translate(-50%,-50%) scale(2.75); transition:left 1.8s ease-in-out,top 1.8s ease-in-out,transform .35s steps(5,end) !important;
-    animation:robotEasterFloat 1.2s steps(4,end) infinite;
+    z-index:6000 !important; transform:translate(-50%,-50%) scale(2.8); transition:transform .35s steps(5,end) !important;
+    animation:robotEasterFloat 1.5s steps(4,end) infinite;
 }
 .today-robot-fab.is-robot-easter .today-robot { animation:robotEasterDance .55s steps(3,end) infinite !important; filter:drop-shadow(0 8px 4px rgba(0,0,0,.45)); }
-.today-robot-fab.is-robot-easter .robot-pet { display:block !important; animation:petFetch .65s steps(4,end) infinite alternate !important; }
-.today-robot-fab.is-robot-easter .robot-ball { display:block !important; animation:robotBallFetch .65s steps(5,end) infinite alternate !important; }
-.today-robot-fab.is-robot-easter .robot-speech { display:block; min-width:65px; font-size:.55rem; }
+.today-robot-fab.is-robot-easter.easter-dogcare .robot-pet,.today-robot-fab.is-robot-easter.easter-fetch .robot-pet { display:block !important; animation:petFetch .8s steps(4,end) infinite alternate !important; }
+.today-robot-fab.is-robot-easter.easter-fetch .robot-ball { display:block !important; animation:robotBallFetch .75s steps(5,end) infinite alternate !important; }
+.today-robot-fab.is-robot-easter .robot-speech { display:block; left:50%; top:-23px; transform:translateX(-50%); min-width:104px; max-width:145px; padding:4px 6px; font-size:.62rem; line-height:1.25; text-align:center; white-space:normal; }
 
 @keyframes todayRobotBob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
 @keyframes robotBeacon { 0%,60%{background:#ff3b30} 61%,100%{background:#ffff00} }

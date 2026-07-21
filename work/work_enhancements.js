@@ -1405,7 +1405,7 @@
     const origEnd = window.endPress;
     const origCancel = window.cancelPress;
     window.startPress = (...args) => {
-        if (window.isWorkEditLocked) return;
+        if (window.isWorkEditLocked && !window.isWorkLayoutMode) return;
         if (window.isWorkLayoutMode) {
             const [, type, index] = args;
             clearTimeout(window.pressTimer);
@@ -1420,7 +1420,7 @@
         return origStart?.(...args);
     };
     window.endPress = (...args) => {
-        if (window.isWorkEditLocked) return;
+        if (window.isWorkEditLocked && !window.isWorkLayoutMode) return;
         if (window.isWorkLayoutMode) {
             clearTimeout(window.pressTimer);
             window.isLongPress = false;
