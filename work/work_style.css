@@ -148,6 +148,16 @@ html, body {
 .robot-ball { display:none; position:absolute; left:-13px; bottom:0; width:9px; height:9px; border-radius:50%; background:#ff3b30; border:2px solid #501010; box-sizing:border-box; pointer-events:none; }
 .robot-ball.is-visible { display:block; animation:robotBallFetch .7s steps(5,end) infinite alternate; }
 .today-robot-fab.is-fetching .robot-pet { animation:petFetch .7s steps(4,end) infinite alternate; }
+.robot-easter-active::before { content:''; position:fixed; inset:0; z-index:5900; background:rgba(4,8,25,.72); backdrop-filter:blur(2px); }
+.today-robot-fab.is-robot-easter {
+    position:fixed !important; left:50% !important; top:48% !important; right:auto !important; bottom:auto !important;
+    z-index:6000 !important; transform:translate(-50%,-50%) scale(2.35); transition:transform .35s steps(5,end) !important;
+    animation:robotEasterFloat 1.2s steps(4,end) infinite;
+}
+.today-robot-fab.is-robot-easter .today-robot { animation:robotEasterDance .55s steps(3,end) infinite !important; filter:drop-shadow(0 8px 4px rgba(0,0,0,.45)); }
+.today-robot-fab.is-robot-easter .robot-pet { display:block !important; animation:petFetch .65s steps(4,end) infinite alternate !important; }
+.today-robot-fab.is-robot-easter .robot-ball { display:block !important; animation:robotBallFetch .65s steps(5,end) infinite alternate !important; }
+.today-robot-fab.is-robot-easter .robot-speech { display:block; min-width:65px; font-size:.55rem; }
 
 @keyframes todayRobotBob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
 @keyframes robotBeacon { 0%,60%{background:#ff3b30} 61%,100%{background:#ffff00} }
@@ -163,6 +173,8 @@ html, body {
 @keyframes robotPatrol { 0%{transform:translateY(0) rotate(-3deg)} 100%{transform:translateY(-4px) rotate(3deg)} }
 @keyframes robotCharge { 0%{filter:brightness(.7)} 100%{filter:brightness(1.45)} }
 @keyframes robotCelebrate { 0%{transform:translate(-4px,-4px) rotate(-10deg)} 100%{transform:translate(4px,-8px) rotate(10deg)} }
+@keyframes robotEasterFloat { 0%,100%{margin-top:0} 50%{margin-top:-10px} }
+@keyframes robotEasterDance { 0%{transform:rotate(-8deg) translateY(0)} 50%{transform:rotate(8deg) translateY(-8px)} 100%{transform:rotate(-3deg) translateY(-2px)} }
 @keyframes robotSpeechPop { from{transform:scale(.5);opacity:0} to{transform:scale(1);opacity:1} }
 @keyframes petWalk { 0%{transform:translateY(0)} 100%{transform:translateY(-3px)} }
 @keyframes petTail { 0%{transform:rotate(-25deg)} 100%{transform:rotate(35deg)} }
@@ -311,11 +323,13 @@ html, body {
 .card-layout-up,.card-layout-down { min-width:32px; height:29px; padding:0; }
 .card-layout-editor-actions { display:flex; justify-content:space-between; gap:8px; padding:7px 4px 4px; }
 .card-layout-editor-actions .w95-btn { min-height:30px; font-weight:900; }
-.title-edit-actions { display:grid; grid-template-columns:1fr 1fr; gap:5px; width:100%; }
+.title-edit-actions { display:grid; grid-template-columns:1fr; gap:5px; width:100%; }
 .title-edit-actions .w95-btn { min-width:0; height:32px; padding:2px 4px; font-size:.72rem; font-weight:900; }
 .title-card-toggle { color:#7c3aed; }
 .title-card-toggle.active-btn { background:#4c1d95; color:#fff; }
 .title-save-btn { color:var(--w-blue); }
+.group-add-btn { display:none !important; }
+.layout-edit-mode .group-add-btn { display:inline-flex !important; }
 
 @media (max-width:360px) {
     .work-card-columns,.work-card-columns.has-custom-column { grid-template-columns:minmax(0, 1fr); gap:4px; }

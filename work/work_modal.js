@@ -315,6 +315,10 @@ window.saveBoxTitle = () => {
     document.getElementById('titleEditModal').style.display = 'none';
 };
 
+window.closeBoxTitleEditor = () => {
+    window.saveBoxTitle();
+};
+
 window.applySavedDragOrder = () => {
     let savedOrder = localStorage.getItem('wm_work_drag_order');
     if (savedOrder) {

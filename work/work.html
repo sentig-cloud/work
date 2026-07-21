@@ -6,7 +6,7 @@
     <title>Work Master Local Pro</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-<link rel="stylesheet" href="work_style.css?v=20260721-7">
+<link rel="stylesheet" href="work_style.css?v=20260721-9">
 </head>
 <body>
 
@@ -316,13 +316,12 @@
 
     <div id="titleEditModal" class="modal-overlay" style="z-index: 2700;">
         <div class="modal-box w95-window" style="max-width: 250px;">
-            <div class="w95-titlebar"><span>상자 이름 변경</span><button type="button" class="w95-btn" onclick="document.getElementById('titleEditModal').style.display='none'">X</button></div>
+            <div class="w95-titlebar"><span>상자 이름 변경</span><button type="button" class="w95-btn" onclick="window.closeBoxTitleEditor()">X</button></div>
             <div style="padding:10px; background:var(--w-gray);">
                 <input type="hidden" id="titleEditTargetId">
                 <input type="text" id="titleEditInput" class="m-input w95-in" style="width:100%; margin-bottom:8px;">
                 <div class="title-edit-actions">
                     <button type="button" id="cardTitleVisibleBtn" class="w95-btn title-card-toggle" onclick="window.toggleCardTitleVisible()">카드 제목 숨김</button>
-                    <button type="button" class="w95-btn title-save-btn" onclick="window.saveBoxTitle()">저장</button>
                 </div>
             </div>
         </div>
@@ -444,12 +443,12 @@
 <script src="work_service.js?v=20260720-4"></script>
 <script src="work_commute.js"></script>
 <script src="work_tag_manager.js"></script>
-<script src="work_sync.js?v=20260720-4"></script>
+<script src="work_sync.js?v=20260721-9"></script>
 <script src="work_render.js?v=20260721-7"></script>
-<script src="work_ui.js"></script>
-<script src="work_modal.js?v=20260721-6"></script>
+<script src="work_ui.js?v=20260721-9"></script>
+<script src="work_modal.js?v=20260721-9"></script>
 <script src="work_logic.js?v=20260721-1"></script>
-<script src="work_enhancements.js?v=20260721-7"></script>
+<script src="work_enhancements.js?v=20260721-9"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 <script src="work_export_html.js?v=20260721-2"></script>

@@ -60,7 +60,7 @@
     // "+" 버튼: 짧게 탭하면 새 항목 추가(기존과 동일), 길게 누르면 그 그룹에서 삭제했던
     // 항목을 다시 불러올 수 있는 복원 목록이 뜬다.
     const addButtonHtml = (type, extraStyle) => `
-        <button type="button" class="w95-btn" style="${extraStyle || ""}"
+        <button type="button" class="w95-btn group-add-btn" style="${extraStyle || ""}"
             onmousedown="window.startAddPress(event,'${type}')"
             onmouseup="window.endAddPress(event,'${type}')"
             onmouseleave="window.cancelAddPress()"
@@ -1405,15 +1405,35 @@
     const origEnd = window.endPress;
     const origCancel = window.cancelPress;
     window.startPress = (...args) => {
-        if (window.isWorkEditLocked || window.isWorkLayoutMode) return;
+        if (window.isWorkEditLocked) return;
+        if (window.isWorkLayoutMode) {
+            const [, type, index] = args;
+            clearTimeout(window.pressTimer);
+            window.isLongPress = false;
+            window.pressTimer = setTimeout(() => {
+                window.isLongPress = true;
+                window.openTagEditBox?.(type, index);
+                navigator.vibrate?.(30);
+            }, 600);
+            return;
+        }
         return origStart?.(...args);
     };
     window.endPress = (...args) => {
-        if (window.isWorkEditLocked || window.isWorkLayoutMode) return;
+        if (window.isWorkEditLocked) return;
+        if (window.isWorkLayoutMode) {
+            clearTimeout(window.pressTimer);
+            window.isLongPress = false;
+            return;
+        }
         return origEnd?.(...args);
     };
     window.cancelPress = (...args) => {
-        if (window.isWorkLayoutMode) return;
+        if (window.isWorkLayoutMode) {
+            clearTimeout(window.pressTimer);
+            window.isLongPress = false;
+            return;
+        }
         return origCancel?.(...args);
     };
 
@@ -1501,7 +1521,9 @@
     // ═══════════════════════════════════════════
     // 태그 편집 (원본 유지)
     // ═══════════════════════════════════════════
-    window.handleLongPress = (type, index) => window.openTagEditBox(type, index);
+    window.handleLongPress = (type, index) => {
+        if (window.isWorkLayoutMode) window.openTagEditBox(type, index);
+    };
 
     window.handleClick = (type, index) => {
         if (window.isWorkEditLocked) return;
@@ -1762,6 +1784,7 @@
     window.addPressLongPressed = false;
 
     window.startAddPress = (event, type) => {
+        if (!window.isWorkLayoutMode) return;
         if (event) event.preventDefault();
         window.addPressLongPressed = false;
         clearTimeout(window.addPressTimer);
@@ -1773,6 +1796,7 @@
     };
 
     window.endAddPress = (event, type) => {
+        if (!window.isWorkLayoutMode) return;
         if (event) event.preventDefault();
         clearTimeout(window.addPressTimer);
         if (window.addPressLongPressed) { window.addPressLongPressed = false; return; }

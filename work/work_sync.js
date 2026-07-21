@@ -586,20 +586,33 @@ window.startSync = async function () {
     }
 };
 
-window.forceSync = async function () {
+window.forceSync = async function (options = {}) {
+    const silent = !!options.silent;
+    const notify = message => {
+        const speech = document.querySelector('#fabToday .robot-speech');
+        if (speech) {
+            speech.textContent = message;
+            speech.classList.add('is-visible');
+            setTimeout(() => speech.classList.remove('is-visible'), 2200);
+        }
+        window.showWorkNavigationToast?.(message);
+    };
     try {
-        if (window.showLoading) window.showLoading("서버 동기화 중...");
+        if (silent) notify('동기화 중...');
+        else if (window.showLoading) window.showLoading("서버 동기화 중...");
         if (window.hasDirtyChanges()) {
             await window.syncNow(true);
-            alert("변경사항을 서버에 저장했습니다.");
+            if (silent) notify('저장 완료!');
+            else alert("변경사항을 서버에 저장했습니다.");
         } else {
             const changed = await window.pullRemoteChanges("force", true);
-            alert(changed ? "서버 변경사항을 반영했습니다." : "이미 최신 상태입니다.");
+            const message = changed ? "서버 변경사항 반영 완료!" : "이미 최신 상태예요";
+            if (silent) notify(message); else alert(message);
         }
     } catch (e) {
-        alert("서버 동기화 실패: " + e.message);
+        if (silent) notify('동기화 실패'); else alert("서버 동기화 실패: " + e.message);
     } finally {
-        if (window.hideLoading) window.hideLoading();
+        if (!silent && window.hideLoading) window.hideLoading();
     }
 };
 

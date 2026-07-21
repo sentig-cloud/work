@@ -144,6 +144,11 @@ window.setupFAB = () => {
     let isTouching = false;
     let isTodayLongPress = false;
     let todayPressTimer = null;
+    let todayEasterTimer = null;
+    let isRobotEasterEgg = false;
+    const mascotRobot = fab.querySelector('.today-robot');
+    const mascotPet = fab.querySelector('.robot-pet');
+    const mascotSpeech = fab.querySelector('.robot-speech');
 
     let startX = 0;
     let startY = 0;
@@ -170,7 +175,37 @@ window.setupFAB = () => {
 
     const clearTodayPressTimer = () => {
         clearTimeout(todayPressTimer);
+        clearTimeout(todayEasterTimer);
         todayPressTimer = null;
+        todayEasterTimer = null;
+    };
+
+    const exitRobotEasterEgg = event => {
+        if (!isRobotEasterEgg) return;
+        event?.preventDefault?.();
+        event?.stopImmediatePropagation?.();
+        isRobotEasterEgg = false;
+        fab.classList.remove('is-robot-easter');
+        document.body.classList.remove('robot-easter-active');
+        mascotPet?.classList.remove('is-visible');
+        mascotSpeech?.classList.remove('is-visible');
+    };
+
+    const enterRobotEasterEgg = () => {
+        if (isDragging || isRobotEasterEgg) return;
+        isTodayLongPress = true;
+        isRobotEasterEgg = true;
+        fab.classList.add('is-robot-easter', 'has-pet');
+        document.body.classList.add('robot-easter-active');
+        mascotPet?.classList.add('is-visible');
+        if (mascotSpeech) {
+            const messages = ['같이 놀자!', '산책 갈까?', '비밀 모드!', '멍멍! 삐빅!', '오늘도 힘내!'];
+            mascotSpeech.textContent = messages[Math.floor(Math.random() * messages.length)];
+            mascotSpeech.classList.add('is-visible');
+        }
+        mascotRobot?.classList.add(['action-dance','action-celebrate','action-hop'][Math.floor(Math.random() * 3)]);
+        navigator.vibrate?.([40,40,80]);
+        setTimeout(() => document.addEventListener('pointerdown', exitRobotEasterEgg, { capture:true, once:true }), 250);
     };
 
     const startPress = (clientX, clientY) => {
@@ -192,8 +227,9 @@ window.setupFAB = () => {
             isTodayLongPress = true;
 
             if (navigator.vibrate) navigator.vibrate(50);
-            if (window.forceSync) window.forceSync();
+            if (window.forceSync) window.forceSync({ silent:true });
         }, 1500);
+        todayEasterTimer = setTimeout(enterRobotEasterEgg, 3500);
     };
 
     const movePress = (clientX, clientY, e) => {
