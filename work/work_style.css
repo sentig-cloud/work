@@ -272,6 +272,7 @@ html, body {
 .work-main-panel { border-left:3px solid #2563eb; }
 .work-customer-panel { border-left:3px solid #0f766e; background:rgba(240,253,250,.82); }
 .work-custom-panel { border-left:3px solid #7c3aed; background:rgba(245,243,255,.86); }
+.work-custom-card-title { margin:-2px 0 3px; padding-bottom:3px; border-bottom:1px solid #c4b5fd; color:#6d28d9; font-size:.7rem; font-weight:900; }
 .work-panel-title { margin-bottom:4px; color:#334155; font-size:.7rem; font-weight:900; }
 .work-main-panel .work-panel-title { color:#1d4ed8; }
 .work-customer-panel .work-panel-title { color:#0f766e; }
@@ -307,6 +308,11 @@ html, body {
 .card-layout-up,.card-layout-down { min-width:32px; height:29px; padding:0; }
 .card-layout-editor-actions { display:flex; justify-content:space-between; gap:8px; padding:7px 4px 4px; }
 .card-layout-editor-actions .w95-btn { min-height:30px; font-weight:900; }
+.title-edit-actions { display:grid; grid-template-columns:1fr 1fr; gap:5px; width:100%; }
+.title-edit-actions .w95-btn { min-width:0; height:32px; padding:2px 4px; font-size:.72rem; font-weight:900; }
+.title-card-toggle { color:#7c3aed; }
+.title-card-toggle.active-btn { background:#4c1d95; color:#fff; }
+.title-save-btn { color:var(--w-blue); }
 
 @media (max-width:360px) {
     .work-card-columns,.work-card-columns.has-custom-column { grid-template-columns:minmax(0, 1fr); gap:4px; }

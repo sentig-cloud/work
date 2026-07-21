@@ -309,7 +309,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
                 customDetails.push({
                     key: `custom:${g.id}`,
                     label: g.title || '선택태그',
-                    html: `<aside class="work-custom-panel work-card-section" data-card-section-key="custom:${g.id}" data-card-section-label="${safeGroupTitle}"><div class="work-info-line custom" style="${excludedCardStyle(g.id)}"><i class="fa-solid fa-tag"></i><span>${valStr}</span></div></aside>`
+                    html: `<aside class="work-custom-panel work-card-section" data-card-section-key="custom:${g.id}" data-card-section-label="${safeGroupTitle}">${g.cardTitleVisible ? `<div class="work-custom-card-title">${safeGroupTitle}</div>` : ''}<div class="work-info-line custom" style="${excludedCardStyle(g.id)}"><i class="fa-solid fa-tag"></i><span>${valStr}</span></div></aside>`
                 });
             }
         });

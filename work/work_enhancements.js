@@ -2144,6 +2144,7 @@
 
     const openEditor = card => {
         closeEditor();
+        window.closeCardSelectionMode?.();
         const sections = [...card.querySelectorAll('.work-card-section')];
         if (!sections.length) return;
         const overlay = document.createElement('div');
@@ -2219,7 +2220,7 @@
             navigator.vibrate?.(35);
             openEditor(pressCard);
             cancelPress();
-        }, 800);
+        }, 1500);
     }, true);
     document.addEventListener('pointermove', event => {
         if (pressTimer && Math.hypot(event.clientX - pressX, event.clientY - pressY) > 10) cancelPress();
