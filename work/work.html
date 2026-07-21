@@ -6,7 +6,7 @@
     <title>Work Master Local Pro</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-<link rel="stylesheet" href="work_style.css?v=20260721-6">
+<link rel="stylesheet" href="work_style.css?v=20260721-7">
 </head>
 <body>
 
@@ -389,6 +389,7 @@
             <span style="font-size:1.2rem; cursor:pointer;" onclick="window.closeSearch()"><i class="fa-solid fa-chevron-left" style="margin-right:8px;"></i> 검색 결과</span>
             <div id="searchEditActions" class="search-edit-actions">
                 <button type="button" id="searchExcludeBtn" class="w95-btn" onclick="window.toggleSelectedSearchOption('excluded')">검색 제외</button>
+                <button type="button" id="searchOrderBtn" class="w95-btn" onclick="window.toggleSearchOrderMode()">순서변경</button>
                 <button type="button" id="searchHideBtn" class="w95-btn" onclick="window.toggleSelectedSearchOption('hidden')">숨기기</button>
             </div>
             <button type="button" id="searchResetBtn" class="w95-btn icon-btn" title="초기화 · 길게 눌러 검색칸 편집"
@@ -444,11 +445,11 @@
 <script src="work_commute.js"></script>
 <script src="work_tag_manager.js"></script>
 <script src="work_sync.js?v=20260720-4"></script>
-<script src="work_render.js?v=20260721-6"></script>
+<script src="work_render.js?v=20260721-7"></script>
 <script src="work_ui.js"></script>
 <script src="work_modal.js?v=20260721-6"></script>
 <script src="work_logic.js?v=20260721-1"></script>
-<script src="work_enhancements.js?v=20260721-6"></script>
+<script src="work_enhancements.js?v=20260721-7"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 <script src="work_export_html.js?v=20260721-2"></script>

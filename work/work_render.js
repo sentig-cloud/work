@@ -301,15 +301,21 @@ window.getLogCardHtml = (l, indexStr = '') => {
         const customGroups = window.getActiveGroups().filter(g =>
             !(window.BUILT_IN_GROUP_IDS || ['taskTypes', 'coworkers', 'statuses', 'equipments', 'memoTags', 'duration']).includes(g.id)
         );
-        customGroups.forEach(g => {
+        const customCardPalette = [
+            ['#7c3aed','#f5f3ff'], ['#c2410c','#fff7ed'], ['#0369a1','#f0f9ff'],
+            ['#047857','#ecfdf5'], ['#be123c','#fff1f2'], ['#a16207','#fefce8'],
+            ['#4338ca','#eef2ff'], ['#0f766e','#f0fdfa']
+        ];
+        customGroups.forEach((g, groupIndex) => {
             const val = l.customGroups && l.customGroups[g.id];
             if (val && (Array.isArray(val) ? val.length > 0 : val)) {
                 const valStr = Array.isArray(val) ? val.join(', ') : String(val);
                 const safeGroupTitle = String(g.title || '선택태그').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const palette = customCardPalette[groupIndex % customCardPalette.length];
                 customDetails.push({
                     key: `custom:${g.id}`,
                     label: g.title || '선택태그',
-                    html: `<aside class="work-custom-panel work-card-section" data-card-section-key="custom:${g.id}" data-card-section-label="${safeGroupTitle}">${g.cardTitleVisible ? `<div class="work-custom-card-title">${safeGroupTitle}</div>` : ''}<div class="work-info-line custom" style="${excludedCardStyle(g.id)}"><i class="fa-solid fa-tag"></i><span>${valStr}</span></div></aside>`
+                    html: `<aside class="work-custom-panel work-card-section" style="--custom-accent:${palette[0]};--custom-bg:${palette[1]};" data-card-section-key="custom:${g.id}" data-card-section-label="${safeGroupTitle}"><div class="work-info-line custom" style="${excludedCardStyle(g.id)}"><i class="fa-solid fa-tag"></i><span>${g.cardTitleVisible ? `<b>${safeGroupTitle}</b><span class="work-custom-title-separator"> : </span>` : ''}${valStr}</span></div></aside>`
                 });
             }
         });

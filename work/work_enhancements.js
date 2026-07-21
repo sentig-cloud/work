@@ -930,6 +930,7 @@
     const searchSelectId = id => `searchGroup_${String(id).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
 
     window.isSearchEditMode = false;
+    window.isSearchOrderMode = false;
     window.selectedSearchGroupIds = new Set();
     window.renderDynamicSearchFilters = (targetMonth = null) => {
         const grid = document.getElementById('searchFilterGrid');
@@ -939,6 +940,11 @@
             : (window.logs || []);
         const oldValues = {};
         grid.querySelectorAll('select[data-search-group]').forEach(el => { oldValues[el.dataset.searchGroup] = el.value; });
+        const fixedValues = {
+            searchOX: document.getElementById('searchOX')?.value || '',
+            searchOT: document.getElementById('searchOT')?.value || '',
+            searchDuty: document.getElementById('searchDuty')?.value || ''
+        };
         const groups = searchableGroups().filter(g => window.isSearchEditMode || (!g.searchExcluded && !g.searchHidden));
         grid.innerHTML = groups.map(g => {
             const value = oldValues[g.id] || '';
@@ -948,14 +954,21 @@
                 const count = searchOptionCount(logs, g.id, tag.name);
                 return `<option value="${esc(tag.name)}" ${value === tag.name ? 'selected' : ''}>[${count}] ${esc(tag.name)}</option>`;
             }).join('');
-            return `<div class="search-filter-cell${state}" data-search-group="${esc(g.id)}">
+            return `<div class="search-filter-cell${state}" data-search-group="${esc(g.id)}"><span class="search-order-handle">⠿</span>
                 <select id="${searchSelectId(g.id)}" data-search-group="${esc(g.id)}" class="m-input w95-in search-group-select" onchange="window.handleSelectChange(this)">
                     <option value="">[ ${esc(title)} ]</option>${options}
                 </select></div>`;
         }).join('') + `<div class="search-filter-cell search-fixed-filter">
             <select id="searchOX" class="m-input w95-in" onchange="window.handleSelectChange(this)">
                 <option value="">[ O/X ]</option><option value="O">O 표시</option><option value="X">X 표시</option>
+            </select></div><div class="search-filter-cell search-fixed-filter">
+            <select id="searchOT" class="m-input w95-in" onchange="window.handleSelectChange(this)">
+                <option value="">[ OT ]</option><option value="yes">OT 있음</option><option value="no">OT 없음</option>
+            </select></div><div class="search-filter-cell search-fixed-filter">
+            <select id="searchDuty" class="m-input w95-in" onchange="window.handleSelectChange(this)">
+                <option value="">[ 당직 ]</option><option value="yes">당직 있음</option><option value="no">당직 없음</option>
             </select></div>`;
+        Object.entries(fixedValues).forEach(([id, value]) => { const el = document.getElementById(id); if (el) el.value = value; });
     };
     window.updateSearchFilters = (targetMonth = null) => window.renderDynamicSearchFilters(targetMonth);
 
@@ -970,6 +983,7 @@
         window.saveLocal?.('search-layout');
     };
     window.toggleSelectedSearchOption = mode => {
+        if (window.isSearchOrderMode) return;
         const selected = [...window.selectedSearchGroupIds]
             .map(id => window.getGroupById?.(id)).filter(Boolean);
         if (!selected.length) return alert('먼저 검색 칸을 하나 이상 선택하세요.');
@@ -987,8 +1001,20 @@
     };
     window.setSearchEditMode = on => {
         window.isSearchEditMode = !!on;
+        window.isSearchOrderMode = false;
         window.selectedSearchGroupIds.clear();
         document.getElementById('searchLayer')?.classList.toggle('is-search-edit', !!on);
+        document.getElementById('searchLayer')?.classList.remove('is-search-order');
+        document.getElementById('searchOrderBtn')?.classList.remove('active-btn');
+        const month = Number(document.getElementById('searchMonth')?.value) || null;
+        window.renderDynamicSearchFilters(month);
+    };
+    window.toggleSearchOrderMode = () => {
+        if (!window.isSearchEditMode) return;
+        window.isSearchOrderMode = !window.isSearchOrderMode;
+        window.selectedSearchGroupIds.clear();
+        document.getElementById('searchLayer')?.classList.toggle('is-search-order', window.isSearchOrderMode);
+        document.getElementById('searchOrderBtn')?.classList.toggle('active-btn', window.isSearchOrderMode);
         const month = Number(document.getElementById('searchMonth')?.value) || null;
         window.renderDynamicSearchFilters(month);
     };
@@ -1027,15 +1053,18 @@
         const cell = event.target.closest('.search-filter-cell[data-search-group]');
         if (!cell) return;
         event.preventDefault();
+        if (window.isSearchOrderMode) {
+            searchDragCell = cell; lastSearchMove = 0;
+            cell.setPointerCapture?.(event.pointerId);
+            return;
+        }
         const id = cell.dataset.searchGroup;
         if (window.selectedSearchGroupIds.has(id)) window.selectedSearchGroupIds.delete(id);
         else window.selectedSearchGroupIds.add(id);
-        searchDragCell = cell; lastSearchMove = 0;
         cell.classList.toggle('is-search-selected', window.selectedSearchGroupIds.has(id));
-        cell.setPointerCapture?.(event.pointerId);
     });
     searchGrid?.addEventListener('pointermove', event => {
-        if (!window.isSearchEditMode || !searchDragCell) return;
+        if (!window.isSearchEditMode || !window.isSearchOrderMode || !searchDragCell) return;
         event.preventDefault();
         if (Date.now() - lastSearchMove < 180) return;
         const over = document.elementFromPoint(event.clientX, event.clientY);
@@ -1069,6 +1098,8 @@
         const keyword = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
         const monthValue = document.getElementById('searchMonth')?.value || '';
         const ox = document.getElementById('searchOX')?.value || '';
+        const ot = document.getElementById('searchOT')?.value || '';
+        const duty = document.getElementById('searchDuty')?.value || '';
         const selections = [...document.querySelectorAll('#searchFilterGrid select[data-search-group]')]
             .filter(el => el.value).map(el => ({ groupId: el.dataset.searchGroup, value: el.value, id: el.id }));
         const filtersArea = document.getElementById('activeFiltersArea');
@@ -1076,10 +1107,12 @@
         if (monthValue) chips.push(`<button class="w95-btn" onclick="window.removeFilter('searchMonth')">${monthValue}월 ×</button>`);
         selections.forEach(s => chips.push(`<button class="w95-btn" onclick="window.removeFilter('${s.id}')">${esc(s.value)} ×</button>`));
         if (ox) chips.push(`<button class="w95-btn" onclick="window.removeFilter('searchOX')">${ox} ×</button>`);
+        if (ot) chips.push(`<button class="w95-btn" onclick="window.removeFilter('searchOT')">OT ${ot === 'yes' ? '있음' : '없음'} ×</button>`);
+        if (duty) chips.push(`<button class="w95-btn" onclick="window.removeFilter('searchDuty')">당직 ${duty === 'yes' ? '있음' : '없음'} ×</button>`);
         filtersArea.innerHTML = chips.join('');
         const resultList = document.getElementById('searchResultList');
         const summary = document.getElementById('searchSummary');
-        if (!keyword && !monthValue && !ox && !selections.length) { resultList.innerHTML = ''; summary.style.display = 'none'; return; }
+        if (!keyword && !monthValue && !ox && !ot && !duty && !selections.length) { resultList.innerHTML = ''; summary.style.display = 'none'; return; }
         const results = (window.logs || []).filter(log => {
             const keywordText = [log.memo, log.content, log.taskNo, log.address, log.customerName, log.commuteNote,
                 log.taskType, log.status, ...(log.coworkers || []), ...(log.tags || []),
@@ -1087,6 +1120,8 @@
             return (!keyword || keywordText.includes(keyword)) &&
                 (!monthValue || Number(log.m) === Number(monthValue)) &&
                 (!ox || log.personalCheck === ox) &&
+                (!ot || (Number(log.otCount || 0) > 0) === (ot === 'yes')) &&
+                (!duty || !!(log.isDuty || log.isDutyLog || log.cat === 'duty') === (duty === 'yes')) &&
                 selections.every(s => groupHasSearchValue(log, s.groupId, s.value));
         });
         const perDay = {};

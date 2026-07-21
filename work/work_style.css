@@ -229,9 +229,10 @@ html, body {
 /* 작업 카드: 왼쪽 작업정보 / 오른쪽 고객정보 */
 .work-card-layout { padding:8px 10px 3px; }
 .work-card-head { display:flex; align-items:center; justify-content:space-between; gap:6px; padding-right:29px; }
-.work-card-date { display:flex; align-items:center; flex-wrap:wrap; gap:5px; min-width:0; color:#475569; font-size:.76rem; font-weight:800; }
+.work-card-date { display:flex; align-items:center; flex-wrap:wrap; gap:6px; min-width:0; color:#334155; font-size:.9rem; font-weight:900; }
 .work-card-date b { color:#dc2626; font-size:1rem; }
-.work-card-date strong { color:var(--w-blue); font-size:.9rem; }
+.work-card-date span { font-size:.92rem; }
+.work-card-date strong { color:var(--w-blue); font-size:1.08rem; }
 .work-card-alerts { display:flex; gap:3px; flex-shrink:0; }
 .work-alert-badge {
     display:inline-flex; align-items:center; min-height:21px; padding:1px 5px;
@@ -260,8 +261,8 @@ html, body {
 }
 .work-task-type { min-width:0; color:#1e3a8a; font-size:.9rem; font-weight:900; word-break:break-word; }
 .task-no-btn.work-task-no {
-    position:static; width:auto; min-width:58px; min-height:25px; height:25px;
-    padding:2px 7px; flex-shrink:0; font-size:.75rem; border-radius:2px;
+    position:static; width:auto; min-width:68px; min-height:31px; height:31px;
+    padding:2px 9px; flex-shrink:0; font-size:.92rem; font-weight:900; border-radius:2px;
 }
 .work-card-columns { display:grid; grid-template-columns:minmax(0, 1fr); gap:5px; align-items:stretch; }
 .work-card-columns.has-custom-column { grid-template-columns:minmax(0, 1fr); }
@@ -271,7 +272,7 @@ html, body {
 }
 .work-main-panel { border-left:3px solid #2563eb; }
 .work-customer-panel { border-left:3px solid #0f766e; background:rgba(240,253,250,.82); }
-.work-custom-panel { border-left:3px solid #7c3aed; background:rgba(245,243,255,.86); }
+.work-custom-panel { border-left:3px solid var(--custom-accent,#7c3aed); background:var(--custom-bg,#f5f3ff); }
 .work-custom-card-title { margin:-2px 0 3px; padding-bottom:3px; border-bottom:1px solid #c4b5fd; color:#6d28d9; font-size:.7rem; font-weight:900; }
 .work-panel-title { margin-bottom:4px; color:#334155; font-size:.7rem; font-weight:900; }
 .work-main-panel .work-panel-title { color:#1d4ed8; }
@@ -290,7 +291,9 @@ html, body {
 .work-info-line.task-type { color:#1d4ed8; font-size:.82rem; }
 .work-info-line.work-content-line { color:#111827; font-size:.82rem; white-space:pre-wrap; }
 .work-info-line.note { color:#9a3412; background:#fff7ed; }
-.work-info-line.custom { color:#7c3aed; }
+.work-info-line.custom { color:var(--custom-accent,#7c3aed); }
+.work-info-line.custom b { color:var(--custom-accent,#7c3aed); font-weight:950; }
+.work-custom-title-separator { color:#64748b; font-weight:900; }
 .work-info-empty { padding:8px 2px; color:#94a3b8; font-size:.7rem; text-align:center; }
 
 .card-layout-editor-layer {
@@ -730,6 +733,11 @@ input, textarea, [contenteditable="true"] {
 .search-edit-actions { display:none; gap:4px; margin-left:auto; margin-right:4px; }
 #searchLayer.is-search-edit .search-edit-actions { display:flex; }
 #searchLayer.is-search-edit .search-filter-cell { cursor:grab; touch-action:none; }
+.search-order-handle { display:none; position:absolute; left:2px; top:50%; z-index:3; transform:translateY(-50%); width:18px; color:#1d4ed8; font-size:1rem; font-weight:900; text-align:center; pointer-events:none; }
+#searchLayer.is-search-order .search-filter-cell[data-search-group] .search-order-handle { display:block; }
+#searchLayer.is-search-order .search-filter-cell[data-search-group] select { padding-left:20px; background:#dbeafe; outline:2px dashed #2563eb; }
+#searchLayer.is-search-order .search-filter-cell[data-search-group] { cursor:move; }
+#searchLayer.is-search-order #searchExcludeBtn,#searchLayer.is-search-order #searchHideBtn { opacity:.45; }
 #searchLayer.is-search-edit .search-filter-cell.is-search-selected { outline:3px solid #f59e0b; outline-offset:1px; }
 #searchLayer.is-search-edit .search-filter-cell.is-search-excluded {
     background:#ff3b30; color:#fff; outline:3px solid #7f1d1d; text-decoration:line-through;
