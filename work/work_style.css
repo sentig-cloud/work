@@ -613,6 +613,10 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
     cursor:pointer !important;
     touch-action:manipulation;
 }
+#workModal.layout-edit-mode.work-edit-locked #workDragContainer .layout-tag-button {
+    pointer-events:auto !important;
+    cursor:pointer !important;
+}
 
 /* 레이아웃 편집 모드: 선택 안 된 블록/객체는 평상시와 동일한 색으로 유지(시인성 확보) —
    노란색 강조는 실제로 선택된 객체에만 표시(.is-block-selected/.is-widget-selected 참고) */

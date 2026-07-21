@@ -1437,6 +1437,63 @@
         return origCancel?.(...args);
     };
 
+    // 레이아웃 이동 이벤트가 태그의 기존 mousedown/touchstart를 선점하므로
+    // 캡처 단계에서 태그 롱탭을 독립 처리한다. 짧은 탭 선택은 계속 잠근다.
+    let layoutTagPressTimer = null;
+    let layoutTagPressButton = null;
+    let layoutTagPressStart = null;
+    const clearLayoutTagPress = () => {
+        clearTimeout(layoutTagPressTimer);
+        layoutTagPressTimer = null;
+        layoutTagPressButton = null;
+        layoutTagPressStart = null;
+    };
+    const getLayoutTagTarget = button => {
+        const groupId = button.closest('.drag-item[data-group-ref]')?.dataset.groupRef;
+        const typeMap = { taskTypes:'task', coworkers:'coworker', equipments:'equip', statuses:'status', memoTags:'memoTag' };
+        const type = button.dataset.tagType || typeMap[groupId] || groupId;
+        const area = button.parentElement;
+        const buttons = [...(area?.querySelectorAll(':scope > .layout-tag-button') || [])];
+        return { type, index:buttons.indexOf(button) };
+    };
+    document.addEventListener('pointerdown', event => {
+        if (!window.isWorkLayoutMode) return;
+        const button = event.target.closest('#workDragContainer .layout-tag-button');
+        if (!button) return;
+        event.preventDefault();
+        event.stopPropagation();
+        clearLayoutTagPress();
+        layoutTagPressButton = button;
+        layoutTagPressStart = { x:event.clientX, y:event.clientY };
+        layoutTagPressTimer = setTimeout(() => {
+            if (!layoutTagPressButton || !window.isWorkLayoutMode) return;
+            const target = getLayoutTagTarget(layoutTagPressButton);
+            if (target.type && target.index >= 0) {
+                window.openTagEditBox?.(target.type, target.index);
+                navigator.vibrate?.(35);
+            }
+            clearTimeout(layoutTagPressTimer);
+            layoutTagPressTimer = null;
+            layoutTagPressStart = null;
+        }, 650);
+    }, true);
+    document.addEventListener('pointermove', event => {
+        if (!layoutTagPressStart) return;
+        if (Math.hypot(event.clientX - layoutTagPressStart.x, event.clientY - layoutTagPressStart.y) > 12) clearLayoutTagPress();
+    }, true);
+    document.addEventListener('pointerup', event => {
+        if (!layoutTagPressButton) return;
+        event.preventDefault();
+        event.stopPropagation();
+        clearLayoutTagPress();
+    }, true);
+    document.addEventListener('pointercancel', clearLayoutTagPress, true);
+    document.addEventListener('click', event => {
+        if (!window.isWorkLayoutMode || !event.target.closest('#workDragContainer .layout-tag-button')) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+    }, true);
+
     // 이벤트 방어
     const isText = (t) => !!t && (t.matches("input,textarea,[contenteditable='true']") || !!t.closest("input,textarea,[contenteditable='true']"));
     document.addEventListener("contextmenu", (e) => { if (!isText(e.target)) e.preventDefault(); });
