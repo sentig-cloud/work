@@ -239,13 +239,21 @@ html, body {
     box-shadow:inset 1px 1px rgba(255,255,255,.65),1px 1px rgba(0,0,0,.25);
     font-size:.67rem; font-weight:900;
 }
-.work-card-status-row { display:flex; margin:5px 0 4px; }
+.work-card-status-row { display:flex; align-items:center; justify-content:space-between; gap:7px; margin:5px 0 6px; }
 .work-status-sticker {
     display:inline-flex; align-items:center; justify-content:center; min-width:47px; min-height:23px;
     padding:2px 8px; background:#000080; color:#fff; border:2px solid #fff;
     outline:1px solid #1e293b; box-shadow:2px 2px 0 rgba(0,0,0,.28); font-size:.75rem; font-weight:900;
 }
 .work-status-sticker.is-empty { background:#64748b; opacity:.8; }
+.work-status-sticker.sticker-completed { background:#172554; }
+.work-status-sticker.sticker-canceled { background:#111827; }
+.work-status-sticker.sticker-pending { background:#6b21a8; }
+.work-status-sticker.sticker-rescheduled { background:#0f766e; }
+.work-status-sticker.sticker-unnecessary { background:#be123c; }
+.work-status-sticker.sticker-construction { background:#1e3a8a; }
+.work-status-sticker.sticker-transfer { background:#9a3412; }
+.work-status-sticker.sticker-default { background:#334155; }
 .work-task-row {
     display:flex; align-items:center; justify-content:space-between; gap:7px;
     margin-bottom:6px; padding:5px 7px; background:#e0e7ff; border:1px solid #818cf8;
@@ -255,13 +263,15 @@ html, body {
     position:static; width:auto; min-width:58px; min-height:25px; height:25px;
     padding:2px 7px; flex-shrink:0; font-size:.75rem; border-radius:2px;
 }
-.work-card-columns { display:grid; grid-template-columns:minmax(0, 1.35fr) minmax(108px, .9fr); gap:6px; align-items:stretch; }
-.work-main-panel,.work-customer-panel {
+.work-card-columns { display:grid; grid-template-columns:minmax(0, 1.15fr) minmax(100px, .95fr); gap:6px; align-items:stretch; }
+.work-card-columns.has-custom-column { grid-template-columns:minmax(0, 1.1fr) minmax(90px, .9fr) minmax(78px, .72fr); }
+.work-main-panel,.work-customer-panel,.work-custom-panel {
     min-width:0; padding:6px; background:rgba(255,255,255,.78); border:1px solid #94a3b8;
     box-shadow:inset 1px 1px #fff;
 }
 .work-main-panel { border-left:3px solid #2563eb; }
 .work-customer-panel { border-left:3px solid #0f766e; background:rgba(240,253,250,.82); }
+.work-custom-panel { border-left:3px solid #7c3aed; background:rgba(245,243,255,.86); }
 .work-panel-title { margin-bottom:4px; color:#334155; font-size:.7rem; font-weight:900; }
 .work-main-panel .work-panel-title { color:#1d4ed8; }
 .work-customer-panel .work-panel-title { color:#0f766e; }
@@ -276,12 +286,17 @@ html, body {
 .work-info-line.customer { color:#4338ca; }
 .work-info-line.address { color:#475569; }
 .work-info-line.equipment,.work-info-line.duration { color:#0f766e; }
+.work-info-line.task-type { color:#1d4ed8; font-size:.82rem; }
+.work-info-line.work-content-line { color:#111827; font-size:.82rem; white-space:pre-wrap; }
+.work-info-line.note { color:#9a3412; background:#fff7ed; }
 .work-info-line.custom { color:#7c3aed; }
 .work-info-empty { padding:8px 2px; color:#94a3b8; font-size:.7rem; text-align:center; }
 
 @media (max-width:360px) {
-    .work-card-columns { grid-template-columns:minmax(0, 1.2fr) minmax(98px, .8fr); gap:4px; }
-    .work-main-panel,.work-customer-panel { padding:5px; }
+    .work-card-columns { grid-template-columns:minmax(0, 1.1fr) minmax(88px, .85fr); gap:4px; }
+    .work-card-columns.has-custom-column { grid-template-columns:minmax(0, 1.05fr) minmax(82px, .85fr) minmax(70px, .7fr); }
+    .work-main-panel,.work-customer-panel,.work-custom-panel { padding:5px; }
+    .work-card-columns.has-custom-column .work-info-line { font-size:.66rem; }
     .work-card-date span { font-size:.7rem; }
 }
 
