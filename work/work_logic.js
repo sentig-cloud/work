@@ -377,6 +377,7 @@ window.saveWorkLog = async () => {
             customGroups: window.activeCustomGroupSelections
                 ? { ...window.activeCustomGroupSelections }
                 : undefined,
+            tagQuantities: JSON.parse(JSON.stringify(window.activeWorkTagQuantities || {})),
             // 그룹별 집계 포함/제외는 이 작업일지에만 적용한다.
             excludedGroups: [...(window.currentWorkExcludedGroups || [])]
         };

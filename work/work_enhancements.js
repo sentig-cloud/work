@@ -44,7 +44,9 @@
         const countSuffix = window.groupShowsCount(groupId) && baseCount > 0
             ? ` (${baseCount})`
             : "";
-        return `${monthly}${tag.name}${countSuffix}`;
+        const workQty = Number(window.activeWorkTagQuantities?.[groupId]?.[tag.name] || 1);
+        const workQtySuffix = workQty > 1 ? ` × ${workQty}` : '';
+        return `${monthly}${tag.name}${countSuffix}${workQtySuffix}`;
     };
 
     const tagButton = (type, tag, index, active) => `
@@ -1578,8 +1580,59 @@
     // ═══════════════════════════════════════════
     // 태그 편집 (원본 유지)
     // ═══════════════════════════════════════════
+    window.openWorkTagQuantity = (type, index) => {
+        const tag = getTagArray(type)[index];
+        if (!tag) return;
+        const groupId = window.typeToGroupId(type);
+        if (!window.groupShowsCount(groupId)) return alert('편집모드에서 이 그룹의 갯수 옵션을 먼저 켜주세요.');
+        window.activeWorkTagQuantities = window.activeWorkTagQuantities || {};
+        window.activeWorkTagQuantities[groupId] = window.activeWorkTagQuantities[groupId] || {};
+        if (groupId === 'taskTypes' && !(window.activeTaskTypes || []).includes(tag.name)) window.activeTaskTypes.push(tag.name);
+        else if (groupId === 'coworkers' && !(window.selectedCoworkers || []).includes(tag.name)) window.selectedCoworkers.push(tag.name);
+        else if (groupId === 'statuses') window.activeStatus = tag.name;
+        else if (!['equipments','memoTags'].includes(groupId)) {
+            window.activeCustomGroupSelections[groupId] = window.activeCustomGroupSelections[groupId] || [];
+            if (!window.activeCustomGroupSelections[groupId].includes(tag.name)) window.activeCustomGroupSelections[groupId].push(tag.name);
+        }
+        let modal = document.getElementById('workTagQuantityModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'workTagQuantityModal';
+            modal.className = 'modal-overlay';
+            modal.style.zIndex = '2750';
+            modal.innerHTML = `<div class="modal-box w95-window" style="max-width:240px"><div class="w95-titlebar"><span id="workQtyTitle">수량 입력</span><button type="button" class="w95-btn" onclick="window.closeWorkTagQuantity()">X</button></div><div class="work-qty-body"><button type="button" class="w95-btn" onclick="window.changeWorkTagQuantity(-1)">−</button><input id="workQtyInput" type="number" min="0" inputmode="numeric" class="m-input w95-in"><button type="button" class="w95-btn" onclick="window.changeWorkTagQuantity(1)">+</button></div></div>`;
+            document.body.appendChild(modal);
+        }
+        window.editingWorkQuantity = { type, index, groupId, name:tag.name };
+        document.getElementById('workQtyTitle').textContent = tag.name;
+        document.getElementById('workQtyInput').value = Number(window.activeWorkTagQuantities[groupId][tag.name] || 1);
+        modal.style.display = 'flex';
+    };
+    window.changeWorkTagQuantity = delta => {
+        const input = document.getElementById('workQtyInput');
+        if (input) input.value = Math.max(0, Number(input.value || 0) + delta);
+    };
+    window.closeWorkTagQuantity = () => {
+        const edit = window.editingWorkQuantity;
+        const input = document.getElementById('workQtyInput');
+        if (edit && input) {
+            const qty = Math.max(0, Number(input.value || 0));
+            const store = window.activeWorkTagQuantities[edit.groupId];
+            if (qty <= 1) delete store[edit.name]; else store[edit.name] = qty;
+            if (qty === 0) {
+                if (edit.groupId === 'taskTypes') window.activeTaskTypes = (window.activeTaskTypes || []).filter(name => name !== edit.name);
+                else if (edit.groupId === 'coworkers') window.selectedCoworkers = (window.selectedCoworkers || []).filter(name => name !== edit.name);
+                else if (edit.groupId === 'statuses' && window.activeStatus === edit.name) window.activeStatus = null;
+                else if (window.activeCustomGroupSelections?.[edit.groupId]) window.activeCustomGroupSelections[edit.groupId] = window.activeCustomGroupSelections[edit.groupId].filter(name => name !== edit.name);
+            }
+            window.renderChangedTagType(edit.type);
+        }
+        document.getElementById('workTagQuantityModal').style.display = 'none';
+        window.editingWorkQuantity = null;
+    };
     window.handleLongPress = (type, index) => {
         if (window.isWorkLayoutMode) window.openTagEditBox(type, index);
+        else window.openWorkTagQuantity(type, index);
     };
 
     window.handleClick = (type, index) => {
@@ -2240,6 +2293,7 @@
 // 작업 카드 내부 칸 순서 편집: 카드 순서/업무 데이터와 분리된 공통 화면 설정이다.
 (() => {
     const STORAGE_KEY = 'wm_work_card_section_order';
+    const WIDGET_KEY = 'wm_work_card_widget_settings';
     let pressTimer = null;
     let pressCard = null;
     let pressX = 0;
@@ -2249,6 +2303,13 @@
 
     const isIgnoredTarget = target => !!target.closest('button, a, img, input, textarea, select, .log-img-list');
     const closeEditor = () => document.getElementById('workCardLayoutEditor')?.remove();
+    const readWidgetSettings = () => { try { return JSON.parse(localStorage.getItem(WIDGET_KEY) || '{}'); } catch (_) { return {}; } };
+    const writeWidgetSetting = (key, patch) => {
+        const settings = readWidgetSettings();
+        settings[key] = { ...(settings[key] || {}), ...patch };
+        localStorage.setItem(WIDGET_KEY, JSON.stringify(settings));
+        window.updateUI?.();
+    };
     const saveEditorOrder = list => {
         const visibleOrder = [...list.querySelectorAll('.card-layout-edit-item')].map(item => item.dataset.key);
         let previous = [];
@@ -2261,7 +2322,7 @@
     const openEditor = card => {
         closeEditor();
         window.closeCardSelectionMode?.();
-        const sections = [...card.querySelectorAll('.work-card-section')];
+        const sections = [...card.querySelectorAll('.work-card-widget')];
         if (!sections.length) return;
         const overlay = document.createElement('div');
         overlay.id = 'workCardLayoutEditor';
@@ -2277,7 +2338,9 @@
             const item = document.createElement('div');
             item.className = 'card-layout-edit-item w95-out';
             item.dataset.key = section.dataset.cardSectionKey;
-            item.innerHTML = `<span class="card-layout-drag-handle" title="끌어서 이동">⠿</span><span class="card-layout-edit-label"></span><button type="button" class="w95-btn card-layout-up" aria-label="위로">▲</button><button type="button" class="w95-btn card-layout-down" aria-label="아래로">▼</button>`;
+            const setting = readWidgetSettings()[item.dataset.key] || {};
+            const heightLabel = { one:'1줄', two:'2줄', auto:'자동' }[setting.height || 'auto'];
+            item.innerHTML = `<span class="card-layout-drag-handle" title="끌어서 이동">⠿</span><span class="card-layout-edit-label"></span><button type="button" class="w95-btn card-layout-size">${Number(setting.cols || 4)}/4</button><button type="button" class="w95-btn card-layout-height">${heightLabel}</button><input type="color" class="card-layout-color" value="${setting.color || '#64748b'}"><button type="button" class="w95-btn card-layout-auto-color">A</button><button type="button" class="w95-btn card-layout-hide">${setting.hidden ? '넣기' : '빼기'}</button>`;
             item.querySelector('.card-layout-edit-label').textContent = section.dataset.cardSectionLabel || `칸 ${index + 1}`;
             list.appendChild(item);
         });
@@ -2285,16 +2348,40 @@
             const item = event.target.closest('.card-layout-edit-item');
             if (event.target.closest('.card-layout-close,.card-layout-done')) return closeEditor();
             if (event.target.closest('.card-layout-reset')) {
+                localStorage.removeItem(WIDGET_KEY);
                 const byKey = new Map([...list.children].map(el => [el.dataset.key, el]));
                 ['work', 'customer'].forEach(key => byKey.get(key) && list.appendChild(byKey.get(key)));
                 [...byKey.keys()].filter(key => key.startsWith('custom:')).forEach(key => list.appendChild(byKey.get(key)));
                 saveEditorOrder(list);
+                window.updateUI?.();
                 return;
             }
             if (!item) return;
-            if (event.target.closest('.card-layout-up') && item.previousElementSibling) list.insertBefore(item, item.previousElementSibling);
-            if (event.target.closest('.card-layout-down') && item.nextElementSibling) list.insertBefore(item.nextElementSibling, item);
+            if (event.target.closest('.card-layout-size')) {
+                const settings = readWidgetSettings(); const current = Number(settings[item.dataset.key]?.cols || 4);
+                const next = current === 4 ? 2 : current === 2 ? 1 : 4;
+                writeWidgetSetting(item.dataset.key, { cols:next }); event.target.textContent = `${next}/4`;
+            }
+            if (event.target.closest('.card-layout-height')) {
+                const current = readWidgetSettings()[item.dataset.key]?.height || 'auto';
+                const next = current === 'auto' ? 'one' : current === 'one' ? 'two' : 'auto';
+                writeWidgetSetting(item.dataset.key, { height:next });
+                event.target.textContent = { one:'1줄', two:'2줄', auto:'자동' }[next];
+            }
+            if (event.target.closest('.card-layout-auto-color')) {
+                writeWidgetSetting(item.dataset.key, { color:'' });
+                item.querySelector('.card-layout-color').value = '#64748b';
+            }
+            if (event.target.closest('.card-layout-hide')) {
+                const hidden = !(readWidgetSettings()[item.dataset.key]?.hidden);
+                writeWidgetSetting(item.dataset.key, { hidden }); event.target.textContent = hidden ? '넣기' : '빼기'; item.classList.toggle('is-in-tray', hidden);
+            }
             saveEditorOrder(list);
+        });
+        list.addEventListener('change', event => {
+            if (!event.target.matches('.card-layout-color')) return;
+            const item = event.target.closest('.card-layout-edit-item');
+            if (item) writeWidgetSetting(item.dataset.key, { color:event.target.value });
         });
         overlay.addEventListener('click', event => { if (event.target === overlay) closeEditor(); });
 
@@ -2349,5 +2436,13 @@
             event.preventDefault();
             event.stopImmediatePropagation();
         }
+    }, true);
+    document.addEventListener('click', event => {
+        const widget = event.target.closest('.work-card-widget');
+        if (!widget || document.getElementById('workCardLayoutEditor') || event.target.closest('button,a,img')) return;
+        if (!widget.matches('.widget-height-one,.widget-height-two')) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        widget.classList.toggle('is-widget-expanded');
     }, true);
 })();

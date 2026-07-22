@@ -196,6 +196,9 @@ window.getWorkCardSectionOrder = (availableKeys = []) => {
     if (!Array.isArray(saved)) saved = [];
     return [...saved.filter(key => availableKeys.includes(key)), ...availableKeys.filter(key => !saved.includes(key))];
 };
+window.getWorkCardWidgetSettings = () => {
+    try { return JSON.parse(localStorage.getItem('wm_work_card_widget_settings') || '{}'); } catch (_) { return {}; }
+};
 
 window.getLogCardHtml = (l, indexStr = '') => {
     const excludedCardStyle = (groupId) => window.isLogGroupExcluded?.(l, groupId)
@@ -261,6 +264,10 @@ window.getLogCardHtml = (l, indexStr = '') => {
     if (isCommuteDetailCard || isCommuteCard || isMemoOrPhoto) taskNoHtml = '';
 
     if (l.cat === 'work') {
+        const formatWorkQtyNames = (names, groupId) => (names || []).map(name => {
+            const qty = Number(l.tagQuantities?.[groupId]?.[name] || 1);
+            return qty > 1 ? `${name} × ${qty}` : name;
+        }).join(', ');
         seqHtml = '';
         taskNoHtml = '';
         const dutyBadge = l.isDuty ? `<span class="work-alert-badge">당직</span>` : '';
@@ -280,7 +287,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
         let customerDetails = [];
         let workDetails = [];
         let customDetails = [];
-        workDetails.push(`<div class="work-info-line task-type" style="${excludedCardStyle('taskTypes')}"><i class="fa-solid fa-screwdriver-wrench"></i><span>${l.taskType || '기본'}</span></div>`);
+        workDetails.push(`<div class="work-info-line task-type" style="${excludedCardStyle('taskTypes')}"><i class="fa-solid fa-screwdriver-wrench"></i><span>${formatWorkQtyNames(String(l.taskType || '기본').split(', '), 'taskTypes')}</span></div>`);
         workDetails.push(`<div class="work-info-line work-content-line"><i class="fa-solid fa-clipboard"></i><span>${l.content || '내용 없음'}</span></div>`);
         if (l.note) workDetails.push(`<div class="work-info-line note"><i class="fa-solid fa-triangle-exclamation"></i><span>${l.note}</span></div>`);
         if (l.customerName) customerDetails.push(`<div class="work-info-line customer"><i class="fa-solid fa-user"></i><span>${l.customerName}</span></div>`);
@@ -309,7 +316,8 @@ window.getLogCardHtml = (l, indexStr = '') => {
         customGroups.forEach((g, groupIndex) => {
             const val = l.customGroups && l.customGroups[g.id];
             if (val && (Array.isArray(val) ? val.length > 0 : val)) {
-                const valStr = Array.isArray(val) ? val.join(', ') : String(val);
+                const quantities = l.tagQuantities && l.tagQuantities[g.id] || {};
+                const valStr = Array.isArray(val) ? val.map(name => Number(quantities[name] || 1) > 1 ? `${name} × ${Number(quantities[name])}` : name).join(', ') : String(val);
                 const safeGroupTitle = String(g.title || '선택태그').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 const palette = customCardPalette[groupIndex % customCardPalette.length];
                 customDetails.push({
@@ -321,7 +329,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
         });
 
         if (l.coworkers && l.coworkers.length > 0) {
-            bottomManagerHtml = `<div style="color:var(--w-blue); font-size:0.8rem; font-weight:bold; ${excludedCardStyle('coworkers')}"><i class="fa-solid fa-user-group"></i> ${l.coworkers.join(', ')}</div>`;
+            bottomManagerHtml = `<div style="color:var(--w-blue); font-size:0.8rem; font-weight:bold; ${excludedCardStyle('coworkers')}"><i class="fa-solid fa-user-group"></i> ${formatWorkQtyNames(l.coworkers, 'coworkers')}</div>`;
         }
 
         const cardSections = [
@@ -339,7 +347,13 @@ window.getLogCardHtml = (l, indexStr = '') => {
                     <div class="work-card-alerts">${dutyBadge}${otBadge}</div>
                 </div>
                 <div class="work-card-status-row">${statusBadge}${inlineTaskNo}</div>
-                <div class="work-card-columns${customDetails.length ? ' has-custom-column' : ''}">${orderedCardSections.map(section => section.html).join('')}</div>
+                <div class="work-card-columns${customDetails.length ? ' has-custom-column' : ''}">${orderedCardSections.map(section => {
+                    const setting = window.getWorkCardWidgetSettings()[section.key] || {};
+                    const cols = Math.max(1, Math.min(4, Number(setting.cols || 4)));
+                    const color = /^#[0-9a-f]{6}$/i.test(setting.color || '') ? setting.color : '';
+                    const heightMode = ['one','two','auto'].includes(setting.height) ? setting.height : 'auto';
+                    return `<div class="work-card-widget widget-height-${heightMode}${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-cols="${cols}" data-card-section-key="${section.key}" data-card-section-label="${section.label || (section.key === 'work' ? '작업정보' : '고객정보')}" style="grid-column:span ${cols};${color ? `--widget-accent:${color};` : ''}">${section.html}</div>`;
+                }).join('')}</div>
             </div>
         `;
     } else if (l.cat === 'commute_in' || l.cat === 'commute_out') {

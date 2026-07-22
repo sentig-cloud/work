@@ -453,6 +453,7 @@ window.openWorkModal = (id = null) => {
     window.activeStatus = null;
     window.activeEquips = {};
     window.activeCustomGroupSelections = {};
+    window.activeWorkTagQuantities = {};
     window.currentWorkExcludedGroups = [];
 
     let y = window.currentYear, m = window.curMonth, d = window.curDay;
@@ -476,6 +477,7 @@ window.openWorkModal = (id = null) => {
         if (log.coworkers) window.selectedCoworkers = [...log.coworkers];
         if (log.imgs) window.workImgs = [...log.imgs];
         if (log.equips) window.activeEquips = { ...log.equips };
+        if (log.tagQuantities) window.activeWorkTagQuantities = JSON.parse(JSON.stringify(log.tagQuantities));
         window.currentWorkExcludedGroups = Array.isArray(log.excludedGroups) ? [...log.excludedGroups] : [];
         window.isWorkDuty = log.isDuty || false;
         window.workStartTime = log.startTime || null;

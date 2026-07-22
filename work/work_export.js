@@ -107,7 +107,10 @@ window.WorkExport = {
                     // v2: 커스텀 그룹 컬럼 처리
                     else if (col.isCustomGroup && col.groupId) {
                         const grpVal = log.customGroups && log.customGroups[col.groupId];
-                        if (Array.isArray(grpVal)) value = grpVal.join(", ");
+                        if (Array.isArray(grpVal)) value = grpVal.map(name => {
+                            const qty = Number(log.tagQuantities?.[col.groupId]?.[name] || 1);
+                            return qty > 1 ? `${name} × ${qty}` : name;
+                        }).join(", ");
                         else value = grpVal || "";
                     }
 
