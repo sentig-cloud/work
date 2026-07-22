@@ -2366,6 +2366,7 @@
                 <div class="card-free-setting-group"><b>글자</b><button type="button" class="w95-btn" data-free-action="font">글자 중</button><button type="button" class="w95-btn" data-free-action="emphasis">강조</button><button type="button" class="w95-btn" data-free-action="underline">밑줄</button><button type="button" class="w95-btn" data-free-action="italic">기울임</button><label class="card-free-color-label">색<input type="color" class="card-free-color" value="#111827" title="글자 색상"></label></div>
                 <div class="card-free-setting-group"><b>칸 기준 정렬</b><button type="button" class="w95-btn" data-free-action="align-h">칸 가로: 없음</button><button type="button" class="w95-btn" data-free-action="align-v">칸 세로: 없음</button></div>
                 <div class="card-free-setting-group"><b>상자</b><button type="button" class="w95-btn" data-free-action="content-box">내용 상자</button><label class="card-free-color-label">상자색<input type="color" class="card-free-content-bg-color" value="#e2e8f0" title="내용 상자 색상"></label><button type="button" class="w95-btn" data-free-action="box">외곽: 기본</button><button type="button" class="w95-btn" data-free-action="border">테두리: 없음</button><button type="button" class="w95-btn" data-free-action="shadow">음영: 없음</button><label class="card-free-color-label">배경<input type="color" class="card-free-bg-color" value="#ffffff" title="배경 색상"></label><label class="card-free-color-label">선<input type="color" class="card-free-border-color" value="#334155" title="테두리 색상"></label></div>
+                <div class="card-free-setting-group card-free-auto-group"><b>자동 설정</b><button type="button" class="w95-btn" data-free-action="auto-color">선택 색상 자동</button><button type="button" class="w95-btn" data-free-action="auto-all">전체 자동 설정</button></div>
                 <div class="card-free-popup-actions"><button type="button" class="w95-btn" data-free-action="reset-style">꾸미기 초기화</button><button type="button" class="w95-btn" data-free-action="close-settings">닫기</button></div>
             </div>
             <div class="card-free-tray"><button type="button" class="w95-btn card-free-store-button" data-free-action="hide">보관</button><div class="card-free-tray-items"></div><button type="button" class="w95-btn card-layout-reset">초기화</button></div>
@@ -2389,6 +2390,35 @@
         let edgeScrollSpeed = 0;
         let edgeScrollTimer = null;
         let lastDragPoint = null;
+        const autoPalette = ['#1d4ed8','#047857','#7c3aed','#b45309','#be123c','#0369a1','#0f766e','#4338ca'];
+        const autoColorForKey = key => {
+            const fixed = {
+                'object:number':'#b91c1c','object:date':'#334155','object:time':'#1d4ed8','object:status':'#065f46',
+                'object:taskNo':'#3730a3','object:alerts':'#b91c1c','object:taskType':'#6d28d9','object:content':'#111827',
+                'object:note':'#b45309','object:customer':'#0f766e','object:address':'#475569','object:equipment':'#0369a1',
+                'object:duration':'#7c3aed','object:manager':'#047857','object:modified':'#64748b','object:images':'#334155'
+            };
+            if (fixed[key]) return fixed[key];
+            const hash = [...String(key)].reduce((sum, char) => ((sum * 31) + char.charCodeAt(0)) >>> 0, 0);
+            return autoPalette[hash % autoPalette.length];
+        };
+        const autoBoxColorForKey = key => ({
+            'object:status':'#dcfce7','object:taskNo':'#e0e7ff','object:alerts':'#fee2e2','object:taskType':'#f3e8ff','object:note':'#fef3c7'
+        })[key] || '#f1f5f9';
+        const applyAutomaticTemplate = () => {
+            const centered = new Set(['object:number','object:date','object:time','object:status','object:taskNo','object:alerts','object:duration','object:modified']);
+            const boxed = new Set(['object:status','object:taskNo','object:alerts']);
+            Object.keys(settings).forEach(key => {
+                if (key === '__meta' || key === 'object:delete' || !settings[key] || typeof settings[key] !== 'object') return;
+                const preserved = resetDecoration(settings[key]);
+                Object.assign(settings[key], preserved, {
+                    color:autoColorForKey(key), alignH:centered.has(key) ? 'center' : 'left', alignV:'middle',
+                    emphasis:['object:number','object:date','object:time','object:status','object:taskNo','object:alerts'].includes(key),
+                    contentBox:boxed.has(key), contentBackgroundColor:boxed.has(key) ? autoBoxColorForKey(key) : ''
+                });
+            });
+            settings.__meta = { ...(settings.__meta || {}), styleVersion:6, autoTemplate:'balanced' };
+        };
 
         const legacySize = (setting, section) => {
             const oldCols = Number(setting.cols || section.dataset.widgetCols || 4);
@@ -2640,7 +2670,15 @@
                 commitWidgetSettings(settings); addToTray(selected.dataset.key, selected.dataset.label); selected.remove(); select(null); return;
             }
             if (action === 'axis') { sizeAxis = sizeAxis === 'w' ? 'h' : 'w'; event.target.textContent = sizeAxis === 'w' ? '가로' : '세로'; return; }
-            if (['title','title-marker','title-position','emphasis','underline','italic','font','align-h','align-v','box','border','shadow','status','content-box','reset-style'].includes(action) && !settingsUnlocked) return;
+            if (['title','title-marker','title-position','emphasis','underline','italic','font','align-h','align-v','box','border','shadow','status','content-box','auto-color','auto-all','reset-style'].includes(action) && !settingsUnlocked) return;
+            if (action === 'auto-color') {
+                const color = autoColorForKey(selected.dataset.key);
+                settings[selected.dataset.key].color = color; colorInput.value = color;
+                selected.style.setProperty('--widget-text-color', color);
+            }
+            if (action === 'auto-all') {
+                applyAutomaticTemplate(); commitWidgetSettings(settings); finish(); return;
+            }
             if (action === 'title') { settings[selected.dataset.key].titleVisible = !settings[selected.dataset.key].titleVisible; selected.classList.toggle('is-title-visible', settings[selected.dataset.key].titleVisible); refreshPreviewTitle(selected); }
             if (action === 'title-marker') { settings[selected.dataset.key].titleMarker = !settings[selected.dataset.key].titleMarker; refreshPreviewTitle(selected); }
             if (action === 'title-position') { settings[selected.dataset.key].titlePosition = settings[selected.dataset.key].titlePosition === 'inline' ? 'top' : 'inline'; refreshPreviewTitle(selected); }

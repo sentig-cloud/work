@@ -1104,5 +1104,9 @@ input, textarea, [contenteditable="true"] {
 .work-card-subwidget:not([data-card-section-key="object:delete"]) .work-status-sticker,
 .work-card-subwidget:not([data-card-section-key="object:delete"]) .task-no-btn,
 .work-card-subwidget:not([data-card-section-key="object:delete"]) .work-alert-badge { background:transparent !important; border:0 !important; box-shadow:none !important; color:inherit !important; }
+.work-card-subwidget:not(.has-content-box):not([data-card-section-key="object:delete"]) .work-info-line,
+.work-card-widget:not(.is-container-widget):not(.has-content-box) .work-info-line { padding:0 !important; background:transparent !important; border:0 !important; border-radius:0 !important; box-shadow:none !important; color:inherit !important; }
+.work-card-subwidget:not([data-card-section-key="object:delete"]) .work-info-line span,
+.work-card-widget:not(.is-container-widget) .work-info-line span { color:inherit !important; }
 .work-card-subwidget,.work-card-subwidget * { font-size:var(--widget-fit-font,var(--widget-font-size,.78rem)) !important; }
 .work-card-subwidget.is-emphasis,.work-card-subwidget.is-emphasis * { font-weight:900 !important; }
