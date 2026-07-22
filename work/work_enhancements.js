@@ -2310,13 +2310,13 @@
     const resetDecoration = value => ({ ...(value || {}), titleVisible:false, titleMarker:false, titlePosition:'top', statusMode:false, contentBox:false, fontSize:'normal', emphasis:false, underline:false, italic:false, alignH:'none', alignV:'none', boxStyle:'plain', borderStyle:'none', shadowStyle:'none', color:'', backgroundColor:'', borderColor:'', contentBackgroundColor:'' });
     const migrateStyles = settings => {
         const next = settings && typeof settings === 'object' ? settings : {};
-        if (Number(next?.__meta?.styleVersion || 0) >= 5) return next;
+        if (Number(next?.__meta?.styleVersion || 0) >= 6) return next;
         Object.keys(next).forEach(key => { if (key !== '__meta' && next[key] && typeof next[key] === 'object') next[key] = resetDecoration(next[key]); });
-        next.__meta = { ...(next.__meta || {}), styleVersion:5 };
+        next.__meta = { ...(next.__meta || {}), styleVersion:6 };
         return next;
     };
     const readWidgetSettings = () => { try { const next = migrateStyles(JSON.parse(localStorage.getItem(WIDGET_KEY) || '{}')); localStorage.setItem(WIDGET_KEY, JSON.stringify(next)); return next; } catch (_) { return {}; } };
-    const readPresets = () => { try { const presets = JSON.parse(localStorage.getItem(PRESET_KEY) || '{}'); let changed = false; ['1','2','3'].forEach(slot => { if (presets[slot] && Number(presets[slot]?.__meta?.styleVersion || 0) < 5) { presets[slot] = migrateStyles(presets[slot]); changed = true; } }); if (changed) localStorage.setItem(PRESET_KEY, JSON.stringify(presets)); return presets; } catch (_) { return {}; } };
+    const readPresets = () => { try { const presets = JSON.parse(localStorage.getItem(PRESET_KEY) || '{}'); let changed = false; ['1','2','3'].forEach(slot => { if (presets[slot] && Number(presets[slot]?.__meta?.styleVersion || 0) < 6) { presets[slot] = migrateStyles(presets[slot]); changed = true; } }); if (changed) localStorage.setItem(PRESET_KEY, JSON.stringify(presets)); return presets; } catch (_) { return {}; } };
     const queueUiSettingsSync = () => {
         window.markDirty?.('master', 'uiSettings', 'upsert');
         window.scheduleSync?.();
@@ -2364,7 +2364,7 @@
             <div class="card-free-object-popup w95-out" role="group" aria-label="선택 객체 표시 설정">
                 <div class="card-free-setting-group"><b>표시</b><button type="button" class="w95-btn" data-free-action="title">제목</button><button type="button" class="w95-btn" data-free-action="title-marker">제목 점</button><button type="button" class="w95-btn" data-free-action="title-position">제목: 상단</button><button type="button" class="w95-btn" data-free-action="status">상태</button></div>
                 <div class="card-free-setting-group"><b>글자</b><button type="button" class="w95-btn" data-free-action="font">글자 중</button><button type="button" class="w95-btn" data-free-action="emphasis">강조</button><button type="button" class="w95-btn" data-free-action="underline">밑줄</button><button type="button" class="w95-btn" data-free-action="italic">기울임</button><label class="card-free-color-label">색<input type="color" class="card-free-color" value="#111827" title="글자 색상"></label></div>
-                <div class="card-free-setting-group"><b>정렬</b><button type="button" class="w95-btn" data-free-action="align-h">가로: 없음</button><button type="button" class="w95-btn" data-free-action="align-v">세로: 없음</button></div>
+                <div class="card-free-setting-group"><b>칸 기준 정렬</b><button type="button" class="w95-btn" data-free-action="align-h">칸 가로: 없음</button><button type="button" class="w95-btn" data-free-action="align-v">칸 세로: 없음</button></div>
                 <div class="card-free-setting-group"><b>상자</b><button type="button" class="w95-btn" data-free-action="content-box">내용 상자</button><label class="card-free-color-label">상자색<input type="color" class="card-free-content-bg-color" value="#e2e8f0" title="내용 상자 색상"></label><button type="button" class="w95-btn" data-free-action="box">외곽: 기본</button><button type="button" class="w95-btn" data-free-action="border">테두리: 없음</button><button type="button" class="w95-btn" data-free-action="shadow">음영: 없음</button><label class="card-free-color-label">배경<input type="color" class="card-free-bg-color" value="#ffffff" title="배경 색상"></label><label class="card-free-color-label">선<input type="color" class="card-free-border-color" value="#334155" title="테두리 색상"></label></div>
                 <div class="card-free-popup-actions"><button type="button" class="w95-btn" data-free-action="reset-style">꾸미기 초기화</button><button type="button" class="w95-btn" data-free-action="close-settings">닫기</button></div>
             </div>
@@ -2454,13 +2454,13 @@
                 const key = action === 'title' ? 'titleVisible' : action === 'title-marker' ? 'titleMarker' : action === 'status' ? 'statusMode' : action === 'content-box' ? 'contentBox' : action;
                 overlay.querySelector(`[data-free-action="${action}"]`)?.classList.toggle('is-active', !!setting[key]);
             });
-            const fontLabels = { small:'글자 소', normal:'글자 중', large:'글자 대', xlarge:'글자 특대' };
+            const fontLabels = { tiny:'글자 아주작게', small:'글자 작게', normal:'글자 보통', large:'글자 크게', xlarge:'글자 아주크게', xxlarge:'글자 최대' };
             const fontButton = overlay.querySelector('[data-free-action="font"]');
             if (fontButton) fontButton.textContent = fontLabels[setting.fontSize || 'normal'];
             const positionButton = overlay.querySelector('[data-free-action="title-position"]');
             if (positionButton) positionButton.textContent = setting.titlePosition === 'inline' ? '제목: 앞쪽' : '제목: 상단';
-            const hLabels = { none:'가로: 없음', left:'가로: 왼쪽', center:'가로: 중앙', right:'가로: 오른쪽' };
-            const vLabels = { none:'세로: 없음', top:'세로: 위', middle:'세로: 중앙', bottom:'세로: 아래' };
+            const hLabels = { none:'칸 가로: 없음', left:'칸 가로: 왼쪽', center:'칸 가로: 가운데', right:'칸 가로: 오른쪽' };
+            const vLabels = { none:'칸 세로: 없음', top:'칸 세로: 위', middle:'칸 세로: 가운데', bottom:'칸 세로: 아래' };
             const borderLabels = { default:'테두리: 기본', none:'테두리: 없음', bold:'테두리: 굵게' };
             const hButton = overlay.querySelector('[data-free-action="align-h"]'); if (hButton) hButton.textContent = hLabels[setting.alignH || 'none'];
             const vButton = overlay.querySelector('[data-free-action="align-v"]'); if (vButton) vButton.textContent = vLabels[setting.alignV || 'none'];
@@ -2469,7 +2469,7 @@
             const shadowLabels = { none:'음영: 없음', soft:'음영: 보통', strong:'음영: 강하게' };
             const boxButton = overlay.querySelector('[data-free-action="box"]'); if (boxButton) boxButton.textContent = boxLabels[setting.boxStyle || 'plain'];
             const shadowButton = overlay.querySelector('[data-free-action="shadow"]'); if (shadowButton) shadowButton.textContent = shadowLabels[setting.shadowStyle || 'none'];
-            selected.style.setProperty('--widget-font-size', { small:'.64rem', normal:'.76rem', large:'.92rem', xlarge:'1.08rem' }[setting.fontSize || 'normal']);
+            selected.style.setProperty('--widget-font-size', { tiny:'.56rem', small:'.66rem', normal:'.78rem', large:'.92rem', xlarge:'1.08rem', xxlarge:'1.28rem' }[setting.fontSize || 'normal']);
         };
         const refreshPreviewTitle = item => {
             if (!item) return;
@@ -2545,7 +2545,7 @@
             item.classList.toggle('is-status-mode', !!setting.statusMode);
             item.classList.toggle('has-content-box', !!setting.contentBox);
             item.dataset.fontSize = settings[key].fontSize;
-            item.style.setProperty('--widget-font-size', { small:'.64rem', normal:'.76rem', large:'.92rem', xlarge:'1.08rem' }[settings[key].fontSize] || '.76rem');
+            item.style.setProperty('--widget-font-size', { tiny:'.56rem', small:'.66rem', normal:'.78rem', large:'.92rem', xlarge:'1.08rem', xxlarge:'1.28rem' }[settings[key].fontSize] || '.78rem');
             item.dataset.alignH = settings[key].alignH; item.dataset.alignV = settings[key].alignV; item.dataset.borderStyle = settings[key].borderStyle;
             item.dataset.boxStyle = settings[key].boxStyle; item.dataset.shadowStyle = settings[key].shadowStyle;
             item.classList.toggle('is-underlined', !!settings[key].underline); item.classList.toggle('is-italic', !!settings[key].italic);
@@ -2640,7 +2640,7 @@
             if (action === 'underline') { settings[selected.dataset.key].underline = !settings[selected.dataset.key].underline; selected.classList.toggle('is-underlined', settings[selected.dataset.key].underline); }
             if (action === 'italic') { settings[selected.dataset.key].italic = !settings[selected.dataset.key].italic; selected.classList.toggle('is-italic', settings[selected.dataset.key].italic); }
             if (action === 'font') {
-                const sizes = ['small','normal','large','xlarge']; const current = settings[selected.dataset.key].fontSize || 'normal';
+                const sizes = ['tiny','small','normal','large','xlarge','xxlarge']; const current = settings[selected.dataset.key].fontSize || 'normal';
                 settings[selected.dataset.key].fontSize = sizes[(sizes.indexOf(current) + 1) % sizes.length]; selected.dataset.fontSize = settings[selected.dataset.key].fontSize;
             }
             if (action === 'align-h') { const values = ['none','left','center','right']; const current = settings[selected.dataset.key].alignH || 'none'; settings[selected.dataset.key].alignH = values[(values.indexOf(current) + 1) % values.length]; selected.dataset.alignH = settings[selected.dataset.key].alignH; }
@@ -2785,4 +2785,21 @@
         event.stopImmediatePropagation();
         widget.classList.toggle('is-widget-expanded');
     }, true);
+
+    const fitCardObjectText = root => requestAnimationFrame(() => {
+        const scope = root?.querySelectorAll ? root : document;
+        scope.querySelectorAll('.work-card-subwidget').forEach(cell => {
+            if (cell.dataset.cardSectionKey === 'object:delete' || !cell.clientWidth || !cell.clientHeight) return;
+            cell.style.removeProperty('--widget-fit-font');
+            const sample = cell.querySelector(':scope > :not(.work-card-object-title),span,b') || cell;
+            let size = parseFloat(getComputedStyle(sample).fontSize) || 12.5;
+            while (size > 8 && (cell.scrollWidth > cell.clientWidth + 1 || cell.scrollHeight > cell.clientHeight + 1)) {
+                size -= .5; cell.style.setProperty('--widget-fit-font', `${size}px`);
+            }
+        });
+    });
+    fitCardObjectText(document);
+    new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => {
+        if (node.nodeType === 1 && (node.matches?.('.work-card-columns,.card-free-preview') || node.querySelector?.('.work-card-subwidget'))) fitCardObjectText(node);
+    }))).observe(document.body, { childList:true, subtree:true });
 })();

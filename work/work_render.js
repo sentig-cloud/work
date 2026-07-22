@@ -199,12 +199,12 @@ window.getWorkCardSectionOrder = (availableKeys = []) => {
 window.getWorkCardWidgetSettings = () => {
     try {
         const settings = JSON.parse(localStorage.getItem('wm_work_card_widget_settings') || '{}');
-        if (Number(settings?.__meta?.styleVersion || 0) < 5) {
+        if (Number(settings?.__meta?.styleVersion || 0) < 6) {
             Object.entries(settings || {}).forEach(([key, value]) => {
                 if (key === '__meta' || !value || typeof value !== 'object') return;
                 Object.assign(value, { titleVisible:false, titleMarker:false, titlePosition:'top', statusMode:false, contentBox:false, fontSize:'normal', emphasis:false, underline:false, italic:false, alignH:'none', alignV:'none', boxStyle:'plain', borderStyle:'none', shadowStyle:'none', color:'', backgroundColor:'', borderColor:'', contentBackgroundColor:'' });
             });
-            settings.__meta = { ...(settings.__meta || {}), styleVersion:5 };
+            settings.__meta = { ...(settings.__meta || {}), styleVersion:6 };
             localStorage.setItem('wm_work_card_widget_settings', JSON.stringify(settings));
         }
         return settings;
@@ -328,7 +328,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
             const titlePosition = setting.titlePosition === 'inline' ? 'inline' : 'top';
             const marker = setting.titleMarker ? '<span class="work-card-title-marker" aria-hidden="true"></span>' : '';
             const title = setting.titleVisible ? `<b class="work-card-object-title">${marker}${label}${titlePosition === 'inline' ? ' : ' : ''}</b>` : '';
-            const fontSize = ['small','normal','large','xlarge'].includes(setting.fontSize) ? setting.fontSize : 'normal';
+            const fontSize = ['tiny','small','normal','large','xlarge','xxlarge'].includes(setting.fontSize) ? setting.fontSize : 'normal';
             const alignH = ['none','left','center','right'].includes(setting.alignH) ? setting.alignH : 'none';
             const alignV = ['none','top','middle','bottom'].includes(setting.alignV) ? setting.alignV : 'none';
             const borderStyle = ['default','none','bold'].includes(setting.borderStyle) ? setting.borderStyle : 'none';
@@ -426,7 +426,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
                     const setting = window.getWorkCardWidgetSettings()[section.key] || {};
                     const isContainer = section.key === 'work' || section.key === 'customer';
                     const layout = getFreeWidgetLayout(setting, 4);
-                    const fontSize = ['small','normal','large','xlarge'].includes(setting.fontSize) ? setting.fontSize : 'normal';
+                    const fontSize = ['tiny','small','normal','large','xlarge','xxlarge'].includes(setting.fontSize) ? setting.fontSize : 'normal';
                     const alignH = ['none','left','center','right'].includes(setting.alignH) ? setting.alignH : 'none';
                     const alignV = ['none','top','middle','bottom'].includes(setting.alignV) ? setting.alignV : 'none';
                     const borderStyle = ['default','none','bold'].includes(setting.borderStyle) ? setting.borderStyle : 'none';
