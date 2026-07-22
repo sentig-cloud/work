@@ -297,17 +297,21 @@ html, body {
 .work-main-panel { border-left:3px solid #2563eb; }
 .work-customer-panel { border-left:3px solid #0f766e; background:rgba(240,253,250,.82); }
 .work-main-panel,.work-customer-panel { display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:3px; align-content:start; }
-.work-card-subwidget { min-width:0; padding:2px 3px; border-left:3px solid var(--widget-accent,transparent); background:var(--widget-bg-color,rgba(255,255,255,.6)); box-sizing:border-box; container-type:inline-size; }
+.work-card-subwidget { min-width:0; padding:2px 3px; border:0; background:transparent; box-shadow:none; box-sizing:border-box; container-type:inline-size; }
+.work-card-subwidget:not([data-card-section-key="object:delete"]),.work-card-subwidget:not([data-card-section-key="object:delete"]) :not(i):not(.fa-solid):not(.fa-regular) { font-family:inherit; font-size:var(--widget-font-size,.76rem); font-weight:400; font-style:normal; color:inherit; }
+.work-card-subwidget:not([data-card-section-key="object:delete"]) .task-no-btn,.work-card-subwidget:not([data-card-section-key="object:delete"]) .work-status-sticker,.work-card-subwidget:not([data-card-section-key="object:delete"]) .work-alert-badge { min-width:0; min-height:0; padding:0; background:transparent; color:inherit; border:0; border-radius:0; box-shadow:none; }
+.work-card-widget:not(.is-container-widget):not(.has-content-box) > .work-card-section { background:transparent; border-color:transparent; box-shadow:none; }
 .work-card-subwidget[style*="--widget-text-color"],.work-card-widget[style*="--widget-text-color"] > .work-card-section { color:var(--widget-text-color) !important; }
 .work-card-subwidget[style*="--widget-text-color"] *,.work-card-widget[style*="--widget-text-color"] > .work-card-section * { color:var(--widget-text-color) !important; }
 .work-card-object-title { display:block; margin:0 0 2px; color:var(--widget-accent,#334155); font-size:.66rem; line-height:1.1; font-weight:950; }
 .work-card-subwidget.title-position-inline { display:flex; align-items:flex-start; gap:3px; }
 .work-card-subwidget.title-position-inline > .work-card-object-title { display:inline; flex:0 0 auto; margin:3px 0 0; white-space:nowrap; }
 .work-card-subwidget.title-position-inline > :not(.work-card-object-title) { min-width:0; flex:1; }
+.work-card-subwidget.widget-align-h-left,.work-card-subwidget.widget-align-h-center,.work-card-subwidget.widget-align-h-right { display:flex; flex-direction:column; }
 .work-card-subwidget.widget-align-v-top { display:flex; flex-direction:column; justify-content:flex-start; }
 .work-card-subwidget.widget-align-v-middle { display:flex; flex-direction:column; justify-content:center; }
 .work-card-subwidget.widget-align-v-bottom { display:flex; flex-direction:column; justify-content:flex-end; }
-.work-card-subwidget.title-position-inline { flex-direction:row; }
+.work-card-subwidget.title-position-inline { display:flex; flex-direction:row; }
 .work-card-subwidget.title-position-inline.widget-align-v-top { align-items:flex-start; }
 .work-card-subwidget.title-position-inline.widget-align-v-middle { align-items:center; }
 .work-card-subwidget.title-position-inline.widget-align-v-bottom { align-items:flex-end; }
@@ -324,6 +328,10 @@ html, body {
 .work-card-subwidget.widget-align-h-center > * { align-self:center; }
 .work-card-subwidget.widget-align-h-right > * { align-self:flex-end; }
 .work-card-subwidget[class*="widget-align-h-"] > .work-info-line { width:100%; box-sizing:border-box; }
+.work-card-subwidget.has-content-box > :not(.work-card-object-title),.work-card-widget.has-content-box > .work-card-section .work-info-line { width:auto; max-width:100%; padding:3px 7px; background:var(--widget-content-bg,#e2e8f0); border:1px solid var(--widget-border-color,#64748b); box-shadow:inset 1px 1px rgba(255,255,255,.8); box-sizing:border-box; }
+.work-card-subwidget.has-content-box.widget-align-h-left > :not(.work-card-object-title) { align-self:flex-start; }
+.work-card-subwidget.has-content-box.widget-align-h-center > :not(.work-card-object-title) { align-self:center; }
+.work-card-subwidget.has-content-box.widget-align-h-right > :not(.work-card-object-title) { align-self:flex-end; }
 .widget-border-none,.work-card-widget.widget-border-none > .work-card-section { border-color:transparent !important; box-shadow:none !important; }
 .widget-border-default,.work-card-widget.widget-border-default > .work-card-section { border-color:var(--widget-border-color,#94a3b8); }
 .widget-border-bold,.work-card-widget.widget-border-bold > .work-card-section { border:3px solid var(--widget-border-color,#334155) !important; box-shadow:inset 0 0 0 1px #fff; }
@@ -456,7 +464,8 @@ html, body {
 .card-free-item.is-italic .card-free-preview { font-style:italic; }
 .card-free-item.is-moving { opacity:.72; z-index:5; cursor:grabbing; }
 .card-free-preview,.card-free-preview > * { min-width:0; height:100%; pointer-events:none !important; }
-.card-free-preview .work-card-subwidget,.card-free-preview .work-card-widget,.card-free-preview .work-card-section { display:block; padding:0; border:0; background:transparent; box-shadow:none; }
+.card-free-preview .work-card-subwidget,.card-free-preview .work-card-widget,.card-free-preview .work-card-section { padding:0; border:0; box-shadow:none; }
+.card-free-preview .work-card-subwidget:not(.has-content-box),.card-free-preview .work-card-widget:not(.has-content-box) .work-card-section { background:transparent; }
 .card-free-preview .work-card-subwidget.title-position-inline { display:flex; }
 .card-free-item.is-status-mode .card-free-preview .work-card-subwidget,.card-free-item.is-status-mode .card-free-preview .work-card-widget > .work-card-section { display:flex; align-items:center; justify-content:center; width:100%; height:100%; background:#334155; color:#fff; }
 .card-free-item.is-status-mode .card-free-preview .work-card-object-title,.card-free-item.is-status-mode .card-free-preview .work-info-line i,.card-free-item.is-status-mode .card-free-preview .work-info-line b,.card-free-item.is-status-mode .card-free-preview .work-custom-title-separator { display:none; }
@@ -464,7 +473,7 @@ html, body {
 .card-free-item.is-status-mode .card-free-preview .work-info-line span { width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .card-free-item.is-status-mode[data-key="object:delete"] .card-free-preview .work-card-subwidget { background:transparent; }
 .card-free-preview .work-info-line { font-size:.66rem; }
-.card-free-object-popup { position:relative; z-index:2; display:none; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:5px; width:auto; max-height:280px; margin:6px 4px; padding:6px; overflow-x:hidden; overflow-y:auto; background:#fff8cc; border:3px solid #7c3aed; box-shadow:0 0 0 2px #f59e0b,0 4px 10px rgba(15,23,42,.32); box-sizing:border-box; }
+.card-free-object-popup { position:fixed; z-index:5100; display:none; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:5px; margin:0; padding:6px; overflow-x:hidden; overflow-y:auto; background:#fff8cc; border:3px solid #7c3aed; box-shadow:0 0 0 2px #f59e0b,0 4px 10px rgba(15,23,42,.32); box-sizing:border-box; }
 .card-free-object-popup.is-open { display:grid; }
 .card-free-setting-group { display:flex; flex-wrap:wrap; align-items:center; gap:4px; min-width:0; padding:5px; background:#f8fafc; border:2px solid #64748b; box-shadow:inset 1px 1px #fff; }
 .card-free-setting-group > b { flex:0 0 100%; padding-bottom:2px; color:#1e3a8a; font-size:.7rem; border-bottom:1px solid #94a3b8; }
@@ -498,6 +507,18 @@ html, body {
     .card-layout-editor-layer { padding:5px; }
     .card-free-canvas { min-height:350px; }
     .card-free-object-popup { grid-template-columns:1fr; }
+}
+
+/* 카드 꾸미기 초기값: 삭제 버튼을 제외한 모든 객체는 동일한 무서식 글꼴로 시작한다. */
+.work-card-subwidget.widget-font-normal:not(.is-emphasis):not([data-card-section-key="object:delete"]),
+.work-card-subwidget.widget-font-normal:not(.is-emphasis):not([data-card-section-key="object:delete"]) :not(i):not(.fa-solid):not(.fa-regular) {
+    font-family:inherit !important; font-size:.76rem !important; font-weight:400 !important; font-style:normal; color:inherit;
+}
+.work-card-subwidget.widget-border-none:not(.has-content-box):not([data-card-section-key="object:delete"]) > *,
+.work-card-subwidget.widget-border-none:not(.has-content-box):not([data-card-section-key="object:delete"]) .task-no-btn,
+.work-card-subwidget.widget-border-none:not(.has-content-box):not([data-card-section-key="object:delete"]) .work-status-sticker,
+.work-card-subwidget.widget-border-none:not(.has-content-box):not([data-card-section-key="object:delete"]) .work-alert-badge {
+    background:transparent !important; border:0 !important; border-radius:0 !important; box-shadow:none !important;
 }
 
 .card-content-zone { padding: 10px 12px 2px 12px; box-sizing: border-box; width: 100%; }

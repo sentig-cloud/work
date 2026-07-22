@@ -2307,16 +2307,16 @@
 
     const isIgnoredTarget = target => !!target.closest('button, a, img, input, textarea, select, .log-img-list');
     const closeEditor = () => document.getElementById('workCardLayoutEditor')?.remove();
-    const resetDecoration = value => ({ ...(value || {}), titleVisible:false, titleMarker:false, titlePosition:'top', statusMode:false, fontSize:'normal', emphasis:false, underline:false, italic:false, alignH:'none', alignV:'none', boxStyle:'plain', borderStyle:'default', shadowStyle:'none', color:'', backgroundColor:'', borderColor:'' });
+    const resetDecoration = value => ({ ...(value || {}), titleVisible:false, titleMarker:false, titlePosition:'top', statusMode:false, contentBox:false, fontSize:'normal', emphasis:false, underline:false, italic:false, alignH:'none', alignV:'none', boxStyle:'plain', borderStyle:'none', shadowStyle:'none', color:'', backgroundColor:'', borderColor:'', contentBackgroundColor:'' });
     const migrateStyles = settings => {
         const next = settings && typeof settings === 'object' ? settings : {};
-        if (Number(next?.__meta?.styleVersion || 0) >= 4) return next;
+        if (Number(next?.__meta?.styleVersion || 0) >= 5) return next;
         Object.keys(next).forEach(key => { if (key !== '__meta' && next[key] && typeof next[key] === 'object') next[key] = resetDecoration(next[key]); });
-        next.__meta = { ...(next.__meta || {}), styleVersion:4 };
+        next.__meta = { ...(next.__meta || {}), styleVersion:5 };
         return next;
     };
     const readWidgetSettings = () => { try { const next = migrateStyles(JSON.parse(localStorage.getItem(WIDGET_KEY) || '{}')); localStorage.setItem(WIDGET_KEY, JSON.stringify(next)); return next; } catch (_) { return {}; } };
-    const readPresets = () => { try { const presets = JSON.parse(localStorage.getItem(PRESET_KEY) || '{}'); let changed = false; ['1','2','3'].forEach(slot => { if (presets[slot] && Number(presets[slot]?.__meta?.styleVersion || 0) < 4) { presets[slot] = migrateStyles(presets[slot]); changed = true; } }); if (changed) localStorage.setItem(PRESET_KEY, JSON.stringify(presets)); return presets; } catch (_) { return {}; } };
+    const readPresets = () => { try { const presets = JSON.parse(localStorage.getItem(PRESET_KEY) || '{}'); let changed = false; ['1','2','3'].forEach(slot => { if (presets[slot] && Number(presets[slot]?.__meta?.styleVersion || 0) < 5) { presets[slot] = migrateStyles(presets[slot]); changed = true; } }); if (changed) localStorage.setItem(PRESET_KEY, JSON.stringify(presets)); return presets; } catch (_) { return {}; } };
     const queueUiSettingsSync = () => {
         window.markDirty?.('master', 'uiSettings', 'upsert');
         window.scheduleSync?.();
@@ -2365,7 +2365,7 @@
                 <div class="card-free-setting-group"><b>표시</b><button type="button" class="w95-btn" data-free-action="title">제목</button><button type="button" class="w95-btn" data-free-action="title-marker">제목 점</button><button type="button" class="w95-btn" data-free-action="title-position">제목: 상단</button><button type="button" class="w95-btn" data-free-action="status">상태</button></div>
                 <div class="card-free-setting-group"><b>글자</b><button type="button" class="w95-btn" data-free-action="font">글자 중</button><button type="button" class="w95-btn" data-free-action="emphasis">강조</button><button type="button" class="w95-btn" data-free-action="underline">밑줄</button><button type="button" class="w95-btn" data-free-action="italic">기울임</button><label class="card-free-color-label">색<input type="color" class="card-free-color" value="#111827" title="글자 색상"></label></div>
                 <div class="card-free-setting-group"><b>정렬</b><button type="button" class="w95-btn" data-free-action="align-h">가로: 없음</button><button type="button" class="w95-btn" data-free-action="align-v">세로: 없음</button></div>
-                <div class="card-free-setting-group"><b>박스</b><button type="button" class="w95-btn" data-free-action="box">박스: 기본</button><button type="button" class="w95-btn" data-free-action="border">테두리: 기본</button><button type="button" class="w95-btn" data-free-action="shadow">음영: 없음</button><label class="card-free-color-label">배경<input type="color" class="card-free-bg-color" value="#ffffff" title="배경 색상"></label><label class="card-free-color-label">선<input type="color" class="card-free-border-color" value="#334155" title="테두리 색상"></label></div>
+                <div class="card-free-setting-group"><b>상자</b><button type="button" class="w95-btn" data-free-action="content-box">내용 상자</button><label class="card-free-color-label">상자색<input type="color" class="card-free-content-bg-color" value="#e2e8f0" title="내용 상자 색상"></label><button type="button" class="w95-btn" data-free-action="box">외곽: 기본</button><button type="button" class="w95-btn" data-free-action="border">테두리: 없음</button><button type="button" class="w95-btn" data-free-action="shadow">음영: 없음</button><label class="card-free-color-label">배경<input type="color" class="card-free-bg-color" value="#ffffff" title="배경 색상"></label><label class="card-free-color-label">선<input type="color" class="card-free-border-color" value="#334155" title="테두리 색상"></label></div>
                 <div class="card-free-popup-actions"><button type="button" class="w95-btn" data-free-action="reset-style">꾸미기 초기화</button><button type="button" class="w95-btn" data-free-action="close-settings">닫기</button></div>
             </div>
             <div class="card-free-tray"><button type="button" class="w95-btn card-free-store-button" data-free-action="hide">보관</button><div class="card-free-tray-items"></div><button type="button" class="w95-btn card-layout-reset">초기화</button></div>
@@ -2377,6 +2377,7 @@
         const colorInput = overlay.querySelector('.card-free-color');
         const bgColorInput = overlay.querySelector('.card-free-bg-color');
         const borderColorInput = overlay.querySelector('.card-free-border-color');
+        const contentBgColorInput = overlay.querySelector('.card-free-content-bg-color');
         let selected = null;
         let dragged = null;
         let dragStart = null;
@@ -2444,12 +2445,13 @@
             colorInput.value = settings[item.dataset.key]?.color || '#111827';
             bgColorInput.value = settings[item.dataset.key]?.backgroundColor || '#ffffff';
             borderColorInput.value = settings[item.dataset.key]?.borderColor || '#334155';
+            contentBgColorInput.value = settings[item.dataset.key]?.contentBackgroundColor || '#e2e8f0';
         };
         const refreshAdvancedState = () => {
             if (!selected) return;
             const setting = settings[selected.dataset.key] || {};
-            ['title','title-marker','emphasis','underline','italic','status'].forEach(action => {
-                const key = action === 'title' ? 'titleVisible' : action === 'title-marker' ? 'titleMarker' : action === 'status' ? 'statusMode' : action;
+            ['title','title-marker','emphasis','underline','italic','status','content-box'].forEach(action => {
+                const key = action === 'title' ? 'titleVisible' : action === 'title-marker' ? 'titleMarker' : action === 'status' ? 'statusMode' : action === 'content-box' ? 'contentBox' : action;
                 overlay.querySelector(`[data-free-action="${action}"]`)?.classList.toggle('is-active', !!setting[key]);
             });
             const fontLabels = { small:'글자 소', normal:'글자 중', large:'글자 대', xlarge:'글자 특대' };
@@ -2462,7 +2464,7 @@
             const borderLabels = { default:'테두리: 기본', none:'테두리: 없음', bold:'테두리: 굵게' };
             const hButton = overlay.querySelector('[data-free-action="align-h"]'); if (hButton) hButton.textContent = hLabels[setting.alignH || 'none'];
             const vButton = overlay.querySelector('[data-free-action="align-v"]'); if (vButton) vButton.textContent = vLabels[setting.alignV || 'none'];
-            const borderButton = overlay.querySelector('[data-free-action="border"]'); if (borderButton) borderButton.textContent = borderLabels[setting.borderStyle || 'default'];
+            const borderButton = overlay.querySelector('[data-free-action="border"]'); if (borderButton) borderButton.textContent = borderLabels[setting.borderStyle || 'none'];
             const boxLabels = { plain:'박스: 기본', square:'박스: 사각', rounded:'박스: 둥근' };
             const shadowLabels = { none:'음영: 없음', soft:'음영: 보통', strong:'음영: 강하게' };
             const boxButton = overlay.querySelector('[data-free-action="box"]'); if (boxButton) boxButton.textContent = boxLabels[setting.boxStyle || 'plain'];
@@ -2497,7 +2499,19 @@
         };
         const positionObjectPopup = item => {
             objectPopup.classList.add('is-open');
-            requestAnimationFrame(() => objectPopup.scrollIntoView({ block:'nearest', behavior:'smooth' }));
+            const dock = () => {
+                const itemRect = item.getBoundingClientRect();
+                const canvasRect = canvas.getBoundingClientRect();
+                objectPopup.style.left = `${Math.max(6, canvasRect.left)}px`;
+                objectPopup.style.width = `${Math.min(canvasRect.width, window.innerWidth - 12)}px`;
+                objectPopup.style.top = `${Math.min(window.innerHeight - 110, itemRect.bottom + 6)}px`;
+                objectPopup.style.maxHeight = `${Math.max(100, window.innerHeight - Math.min(window.innerHeight - 110, itemRect.bottom + 6) - 8)}px`;
+            };
+            requestAnimationFrame(() => {
+                const rect = item.getBoundingClientRect();
+                if (rect.bottom > window.innerHeight * .58) canvas.scrollTop += rect.bottom - window.innerHeight * .48;
+                requestAnimationFrame(dock);
+            });
         };
         const addToTray = (key, label) => {
             if ([...tray.children].some(button => button.dataset.key === key)) return;
@@ -2525,10 +2539,11 @@
             item.querySelector('.card-free-preview').appendChild(preview);
             const titleVisible = !!setting.titleVisible;
             const titlePosition = setting.titlePosition || (key.startsWith('custom:') ? 'inline' : 'top');
-            settings[key] = { ...(settings[key] || {}), titleVisible, titleMarker:!!setting.titleMarker, titlePosition, fontSize:setting.fontSize || 'normal', alignH:setting.alignH || 'none', alignV:setting.alignV || 'none', borderStyle:setting.borderStyle || 'default', boxStyle:setting.boxStyle || 'plain', shadowStyle:setting.shadowStyle || 'none' };
+            settings[key] = { ...(settings[key] || {}), titleVisible, titleMarker:!!setting.titleMarker, titlePosition, contentBox:!!setting.contentBox, fontSize:setting.fontSize || 'normal', alignH:setting.alignH || 'none', alignV:setting.alignV || 'none', borderStyle:setting.borderStyle || 'none', boxStyle:setting.boxStyle || 'plain', shadowStyle:setting.shadowStyle || 'none' };
             item.classList.toggle('is-title-visible', titleVisible);
             item.classList.toggle('is-emphasis', !!setting.emphasis);
             item.classList.toggle('is-status-mode', !!setting.statusMode);
+            item.classList.toggle('has-content-box', !!setting.contentBox);
             item.dataset.fontSize = settings[key].fontSize;
             item.style.setProperty('--widget-font-size', { small:'.64rem', normal:'.76rem', large:'.92rem', xlarge:'1.08rem' }[settings[key].fontSize] || '.76rem');
             item.dataset.alignH = settings[key].alignH; item.dataset.alignV = settings[key].alignV; item.dataset.borderStyle = settings[key].borderStyle;
@@ -2537,6 +2552,7 @@
             if (setting.color) item.style.setProperty('--widget-text-color', setting.color);
             if (setting.backgroundColor) item.style.setProperty('--widget-bg-color', setting.backgroundColor);
             if (setting.borderColor) item.style.setProperty('--widget-border-color', setting.borderColor);
+            if (setting.contentBackgroundColor) item.style.setProperty('--widget-content-bg', setting.contentBackgroundColor);
             canvas.appendChild(item); place(item); persist(item);
         });
         const knownLabels = {
@@ -2616,7 +2632,7 @@
                 commitWidgetSettings(settings); addToTray(selected.dataset.key, selected.dataset.label); selected.remove(); select(null); return;
             }
             if (action === 'axis') { sizeAxis = sizeAxis === 'w' ? 'h' : 'w'; event.target.textContent = sizeAxis === 'w' ? '가로' : '세로'; return; }
-            if (['title','title-marker','title-position','emphasis','underline','italic','font','align-h','align-v','box','border','shadow','status','reset-style'].includes(action) && !settingsUnlocked) return;
+            if (['title','title-marker','title-position','emphasis','underline','italic','font','align-h','align-v','box','border','shadow','status','content-box','reset-style'].includes(action) && !settingsUnlocked) return;
             if (action === 'title') { settings[selected.dataset.key].titleVisible = !settings[selected.dataset.key].titleVisible; selected.classList.toggle('is-title-visible', settings[selected.dataset.key].titleVisible); refreshPreviewTitle(selected); }
             if (action === 'title-marker') { settings[selected.dataset.key].titleMarker = !settings[selected.dataset.key].titleMarker; refreshPreviewTitle(selected); }
             if (action === 'title-position') { settings[selected.dataset.key].titlePosition = settings[selected.dataset.key].titlePosition === 'inline' ? 'top' : 'inline'; refreshPreviewTitle(selected); }
@@ -2635,10 +2651,13 @@
             if (action === 'status') {
                 settings[selected.dataset.key].statusMode = !settings[selected.dataset.key].statusMode; selected.classList.toggle('is-status-mode', settings[selected.dataset.key].statusMode);
             }
+            if (action === 'content-box') {
+                settings[selected.dataset.key].contentBox = !settings[selected.dataset.key].contentBox; selected.classList.toggle('has-content-box', settings[selected.dataset.key].contentBox);
+            }
             if (action === 'reset-style') {
                 Object.assign(settings[selected.dataset.key], resetDecoration(settings[selected.dataset.key]));
-                selected.dataset.fontSize = 'normal'; selected.dataset.alignH = 'none'; selected.dataset.alignV = 'none'; selected.dataset.boxStyle = 'plain'; selected.dataset.borderStyle = 'default'; selected.dataset.shadowStyle = 'none';
-                selected.classList.remove('is-title-visible','is-status-mode','is-emphasis','is-underlined','is-italic'); selected.style.removeProperty('--widget-text-color'); selected.style.removeProperty('--widget-bg-color'); selected.style.removeProperty('--widget-border-color'); colorInput.value = '#111827'; bgColorInput.value = '#ffffff'; borderColorInput.value = '#334155'; refreshPreviewTitle(selected);
+                selected.dataset.fontSize = 'normal'; selected.dataset.alignH = 'none'; selected.dataset.alignV = 'none'; selected.dataset.boxStyle = 'plain'; selected.dataset.borderStyle = 'none'; selected.dataset.shadowStyle = 'none';
+                selected.classList.remove('is-title-visible','is-status-mode','has-content-box','is-emphasis','is-underlined','is-italic'); selected.style.removeProperty('--widget-text-color'); selected.style.removeProperty('--widget-bg-color'); selected.style.removeProperty('--widget-border-color'); selected.style.removeProperty('--widget-content-bg'); colorInput.value = '#111827'; bgColorInput.value = '#ffffff'; borderColorInput.value = '#334155'; contentBgColorInput.value = '#e2e8f0'; refreshPreviewTitle(selected);
             }
             if (action === 'size-minus' || action === 'size-plus') {
                 const delta = action === 'size-plus' ? 1 : -1;
@@ -2668,6 +2687,11 @@
             if (!selected || !settingsUnlocked) return;
             settings[selected.dataset.key] = { ...(settings[selected.dataset.key] || {}), borderColor:borderColorInput.value };
             selected.style.setProperty('--widget-border-color', borderColorInput.value); commitWidgetSettings(settings);
+        });
+        contentBgColorInput.addEventListener('input', () => {
+            if (!selected || !settingsUnlocked) return;
+            settings[selected.dataset.key] = { ...(settings[selected.dataset.key] || {}), contentBackgroundColor:contentBgColorInput.value, contentBox:true };
+            selected.classList.add('has-content-box'); selected.style.setProperty('--widget-content-bg', contentBgColorInput.value); commitWidgetSettings(settings); refreshAdvancedState();
         });
         canvas.addEventListener('pointerdown', event => {
             if (event.pointerType === 'touch') activeTouches.set(event.pointerId, event.clientY);

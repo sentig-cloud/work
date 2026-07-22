@@ -199,12 +199,12 @@ window.getWorkCardSectionOrder = (availableKeys = []) => {
 window.getWorkCardWidgetSettings = () => {
     try {
         const settings = JSON.parse(localStorage.getItem('wm_work_card_widget_settings') || '{}');
-        if (Number(settings?.__meta?.styleVersion || 0) < 4) {
+        if (Number(settings?.__meta?.styleVersion || 0) < 5) {
             Object.entries(settings || {}).forEach(([key, value]) => {
                 if (key === '__meta' || !value || typeof value !== 'object') return;
-                Object.assign(value, { titleVisible:false, titleMarker:false, titlePosition:'top', statusMode:false, fontSize:'normal', emphasis:false, underline:false, italic:false, alignH:'none', alignV:'none', boxStyle:'plain', borderStyle:'default', shadowStyle:'none', color:'', backgroundColor:'', borderColor:'' });
+                Object.assign(value, { titleVisible:false, titleMarker:false, titlePosition:'top', statusMode:false, contentBox:false, fontSize:'normal', emphasis:false, underline:false, italic:false, alignH:'none', alignV:'none', boxStyle:'plain', borderStyle:'none', shadowStyle:'none', color:'', backgroundColor:'', borderColor:'', contentBackgroundColor:'' });
             });
-            settings.__meta = { ...(settings.__meta || {}), styleVersion:4 };
+            settings.__meta = { ...(settings.__meta || {}), styleVersion:5 };
             localStorage.setItem('wm_work_card_widget_settings', JSON.stringify(settings));
         }
         return settings;
@@ -316,10 +316,11 @@ window.getLogCardHtml = (l, indexStr = '') => {
             const color = /^#[0-9a-f]{6}$/i.test(setting.color || '') ? setting.color : '';
             const backgroundColor = /^#[0-9a-f]{6}$/i.test(setting.backgroundColor || '') ? setting.backgroundColor : '';
             const borderColor = /^#[0-9a-f]{6}$/i.test(setting.borderColor || '') ? setting.borderColor : '';
+            const contentBackgroundColor = /^#[0-9a-f]{6}$/i.test(setting.contentBackgroundColor || '') ? setting.contentBackgroundColor : '';
             const placement = layout.hasPosition
                 ? `grid-column:${layout.x} / span ${layout.w};grid-row:${layout.y} / span ${layout.h};`
                 : `grid-column:span ${layout.w};grid-row:span ${layout.h};`;
-            return `${placement}${color ? `--widget-text-color:${color};` : ''}${backgroundColor ? `--widget-bg-color:${backgroundColor};` : ''}${borderColor ? `--widget-border-color:${borderColor};` : ''}`;
+            return `${placement}${color ? `--widget-text-color:${color};` : ''}${backgroundColor ? `--widget-bg-color:${backgroundColor};` : ''}${borderColor ? `--widget-border-color:${borderColor};` : ''}${contentBackgroundColor ? `--widget-content-bg:${contentBackgroundColor};` : ''}`;
         };
         const makeCardObject = (key, label, inner, defaultCols = 4) => {
             const setting = window.getWorkCardWidgetSettings()[`object:${key}`] || {};
@@ -330,10 +331,10 @@ window.getLogCardHtml = (l, indexStr = '') => {
             const fontSize = ['small','normal','large','xlarge'].includes(setting.fontSize) ? setting.fontSize : 'normal';
             const alignH = ['none','left','center','right'].includes(setting.alignH) ? setting.alignH : 'none';
             const alignV = ['none','top','middle','bottom'].includes(setting.alignV) ? setting.alignV : 'none';
-            const borderStyle = ['default','none','bold'].includes(setting.borderStyle) ? setting.borderStyle : 'default';
+            const borderStyle = ['default','none','bold'].includes(setting.borderStyle) ? setting.borderStyle : 'none';
             const boxStyle = ['plain','square','rounded'].includes(setting.boxStyle) ? setting.boxStyle : 'plain';
             const shadowStyle = ['none','soft','strong'].includes(setting.shadowStyle) ? setting.shadowStyle : 'none';
-            return `<div class="work-card-subwidget title-position-${titlePosition} widget-font-${fontSize} widget-align-h-${alignH} widget-align-v-${alignV} widget-border-${borderStyle} widget-box-${boxStyle} widget-shadow-${shadowStyle}${setting.emphasis ? ' is-emphasis' : ''}${setting.underline ? ' is-underlined' : ''}${setting.italic ? ' is-italic' : ''}${setting.statusMode ? ' is-status-mode' : ''}${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="object:${key}" data-card-section-label="${label}" style="${freeWidgetStyle(setting, defaultCols)}">${title}${inner}</div>`;
+            return `<div class="work-card-subwidget title-position-${titlePosition} widget-font-${fontSize} widget-align-h-${alignH} widget-align-v-${alignV} widget-border-${borderStyle} widget-box-${boxStyle} widget-shadow-${shadowStyle}${setting.emphasis ? ' is-emphasis' : ''}${setting.underline ? ' is-underlined' : ''}${setting.italic ? ' is-italic' : ''}${setting.statusMode ? ' is-status-mode' : ''}${setting.contentBox ? ' has-content-box' : ''}${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="object:${key}" data-card-section-label="${label}" style="${freeWidgetStyle(setting, defaultCols)}">${title}${inner}</div>`;
         };
         const sortCardObjects = items => {
             const order = window.getWorkCardSectionOrder(items.map(html => html.match(/data-card-section-key="([^"]+)"/)?.[1]).filter(Boolean));
@@ -428,10 +429,10 @@ window.getLogCardHtml = (l, indexStr = '') => {
                     const fontSize = ['small','normal','large','xlarge'].includes(setting.fontSize) ? setting.fontSize : 'normal';
                     const alignH = ['none','left','center','right'].includes(setting.alignH) ? setting.alignH : 'none';
                     const alignV = ['none','top','middle','bottom'].includes(setting.alignV) ? setting.alignV : 'none';
-                    const borderStyle = ['default','none','bold'].includes(setting.borderStyle) ? setting.borderStyle : 'default';
+                    const borderStyle = ['default','none','bold'].includes(setting.borderStyle) ? setting.borderStyle : 'none';
                     const boxStyle = ['plain','square','rounded'].includes(setting.boxStyle) ? setting.boxStyle : 'plain';
                     const shadowStyle = ['none','soft','strong'].includes(setting.shadowStyle) ? setting.shadowStyle : 'none';
-                    return `<div class="work-card-widget widget-font-${fontSize} widget-align-h-${alignH} widget-align-v-${alignV} widget-border-${borderStyle} widget-box-${boxStyle} widget-shadow-${shadowStyle}${isContainer ? ' is-container-widget' : ''}${setting.emphasis ? ' is-emphasis' : ''}${setting.underline ? ' is-underlined' : ''}${setting.italic ? ' is-italic' : ''}${setting.statusMode ? ' is-status-mode' : ''}${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="${section.key}" data-card-section-label="${section.label || section.key}" style="${isContainer ? '' : freeWidgetStyle(setting, 4)}">${section.html}</div>`;
+                    return `<div class="work-card-widget widget-font-${fontSize} widget-align-h-${alignH} widget-align-v-${alignV} widget-border-${borderStyle} widget-box-${boxStyle} widget-shadow-${shadowStyle}${isContainer ? ' is-container-widget' : ''}${setting.emphasis ? ' is-emphasis' : ''}${setting.underline ? ' is-underlined' : ''}${setting.italic ? ' is-italic' : ''}${setting.statusMode ? ' is-status-mode' : ''}${setting.contentBox ? ' has-content-box' : ''}${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="${section.key}" data-card-section-label="${section.label || section.key}" style="${isContainer ? '' : freeWidgetStyle(setting, 4)}">${section.html}</div>`;
                 }).join('')}</div>
             </div>
         `;
