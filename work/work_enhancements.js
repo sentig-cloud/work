@@ -2497,6 +2497,14 @@
             const title = document.createElement('b'); title.className = 'work-card-object-title';
             title.innerHTML = `${setting.titleMarker ? '<span class="work-card-title-marker" aria-hidden="true"></span>' : ''}${item.dataset.label}${setting.titlePosition === 'inline' ? ' : ' : ''}`; target.prepend(title);
         };
+        const refreshPreviewAlignment = item => {
+            if (!item) return;
+            const setting = settings[item.dataset.key] || {};
+            const target = item.querySelector('.card-free-preview > .work-card-subwidget,.card-free-preview > .work-card-widget');
+            if (!target) return;
+            [...target.classList].filter(name => name.startsWith('widget-align-h-') || name.startsWith('widget-align-v-')).forEach(name => target.classList.remove(name));
+            target.classList.add(`widget-align-h-${setting.alignH || 'none'}`, `widget-align-v-${setting.alignV || 'none'}`);
+        };
         const positionObjectPopup = item => {
             objectPopup.classList.add('is-open');
             const dock = () => {
@@ -2643,8 +2651,8 @@
                 const sizes = ['tiny','small','normal','large','xlarge','xxlarge']; const current = settings[selected.dataset.key].fontSize || 'normal';
                 settings[selected.dataset.key].fontSize = sizes[(sizes.indexOf(current) + 1) % sizes.length]; selected.dataset.fontSize = settings[selected.dataset.key].fontSize;
             }
-            if (action === 'align-h') { const values = ['none','left','center','right']; const current = settings[selected.dataset.key].alignH || 'none'; settings[selected.dataset.key].alignH = values[(values.indexOf(current) + 1) % values.length]; selected.dataset.alignH = settings[selected.dataset.key].alignH; }
-            if (action === 'align-v') { const values = ['none','top','middle','bottom']; const current = settings[selected.dataset.key].alignV || 'none'; settings[selected.dataset.key].alignV = values[(values.indexOf(current) + 1) % values.length]; selected.dataset.alignV = settings[selected.dataset.key].alignV; }
+            if (action === 'align-h') { const values = ['none','left','center','right']; const current = settings[selected.dataset.key].alignH || 'none'; settings[selected.dataset.key].alignH = values[(values.indexOf(current) + 1) % values.length]; selected.dataset.alignH = settings[selected.dataset.key].alignH; refreshPreviewAlignment(selected); }
+            if (action === 'align-v') { const values = ['none','top','middle','bottom']; const current = settings[selected.dataset.key].alignV || 'none'; settings[selected.dataset.key].alignV = values[(values.indexOf(current) + 1) % values.length]; selected.dataset.alignV = settings[selected.dataset.key].alignV; refreshPreviewAlignment(selected); }
             if (action === 'border') { const values = ['default','none','bold']; const current = settings[selected.dataset.key].borderStyle || 'default'; settings[selected.dataset.key].borderStyle = values[(values.indexOf(current) + 1) % values.length]; selected.dataset.borderStyle = settings[selected.dataset.key].borderStyle; }
             if (action === 'box') { const values = ['plain','square','rounded']; const current = settings[selected.dataset.key].boxStyle || 'plain'; settings[selected.dataset.key].boxStyle = values[(values.indexOf(current) + 1) % values.length]; selected.dataset.boxStyle = settings[selected.dataset.key].boxStyle; }
             if (action === 'shadow') { const values = ['none','soft','strong']; const current = settings[selected.dataset.key].shadowStyle || 'none'; settings[selected.dataset.key].shadowStyle = values[(values.indexOf(current) + 1) % values.length]; selected.dataset.shadowStyle = settings[selected.dataset.key].shadowStyle; }

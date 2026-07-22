@@ -1088,6 +1088,9 @@ input, textarea, [contenteditable="true"] {
 .work-card-subwidget.widget-align-v-top { display:flex !important; justify-content:flex-start; }
 .work-card-subwidget.widget-align-v-middle { display:flex !important; justify-content:center; }
 .work-card-subwidget.widget-align-v-bottom { display:flex !important; justify-content:flex-end; }
+.work-card-subwidget:not(.title-position-inline).widget-align-v-top > :not(.work-card-object-title) { height:auto !important; margin-top:0; margin-bottom:auto; }
+.work-card-subwidget:not(.title-position-inline).widget-align-v-middle > :not(.work-card-object-title) { height:auto !important; margin-top:auto; margin-bottom:auto; }
+.work-card-subwidget:not(.title-position-inline).widget-align-v-bottom > :not(.work-card-object-title) { height:auto !important; margin-top:auto; margin-bottom:0; }
 .work-card-subwidget.title-position-inline { display:flex !important; flex-direction:row !important; }
 .work-card-subwidget.title-position-inline.widget-align-h-left { justify-content:flex-start; }
 .work-card-subwidget.title-position-inline.widget-align-h-center { justify-content:center; }
@@ -1095,6 +1098,9 @@ input, textarea, [contenteditable="true"] {
 .work-card-subwidget.title-position-inline.widget-align-v-top { align-items:flex-start; }
 .work-card-subwidget.title-position-inline.widget-align-v-middle { align-items:center; }
 .work-card-subwidget.title-position-inline.widget-align-v-bottom { align-items:flex-end; }
+.card-free-item[data-align-v="top"] .card-free-preview > .work-card-subwidget:not(.title-position-inline) > :not(.work-card-object-title) { height:auto !important; margin-top:0; margin-bottom:auto; }
+.card-free-item[data-align-v="middle"] .card-free-preview > .work-card-subwidget:not(.title-position-inline) > :not(.work-card-object-title) { height:auto !important; margin-top:auto; margin-bottom:auto; }
+.card-free-item[data-align-v="bottom"] .card-free-preview > .work-card-subwidget:not(.title-position-inline) > :not(.work-card-object-title) { height:auto !important; margin-top:auto; margin-bottom:0; }
 .work-card-subwidget:not([data-card-section-key="object:delete"]) .work-status-sticker,
 .work-card-subwidget:not([data-card-section-key="object:delete"]) .task-no-btn,
 .work-card-subwidget:not([data-card-section-key="object:delete"]) .work-alert-badge { background:transparent !important; border:0 !important; box-shadow:none !important; color:inherit !important; }
