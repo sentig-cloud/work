@@ -2307,8 +2307,16 @@
 
     const isIgnoredTarget = target => !!target.closest('button, a, img, input, textarea, select, .log-img-list');
     const closeEditor = () => document.getElementById('workCardLayoutEditor')?.remove();
-    const readWidgetSettings = () => { try { return JSON.parse(localStorage.getItem(WIDGET_KEY) || '{}'); } catch (_) { return {}; } };
-    const readPresets = () => { try { return JSON.parse(localStorage.getItem(PRESET_KEY) || '{}'); } catch (_) { return {}; } };
+    const resetDecoration = value => ({ ...(value || {}), titleVisible:false, titleMarker:false, titlePosition:'top', statusMode:false, fontSize:'normal', emphasis:false, underline:false, italic:false, alignH:'none', alignV:'none', boxStyle:'plain', borderStyle:'default', shadowStyle:'none', color:'', backgroundColor:'', borderColor:'' });
+    const migrateStyles = settings => {
+        const next = settings && typeof settings === 'object' ? settings : {};
+        if (Number(next?.__meta?.styleVersion || 0) >= 4) return next;
+        Object.keys(next).forEach(key => { if (key !== '__meta' && next[key] && typeof next[key] === 'object') next[key] = resetDecoration(next[key]); });
+        next.__meta = { ...(next.__meta || {}), styleVersion:4 };
+        return next;
+    };
+    const readWidgetSettings = () => { try { const next = migrateStyles(JSON.parse(localStorage.getItem(WIDGET_KEY) || '{}')); localStorage.setItem(WIDGET_KEY, JSON.stringify(next)); return next; } catch (_) { return {}; } };
+    const readPresets = () => { try { const presets = JSON.parse(localStorage.getItem(PRESET_KEY) || '{}'); let changed = false; ['1','2','3'].forEach(slot => { if (presets[slot] && Number(presets[slot]?.__meta?.styleVersion || 0) < 4) { presets[slot] = migrateStyles(presets[slot]); changed = true; } }); if (changed) localStorage.setItem(PRESET_KEY, JSON.stringify(presets)); return presets; } catch (_) { return {}; } };
     const queueUiSettingsSync = () => {
         window.markDirty?.('master', 'uiSettings', 'upsert');
         window.scheduleSync?.();
@@ -2354,10 +2362,11 @@
             </div>
             <div class="card-free-canvas" aria-label="12칸 카드 배치 영역"></div>
             <div class="card-free-object-popup w95-out" role="group" aria-label="선택 객체 표시 설정">
-                <div class="card-free-setting-group"><b>표시</b><button type="button" class="w95-btn" data-free-action="title">제목</button><button type="button" class="w95-btn" data-free-action="title-position">제목: 상단</button><button type="button" class="w95-btn" data-free-action="status">상태</button></div>
+                <div class="card-free-setting-group"><b>표시</b><button type="button" class="w95-btn" data-free-action="title">제목</button><button type="button" class="w95-btn" data-free-action="title-marker">제목 점</button><button type="button" class="w95-btn" data-free-action="title-position">제목: 상단</button><button type="button" class="w95-btn" data-free-action="status">상태</button></div>
                 <div class="card-free-setting-group"><b>글자</b><button type="button" class="w95-btn" data-free-action="font">글자 중</button><button type="button" class="w95-btn" data-free-action="emphasis">강조</button><button type="button" class="w95-btn" data-free-action="underline">밑줄</button><button type="button" class="w95-btn" data-free-action="italic">기울임</button><label class="card-free-color-label">색<input type="color" class="card-free-color" value="#111827" title="글자 색상"></label></div>
-                <div class="card-free-setting-group"><b>정렬</b><button type="button" class="w95-btn" data-free-action="align-h">가로: 중앙</button><button type="button" class="w95-btn" data-free-action="align-v">세로: 중앙</button></div>
-                <div class="card-free-setting-group"><b>박스</b><button type="button" class="w95-btn" data-free-action="box">박스: 기본</button><button type="button" class="w95-btn" data-free-action="border">테두리: 기본</button><button type="button" class="w95-btn" data-free-action="shadow">음영: 없음</button><label class="card-free-color-label">배경<input type="color" class="card-free-bg-color" value="#ffffff" title="배경 색상"></label><label class="card-free-color-label">선<input type="color" class="card-free-border-color" value="#334155" title="테두리 색상"></label><button type="button" class="w95-btn" data-free-action="reset-style">꾸미기 초기화</button></div>
+                <div class="card-free-setting-group"><b>정렬</b><button type="button" class="w95-btn" data-free-action="align-h">가로: 없음</button><button type="button" class="w95-btn" data-free-action="align-v">세로: 없음</button></div>
+                <div class="card-free-setting-group"><b>박스</b><button type="button" class="w95-btn" data-free-action="box">박스: 기본</button><button type="button" class="w95-btn" data-free-action="border">테두리: 기본</button><button type="button" class="w95-btn" data-free-action="shadow">음영: 없음</button><label class="card-free-color-label">배경<input type="color" class="card-free-bg-color" value="#ffffff" title="배경 색상"></label><label class="card-free-color-label">선<input type="color" class="card-free-border-color" value="#334155" title="테두리 색상"></label></div>
+                <div class="card-free-popup-actions"><button type="button" class="w95-btn" data-free-action="reset-style">꾸미기 초기화</button><button type="button" class="w95-btn" data-free-action="close-settings">닫기</button></div>
             </div>
             <div class="card-free-tray"><button type="button" class="w95-btn card-free-store-button" data-free-action="hide">보관</button><div class="card-free-tray-items"></div><button type="button" class="w95-btn card-layout-reset">초기화</button></div>
         </div>`;
@@ -2412,6 +2421,17 @@
             }
             return { x:1, y:120 };
         };
+        const nearestSpace = (w, h, startX, startY, ignore = null) => {
+            const others = [...canvas.children].filter(item => item !== ignore).map(rectOf);
+            let best = null;
+            for (let y = 1; y < 120; y++) for (let x = 1; x <= 13 - w; x++) {
+                const next = { x, y, w, h };
+                if (others.some(other => overlaps(next, other))) continue;
+                const score = Math.abs(y - startY) * 12 + Math.abs(x - startX);
+                if (!best || score < best.score) best = { x, y, score };
+            }
+            return best || firstSpace(w, h, ignore);
+        };
         const select = item => {
             selected?.classList.remove('is-selected','is-settings-open');
             selected = item;
@@ -2428,8 +2448,8 @@
         const refreshAdvancedState = () => {
             if (!selected) return;
             const setting = settings[selected.dataset.key] || {};
-            ['title','emphasis','underline','italic','status'].forEach(action => {
-                const key = action === 'title' ? 'titleVisible' : action === 'status' ? 'statusMode' : action;
+            ['title','title-marker','emphasis','underline','italic','status'].forEach(action => {
+                const key = action === 'title' ? 'titleVisible' : action === 'title-marker' ? 'titleMarker' : action === 'status' ? 'statusMode' : action;
                 overlay.querySelector(`[data-free-action="${action}"]`)?.classList.toggle('is-active', !!setting[key]);
             });
             const fontLabels = { small:'글자 소', normal:'글자 중', large:'글자 대', xlarge:'글자 특대' };
@@ -2437,11 +2457,11 @@
             if (fontButton) fontButton.textContent = fontLabels[setting.fontSize || 'normal'];
             const positionButton = overlay.querySelector('[data-free-action="title-position"]');
             if (positionButton) positionButton.textContent = setting.titlePosition === 'inline' ? '제목: 앞쪽' : '제목: 상단';
-            const hLabels = { left:'가로: 왼쪽', center:'가로: 중앙', right:'가로: 오른쪽' };
-            const vLabels = { top:'세로: 위', middle:'세로: 중앙', bottom:'세로: 아래' };
+            const hLabels = { none:'가로: 없음', left:'가로: 왼쪽', center:'가로: 중앙', right:'가로: 오른쪽' };
+            const vLabels = { none:'세로: 없음', top:'세로: 위', middle:'세로: 중앙', bottom:'세로: 아래' };
             const borderLabels = { default:'테두리: 기본', none:'테두리: 없음', bold:'테두리: 굵게' };
-            const hButton = overlay.querySelector('[data-free-action="align-h"]'); if (hButton) hButton.textContent = hLabels[setting.alignH || 'left'];
-            const vButton = overlay.querySelector('[data-free-action="align-v"]'); if (vButton) vButton.textContent = vLabels[setting.alignV || 'middle'];
+            const hButton = overlay.querySelector('[data-free-action="align-h"]'); if (hButton) hButton.textContent = hLabels[setting.alignH || 'none'];
+            const vButton = overlay.querySelector('[data-free-action="align-v"]'); if (vButton) vButton.textContent = vLabels[setting.alignV || 'none'];
             const borderButton = overlay.querySelector('[data-free-action="border"]'); if (borderButton) borderButton.textContent = borderLabels[setting.borderStyle || 'default'];
             const boxLabels = { plain:'박스: 기본', square:'박스: 사각', rounded:'박스: 둥근' };
             const shadowLabels = { none:'음영: 없음', soft:'음영: 보통', strong:'음영: 강하게' };
@@ -2463,26 +2483,21 @@
                 span?.querySelector('b')?.remove(); span?.querySelector('.work-custom-title-separator')?.remove();
                 if (!setting.titleVisible || !span) return;
                 if (setting.titlePosition === 'inline') {
-                    const title = document.createElement('b'); title.textContent = item.dataset.label;
+                    const title = document.createElement('b'); title.innerHTML = `${setting.titleMarker ? '<span class="work-card-title-marker" aria-hidden="true"></span>' : ''}${item.dataset.label}`;
                     const separator = document.createElement('span'); separator.className = 'work-custom-title-separator'; separator.textContent = ' : ';
                     span.prepend(separator); span.prepend(title);
                 } else {
-                    const title = document.createElement('b'); title.className = 'work-card-object-title'; title.textContent = item.dataset.label; target.prepend(title);
+                    const title = document.createElement('b'); title.className = 'work-card-object-title'; title.innerHTML = `${setting.titleMarker ? '<span class="work-card-title-marker" aria-hidden="true"></span>' : ''}${item.dataset.label}`; target.prepend(title);
                 }
                 return;
             }
             if (!setting.titleVisible) return;
             const title = document.createElement('b'); title.className = 'work-card-object-title';
-            title.textContent = `${item.dataset.label}${setting.titlePosition === 'inline' ? ' : ' : ''}`; target.prepend(title);
+            title.innerHTML = `${setting.titleMarker ? '<span class="work-card-title-marker" aria-hidden="true"></span>' : ''}${item.dataset.label}${setting.titlePosition === 'inline' ? ' : ' : ''}`; target.prepend(title);
         };
         const positionObjectPopup = item => {
-            const rect = item.getBoundingClientRect();
             objectPopup.classList.add('is-open');
-            const popupRect = objectPopup.getBoundingClientRect();
-            const left = Math.max(6, Math.min(window.innerWidth - popupRect.width - 6, rect.left));
-            const below = rect.bottom + 6;
-            const top = below + popupRect.height <= window.innerHeight - 6 ? below : Math.max(6, rect.top - popupRect.height - 6);
-            objectPopup.style.left = `${left}px`; objectPopup.style.top = `${top}px`;
+            requestAnimationFrame(() => objectPopup.scrollIntoView({ block:'nearest', behavior:'smooth' }));
         };
         const addToTray = (key, label) => {
             if ([...tray.children].some(button => button.dataset.key === key)) return;
@@ -2499,19 +2514,18 @@
             const item = document.createElement('div');
             item.className = 'card-free-item'; item.dataset.key = key; item.dataset.label = label;
             const size = legacySize(setting, section); item.dataset.w = size.w; item.dataset.h = size.h;
-            const pos = size.x > 0 && size.y > 0 ? { x:size.x, y:size.y } : firstSpace(size.w, size.h);
+            const wanted = size.x > 0 && size.y > 0 ? { x:size.x, y:size.y } : firstSpace(size.w, size.h);
+            const wantedRect = { x:Math.max(1, Math.min(13 - size.w, wanted.x)), y:Math.max(1, wanted.y), w:size.w, h:size.h };
+            const pos = [...canvas.children].some(other => overlaps(wantedRect, rectOf(other))) ? nearestSpace(size.w, size.h, wantedRect.x, wantedRect.y) : wantedRect;
             item.dataset.x = Math.max(1, Math.min(13 - size.w, pos.x)); item.dataset.y = Math.max(1, pos.y);
             item.innerHTML = `<div class="card-free-preview"></div>`;
             const preview = section.cloneNode(true); preview.classList.remove('is-widget-hidden'); preview.removeAttribute('style');
             preview.classList.remove('widget-font-small','widget-font-normal','widget-font-large','widget-font-xlarge');
             preview.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
             item.querySelector('.card-free-preview').appendChild(preview);
-            const titleVisible = typeof setting.titleVisible === 'boolean'
-                ? setting.titleVisible
-                : !!preview.querySelector('.work-card-object-title,.work-info-line.custom b');
+            const titleVisible = !!setting.titleVisible;
             const titlePosition = setting.titlePosition || (key.startsWith('custom:') ? 'inline' : 'top');
-            const exceptionKeys = ['object:content','object:note','object:address','object:images'];
-            settings[key] = { ...(settings[key] || {}), titleVisible, titlePosition, fontSize:setting.fontSize || 'normal', alignH:setting.alignH || (exceptionKeys.includes(key) ? 'left' : 'center'), alignV:setting.alignV || 'middle', borderStyle:setting.borderStyle || 'default', boxStyle:setting.boxStyle || 'plain', shadowStyle:setting.shadowStyle || 'none' };
+            settings[key] = { ...(settings[key] || {}), titleVisible, titleMarker:!!setting.titleMarker, titlePosition, fontSize:setting.fontSize || 'normal', alignH:setting.alignH || 'none', alignV:setting.alignV || 'none', borderStyle:setting.borderStyle || 'default', boxStyle:setting.boxStyle || 'plain', shadowStyle:setting.shadowStyle || 'none' };
             item.classList.toggle('is-title-visible', titleVisible);
             item.classList.toggle('is-emphasis', !!setting.emphasis);
             item.classList.toggle('is-status-mode', !!setting.statusMode);
@@ -2544,6 +2558,11 @@
         const finish = () => {
             clearInterval(edgeScrollTimer); edgeScrollTimer = null;
             const items = [...canvas.children];
+            items.sort((a,b) => (+a.dataset.y - +b.dataset.y) || (+a.dataset.x - +b.dataset.x)).forEach((item, index, sorted) => {
+                if (!sorted.slice(0, index).some(other => overlaps(rectOf(item), rectOf(other)))) return;
+                const space = nearestSpace(+item.dataset.w, +item.dataset.h, +item.dataset.x, +item.dataset.y, item);
+                item.dataset.x = space.x; item.dataset.y = space.y; place(item);
+            });
             const minY = items.length ? Math.min(...items.map(item => +item.dataset.y || 1)) : 1;
             if (minY > 1) items.forEach(item => { item.dataset.y = (+item.dataset.y || 1) - minY + 1; settings[item.dataset.key] = { ...(settings[item.dataset.key] || {}), y:+item.dataset.y }; });
             commitWidgetSettings(settings);
@@ -2588,13 +2607,18 @@
                 if (settingsUnlocked) { refreshAdvancedState(); positionObjectPopup(selected); }
                 return;
             }
+            if (action === 'close-settings') {
+                settingsUnlocked = false; overlay.classList.remove('is-object-settings'); selected.classList.remove('is-settings-open');
+                overlay.querySelector('[data-free-action="settings"]')?.classList.remove('is-active'); objectPopup.classList.remove('is-open'); return;
+            }
             if (action === 'hide') {
                 settings[selected.dataset.key] = { ...(settings[selected.dataset.key] || {}), hidden:true };
                 commitWidgetSettings(settings); addToTray(selected.dataset.key, selected.dataset.label); selected.remove(); select(null); return;
             }
             if (action === 'axis') { sizeAxis = sizeAxis === 'w' ? 'h' : 'w'; event.target.textContent = sizeAxis === 'w' ? '가로' : '세로'; return; }
-            if (['title','title-position','emphasis','underline','italic','font','align-h','align-v','box','border','shadow','status','reset-style'].includes(action) && !settingsUnlocked) return;
+            if (['title','title-marker','title-position','emphasis','underline','italic','font','align-h','align-v','box','border','shadow','status','reset-style'].includes(action) && !settingsUnlocked) return;
             if (action === 'title') { settings[selected.dataset.key].titleVisible = !settings[selected.dataset.key].titleVisible; selected.classList.toggle('is-title-visible', settings[selected.dataset.key].titleVisible); refreshPreviewTitle(selected); }
+            if (action === 'title-marker') { settings[selected.dataset.key].titleMarker = !settings[selected.dataset.key].titleMarker; refreshPreviewTitle(selected); }
             if (action === 'title-position') { settings[selected.dataset.key].titlePosition = settings[selected.dataset.key].titlePosition === 'inline' ? 'top' : 'inline'; refreshPreviewTitle(selected); }
             if (action === 'emphasis') { settings[selected.dataset.key].emphasis = !settings[selected.dataset.key].emphasis; selected.classList.toggle('is-emphasis', settings[selected.dataset.key].emphasis); }
             if (action === 'underline') { settings[selected.dataset.key].underline = !settings[selected.dataset.key].underline; selected.classList.toggle('is-underlined', settings[selected.dataset.key].underline); }
@@ -2603,8 +2627,8 @@
                 const sizes = ['small','normal','large','xlarge']; const current = settings[selected.dataset.key].fontSize || 'normal';
                 settings[selected.dataset.key].fontSize = sizes[(sizes.indexOf(current) + 1) % sizes.length]; selected.dataset.fontSize = settings[selected.dataset.key].fontSize;
             }
-            if (action === 'align-h') { const values = ['left','center','right']; const current = settings[selected.dataset.key].alignH || 'left'; settings[selected.dataset.key].alignH = values[(values.indexOf(current) + 1) % values.length]; selected.dataset.alignH = settings[selected.dataset.key].alignH; }
-            if (action === 'align-v') { const values = ['top','middle','bottom']; const current = settings[selected.dataset.key].alignV || 'middle'; settings[selected.dataset.key].alignV = values[(values.indexOf(current) + 1) % values.length]; selected.dataset.alignV = settings[selected.dataset.key].alignV; }
+            if (action === 'align-h') { const values = ['none','left','center','right']; const current = settings[selected.dataset.key].alignH || 'none'; settings[selected.dataset.key].alignH = values[(values.indexOf(current) + 1) % values.length]; selected.dataset.alignH = settings[selected.dataset.key].alignH; }
+            if (action === 'align-v') { const values = ['none','top','middle','bottom']; const current = settings[selected.dataset.key].alignV || 'none'; settings[selected.dataset.key].alignV = values[(values.indexOf(current) + 1) % values.length]; selected.dataset.alignV = settings[selected.dataset.key].alignV; }
             if (action === 'border') { const values = ['default','none','bold']; const current = settings[selected.dataset.key].borderStyle || 'default'; settings[selected.dataset.key].borderStyle = values[(values.indexOf(current) + 1) % values.length]; selected.dataset.borderStyle = settings[selected.dataset.key].borderStyle; }
             if (action === 'box') { const values = ['plain','square','rounded']; const current = settings[selected.dataset.key].boxStyle || 'plain'; settings[selected.dataset.key].boxStyle = values[(values.indexOf(current) + 1) % values.length]; selected.dataset.boxStyle = settings[selected.dataset.key].boxStyle; }
             if (action === 'shadow') { const values = ['none','soft','strong']; const current = settings[selected.dataset.key].shadowStyle || 'none'; settings[selected.dataset.key].shadowStyle = values[(values.indexOf(current) + 1) % values.length]; selected.dataset.shadowStyle = settings[selected.dataset.key].shadowStyle; }
@@ -2612,10 +2636,9 @@
                 settings[selected.dataset.key].statusMode = !settings[selected.dataset.key].statusMode; selected.classList.toggle('is-status-mode', settings[selected.dataset.key].statusMode);
             }
             if (action === 'reset-style') {
-                const isException = ['object:content','object:note','object:address','object:images'].includes(selected.dataset.key);
-                Object.assign(settings[selected.dataset.key], { fontSize:'normal', emphasis:false, underline:false, italic:false, alignH:isException ? 'left' : 'center', alignV:'middle', boxStyle:'plain', borderStyle:'default', shadowStyle:'none', color:'', backgroundColor:'', borderColor:'' });
-                selected.dataset.fontSize = 'normal'; selected.dataset.alignH = settings[selected.dataset.key].alignH; selected.dataset.alignV = 'middle'; selected.dataset.boxStyle = 'plain'; selected.dataset.borderStyle = 'default'; selected.dataset.shadowStyle = 'none';
-                selected.classList.remove('is-emphasis','is-underlined','is-italic'); selected.style.removeProperty('--widget-text-color'); selected.style.removeProperty('--widget-bg-color'); selected.style.removeProperty('--widget-border-color'); colorInput.value = '#111827'; bgColorInput.value = '#ffffff'; borderColorInput.value = '#334155';
+                Object.assign(settings[selected.dataset.key], resetDecoration(settings[selected.dataset.key]));
+                selected.dataset.fontSize = 'normal'; selected.dataset.alignH = 'none'; selected.dataset.alignV = 'none'; selected.dataset.boxStyle = 'plain'; selected.dataset.borderStyle = 'default'; selected.dataset.shadowStyle = 'none';
+                selected.classList.remove('is-title-visible','is-status-mode','is-emphasis','is-underlined','is-italic'); selected.style.removeProperty('--widget-text-color'); selected.style.removeProperty('--widget-bg-color'); selected.style.removeProperty('--widget-border-color'); colorInput.value = '#111827'; bgColorInput.value = '#ffffff'; borderColorInput.value = '#334155'; refreshPreviewTitle(selected);
             }
             if (action === 'size-minus' || action === 'size-plus') {
                 const delta = action === 'size-plus' ? 1 : -1;
@@ -2625,7 +2648,7 @@
             selected.dataset.x = Math.min(+selected.dataset.x, 13 - +selected.dataset.w);
             const collision = [...canvas.children].some(item => item !== selected && overlaps(rectOf(selected), rectOf(item)));
             if (collision) {
-                const space = firstSpace(+selected.dataset.w, +selected.dataset.h, selected);
+                const space = nearestSpace(+selected.dataset.w, +selected.dataset.h, +selected.dataset.x, +selected.dataset.y, selected);
                 selected.dataset.x = space.x; selected.dataset.y = space.y;
             }
             place(selected); persist(selected); refreshAdvancedState();
@@ -2660,7 +2683,7 @@
                 if (!dragged || !edgeScrollSpeed || !lastDragPoint) return;
                 canvas.scrollTop += edgeScrollSpeed;
                 const rect = canvas.getBoundingClientRect();
-                dragged.dataset.y = Math.max(1, Math.floor((lastDragPoint.y - rect.top + canvas.scrollTop) / 28) + 1); place(dragged);
+                dragged.dataset.y = Math.max(1, Math.floor((lastDragPoint.y - rect.top + canvas.scrollTop) / 27) + 1); place(dragged);
             }, 32);
             item.setPointerCapture?.(event.pointerId);
             if (event.cancelable) event.preventDefault();
@@ -2684,14 +2707,14 @@
             lastDragPoint = { x:event.clientX, y:event.clientY };
             edgeScrollSpeed = event.clientY < rect.top + edgeZone ? -12 : event.clientY > rect.bottom - edgeZone ? 12 : 0;
             dragged.dataset.x = Math.max(1, Math.min(13 - +dragged.dataset.w, Math.floor((event.clientX - rect.left) / (rect.width / 12)) + 1));
-            dragged.dataset.y = Math.max(1, Math.floor((event.clientY - rect.top + canvas.scrollTop) / 28) + 1); place(dragged);
+            dragged.dataset.y = Math.max(1, Math.floor((event.clientY - rect.top + canvas.scrollTop) / 27) + 1); place(dragged);
         });
         const drop = event => {
             if (event?.pointerType === 'touch') activeTouches.delete(event.pointerId);
             if (!dragged) return;
             edgeScrollSpeed = 0; clearInterval(edgeScrollTimer); edgeScrollTimer = null; lastDragPoint = null;
             const hit = [...canvas.children].find(item => item !== dragged && overlaps(rectOf(dragged), rectOf(item)));
-            if (hit) { hit.dataset.x = dragStart.x; hit.dataset.y = dragStart.y; place(hit); persist(hit); }
+            if (hit) { const space = nearestSpace(+dragged.dataset.w, +dragged.dataset.h, +dragged.dataset.x, +dragged.dataset.y, dragged); dragged.dataset.x = space.x; dragged.dataset.y = space.y; place(dragged); }
             dragged.classList.remove('is-moving'); persist(dragged); dragged = null; dragStart = null; itemPressStart = null;
         };
         canvas.addEventListener('pointerup', drop); canvas.addEventListener('pointercancel', drop);

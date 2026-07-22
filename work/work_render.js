@@ -199,13 +199,12 @@ window.getWorkCardSectionOrder = (availableKeys = []) => {
 window.getWorkCardWidgetSettings = () => {
     try {
         const settings = JSON.parse(localStorage.getItem('wm_work_card_widget_settings') || '{}');
-        if (Number(settings?.__meta?.styleVersion || 0) < 3) {
-            const exceptions = new Set(['object:content','object:note','object:address','object:images']);
+        if (Number(settings?.__meta?.styleVersion || 0) < 4) {
             Object.entries(settings || {}).forEach(([key, value]) => {
                 if (key === '__meta' || !value || typeof value !== 'object') return;
-                Object.assign(value, { fontSize:'normal', emphasis:false, underline:false, italic:false, alignH:exceptions.has(key) ? 'left' : 'center', alignV:'middle', boxStyle:'plain', borderStyle:'default', shadowStyle:'none', color:'', backgroundColor:'', borderColor:'' });
+                Object.assign(value, { titleVisible:false, titleMarker:false, titlePosition:'top', statusMode:false, fontSize:'normal', emphasis:false, underline:false, italic:false, alignH:'none', alignV:'none', boxStyle:'plain', borderStyle:'default', shadowStyle:'none', color:'', backgroundColor:'', borderColor:'' });
             });
-            settings.__meta = { ...(settings.__meta || {}), styleVersion:3 };
+            settings.__meta = { ...(settings.__meta || {}), styleVersion:4 };
             localStorage.setItem('wm_work_card_widget_settings', JSON.stringify(settings));
         }
         return settings;
@@ -326,10 +325,11 @@ window.getLogCardHtml = (l, indexStr = '') => {
             const setting = window.getWorkCardWidgetSettings()[`object:${key}`] || {};
             const layout = getFreeWidgetLayout(setting, defaultCols);
             const titlePosition = setting.titlePosition === 'inline' ? 'inline' : 'top';
-            const title = setting.titleVisible ? `<b class="work-card-object-title">${label}${titlePosition === 'inline' ? ' : ' : ''}</b>` : '';
+            const marker = setting.titleMarker ? '<span class="work-card-title-marker" aria-hidden="true"></span>' : '';
+            const title = setting.titleVisible ? `<b class="work-card-object-title">${marker}${label}${titlePosition === 'inline' ? ' : ' : ''}</b>` : '';
             const fontSize = ['small','normal','large','xlarge'].includes(setting.fontSize) ? setting.fontSize : 'normal';
-            const alignH = ['left','center','right'].includes(setting.alignH) ? setting.alignH : (['content','note','address','images'].includes(key) ? 'left' : 'center');
-            const alignV = ['top','middle','bottom'].includes(setting.alignV) ? setting.alignV : 'middle';
+            const alignH = ['none','left','center','right'].includes(setting.alignH) ? setting.alignH : 'none';
+            const alignV = ['none','top','middle','bottom'].includes(setting.alignV) ? setting.alignV : 'none';
             const borderStyle = ['default','none','bold'].includes(setting.borderStyle) ? setting.borderStyle : 'default';
             const boxStyle = ['plain','square','rounded'].includes(setting.boxStyle) ? setting.boxStyle : 'plain';
             const shadowStyle = ['none','soft','strong'].includes(setting.shadowStyle) ? setting.shadowStyle : 'none';
@@ -380,12 +380,13 @@ window.getLogCardHtml = (l, indexStr = '') => {
                 const safeGroupTitle = String(g.title || '선택태그').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 const palette = customCardPalette[groupIndex % customCardPalette.length];
                 const customWidgetSetting = window.getWorkCardWidgetSettings()[`custom:${g.id}`] || {};
-                const customTitleVisible = typeof customWidgetSetting.titleVisible === 'boolean' ? customWidgetSetting.titleVisible : !!g.cardTitleVisible;
+                const customTitleVisible = !!customWidgetSetting.titleVisible;
                 const customTitlePosition = customWidgetSetting.titlePosition === 'top' ? 'top' : 'inline';
+                const customTitleMarker = customWidgetSetting.titleMarker ? '<span class="work-card-title-marker" aria-hidden="true"></span>' : '';
                 customDetails.push({
                     key: `custom:${g.id}`,
                     label: g.title || '선택태그',
-                    html: `<aside class="work-custom-panel work-card-section title-position-${customTitlePosition}" style="--custom-accent:${palette[0]};--custom-bg:${palette[1]};" data-card-section-key="custom:${g.id}" data-card-section-label="${safeGroupTitle}">${customTitleVisible && customTitlePosition === 'top' ? `<b class="work-card-object-title">${safeGroupTitle}</b>` : ''}<div class="work-info-line custom" style="${excludedCardStyle(g.id)}"><i class="fa-solid fa-tag"></i><span>${customTitleVisible && customTitlePosition === 'inline' ? `<b>${safeGroupTitle}</b><span class="work-custom-title-separator"> : </span>` : ''}${valStr}</span></div></aside>`
+                    html: `<aside class="work-custom-panel work-card-section title-position-${customTitlePosition}" style="--custom-accent:${palette[0]};--custom-bg:${palette[1]};" data-card-section-key="custom:${g.id}" data-card-section-label="${safeGroupTitle}">${customTitleVisible && customTitlePosition === 'top' ? `<b class="work-card-object-title">${customTitleMarker}${safeGroupTitle}</b>` : ''}<div class="work-info-line custom" style="${excludedCardStyle(g.id)}"><i class="fa-solid fa-tag"></i><span>${customTitleVisible && customTitlePosition === 'inline' ? `<b>${customTitleMarker}${safeGroupTitle}</b><span class="work-custom-title-separator"> : </span>` : ''}${valStr}</span></div></aside>`
                 });
             }
         });
@@ -425,8 +426,8 @@ window.getLogCardHtml = (l, indexStr = '') => {
                     const isContainer = section.key === 'work' || section.key === 'customer';
                     const layout = getFreeWidgetLayout(setting, 4);
                     const fontSize = ['small','normal','large','xlarge'].includes(setting.fontSize) ? setting.fontSize : 'normal';
-                    const alignH = ['left','center','right'].includes(setting.alignH) ? setting.alignH : 'center';
-                    const alignV = ['top','middle','bottom'].includes(setting.alignV) ? setting.alignV : 'middle';
+                    const alignH = ['none','left','center','right'].includes(setting.alignH) ? setting.alignH : 'none';
+                    const alignV = ['none','top','middle','bottom'].includes(setting.alignV) ? setting.alignV : 'none';
                     const borderStyle = ['default','none','bold'].includes(setting.borderStyle) ? setting.borderStyle : 'default';
                     const boxStyle = ['plain','square','rounded'].includes(setting.boxStyle) ? setting.boxStyle : 'plain';
                     const shadowStyle = ['none','soft','strong'].includes(setting.shadowStyle) ? setting.shadowStyle : 'none';
