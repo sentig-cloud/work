@@ -287,21 +287,32 @@ window.getLogCardHtml = (l, indexStr = '') => {
         let customerDetails = [];
         let workDetails = [];
         let customDetails = [];
-        workDetails.push(`<div class="work-info-line task-type" style="${excludedCardStyle('taskTypes')}"><i class="fa-solid fa-screwdriver-wrench"></i><span>${formatWorkQtyNames(String(l.taskType || '기본').split(', '), 'taskTypes')}</span></div>`);
-        workDetails.push(`<div class="work-info-line work-content-line"><i class="fa-solid fa-clipboard"></i><span>${l.content || '내용 없음'}</span></div>`);
-        if (l.note) workDetails.push(`<div class="work-info-line note"><i class="fa-solid fa-triangle-exclamation"></i><span>${l.note}</span></div>`);
-        if (l.customerName) customerDetails.push(`<div class="work-info-line customer"><i class="fa-solid fa-user"></i><span>${l.customerName}</span></div>`);
-        if (l.address) customerDetails.push(`<div class="work-info-line address"><i class="fa-solid fa-map-marker-alt"></i><span>${l.address}</span></div>`);
+        const makeCardObject = (key, label, inner, defaultCols = 4) => {
+            const setting = window.getWorkCardWidgetSettings()[`object:${key}`] || {};
+            const cols = Math.max(1, Math.min(4, Number(setting.cols || defaultCols)));
+            const height = ['one','two','auto'].includes(setting.height) ? setting.height : 'auto';
+            const color = /^#[0-9a-f]{6}$/i.test(setting.color || '') ? setting.color : '';
+            return `<div class="work-card-subwidget widget-height-${height}${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-cols="${cols}" data-card-section-key="object:${key}" data-card-section-label="${label}" style="grid-column:span ${cols};${color ? `--widget-accent:${color};` : ''}">${inner}</div>`;
+        };
+        const sortCardObjects = items => {
+            const order = window.getWorkCardSectionOrder(items.map(html => html.match(/data-card-section-key="([^"]+)"/)?.[1]).filter(Boolean));
+            return [...items].sort((a,b) => order.indexOf(a.match(/data-card-section-key="([^"]+)"/)?.[1]) - order.indexOf(b.match(/data-card-section-key="([^"]+)"/)?.[1]));
+        };
+        workDetails.push(makeCardObject('taskType','작업유형',`<div class="work-info-line task-type" style="${excludedCardStyle('taskTypes')}"><i class="fa-solid fa-screwdriver-wrench"></i><span>${formatWorkQtyNames(String(l.taskType || '기본').split(', '), 'taskTypes')}</span></div>`,2));
+        workDetails.push(makeCardObject('content','작업내용',`<div class="work-info-line work-content-line"><i class="fa-solid fa-clipboard"></i><span>${l.content || '내용 없음'}</span></div>`));
+        if (l.note) workDetails.push(makeCardObject('note','특이사항',`<div class="work-info-line note"><i class="fa-solid fa-triangle-exclamation"></i><span>${l.note}</span></div>`));
+        if (l.customerName) customerDetails.push(makeCardObject('customer','고객명',`<div class="work-info-line customer"><i class="fa-solid fa-user"></i><span>${l.customerName}</span></div>`,2));
+        if (l.address) customerDetails.push(makeCardObject('address','주소',`<div class="work-info-line address"><i class="fa-solid fa-map-marker-alt"></i><span>${l.address}</span></div>`));
         if (l.equips) {
             let eqStr = Object.entries(l.equips).filter(e => e[1] > 0)
                 .map(e => Number(e[1]) > 1 ? `${e[0]} ${e[1]}` : e[0]).join(', ');
-            if (eqStr) customerDetails.push(`<div class="work-info-line equipment" style="${excludedCardStyle('equipments')}"><i class="fa-solid fa-box"></i><span>${eqStr}</span></div>`);
+            if (eqStr) customerDetails.push(makeCardObject('equipment','장비',`<div class="work-info-line equipment" style="${excludedCardStyle('equipments')}"><i class="fa-solid fa-box"></i><span>${eqStr}</span></div>`,2));
         }
 
         // 시작/종료/총시간 (특수 그룹 — 태그 목록이 아니라 log.startTime/endTime/totalMin에 직접 저장)
         if (l.startTime || l.endTime) {
             const totalStr = l.totalMin ? window.formatDurationMin(l.totalMin) : '--:--';
-            workDetails.push(`<div class="work-info-line duration"><i class="fa-solid fa-hourglass-half"></i><span>${l.startTime || '--:--'}~${l.endTime || '--:--'} (${totalStr})</span></div>`);
+            workDetails.push(makeCardObject('duration','작업시간',`<div class="work-info-line duration"><i class="fa-solid fa-hourglass-half"></i><span>${l.startTime || '--:--'}~${l.endTime || '--:--'} (${totalStr})</span></div>`,2));
         }
 
         // 커스텀 그룹 값 카드에 표시
@@ -332,9 +343,20 @@ window.getLogCardHtml = (l, indexStr = '') => {
             bottomManagerHtml = `<div style="color:var(--w-blue); font-size:0.8rem; font-weight:bold; ${excludedCardStyle('coworkers')}"><i class="fa-solid fa-user-group"></i> ${formatWorkQtyNames(l.coworkers, 'coworkers')}</div>`;
         }
 
+        const allStandardObjects = [
+            ...workDetails.map(html => ({ html, origin:'work' })),
+            ...customerDetails.map(html => ({ html, origin:'customer' }))
+        ];
+        const objectContainer = item => {
+            const key = item.html.match(/data-card-section-key="([^"]+)"/)?.[1];
+            return window.getWorkCardWidgetSettings()[key]?.container || item.origin;
+        };
+        workDetails = allStandardObjects.filter(item => objectContainer(item) === 'work').map(item => item.html);
+        customerDetails = allStandardObjects.filter(item => objectContainer(item) === 'customer').map(item => item.html);
+
         const cardSections = [
-            { key: 'work', html: `<section class="work-main-panel work-card-section" data-card-section-key="work" data-card-section-label="작업정보">${workDetails.join('')}</section>` },
-            { key: 'customer', html: `<aside class="work-customer-panel work-card-section" data-card-section-key="customer" data-card-section-label="고객정보">${customerDetails.length ? customerDetails.join('') : '<div class="work-info-empty">등록 정보 없음</div>'}</aside>` },
+            { key: 'work', html: `<section class="work-main-panel work-card-section" data-card-section-key="work" data-card-section-label="작업정보">${sortCardObjects(workDetails).join('')}</section>` },
+            { key: 'customer', html: `<aside class="work-customer-panel work-card-section" data-card-section-key="customer" data-card-section-label="고객정보">${customerDetails.length ? sortCardObjects(customerDetails).join('') : '<div class="work-info-empty">등록 정보 없음</div>'}</aside>` },
             ...customDetails
         ];
         const orderedCardSections = window.getWorkCardSectionOrder(cardSections.map(section => section.key))

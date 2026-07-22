@@ -2322,7 +2322,8 @@
     const openEditor = card => {
         closeEditor();
         window.closeCardSelectionMode?.();
-        const sections = [...card.querySelectorAll('.work-card-widget')];
+        const sections = [...card.querySelectorAll('.work-card-subwidget,.work-card-widget')]
+            .filter(section => section.classList.contains('work-card-subwidget') || section.dataset.cardSectionKey?.startsWith('custom:'));
         if (!sections.length) return;
         const overlay = document.createElement('div');
         overlay.id = 'workCardLayoutEditor';
@@ -2340,8 +2341,9 @@
             item.dataset.key = section.dataset.cardSectionKey;
             const setting = readWidgetSettings()[item.dataset.key] || {};
             const heightLabel = { one:'1줄', two:'2줄', auto:'자동' }[setting.height || 'auto'];
-            item.innerHTML = `<span class="card-layout-drag-handle" title="끌어서 이동">⠿</span><span class="card-layout-edit-label"></span><button type="button" class="w95-btn card-layout-size">${Number(setting.cols || 4)}/4</button><button type="button" class="w95-btn card-layout-height">${heightLabel}</button><input type="color" class="card-layout-color" value="${setting.color || '#64748b'}"><button type="button" class="w95-btn card-layout-auto-color">A</button><button type="button" class="w95-btn card-layout-hide">${setting.hidden ? '넣기' : '빼기'}</button>`;
+            item.innerHTML = `<span class="card-layout-drag-handle" title="끌어서 이동">⠿</span><span class="card-layout-edit-label"></span><button type="button" class="w95-btn card-layout-size">${Number(setting.cols || 4)}/4</button><button type="button" class="w95-btn card-layout-height">${heightLabel}</button><button type="button" class="w95-btn card-layout-container" title="작업/고객 칸 이동">↔</button><input type="color" class="card-layout-color" value="${setting.color || '#64748b'}"><button type="button" class="w95-btn card-layout-auto-color">A</button><button type="button" class="w95-btn card-layout-hide">${setting.hidden ? '넣기' : '빼기'}</button>`;
             item.querySelector('.card-layout-edit-label').textContent = section.dataset.cardSectionLabel || `칸 ${index + 1}`;
+            if (!item.dataset.key.startsWith('object:')) item.querySelector('.card-layout-container').disabled = true;
             list.appendChild(item);
         });
         overlay.addEventListener('click', event => {
@@ -2367,6 +2369,11 @@
                 const next = current === 'auto' ? 'one' : current === 'one' ? 'two' : 'auto';
                 writeWidgetSetting(item.dataset.key, { height:next });
                 event.target.textContent = { one:'1줄', two:'2줄', auto:'자동' }[next];
+            }
+            if (event.target.closest('.card-layout-container') && item.dataset.key.startsWith('object:')) {
+                const defaults = ['object:customer','object:address','object:equipment'];
+                const current = readWidgetSettings()[item.dataset.key]?.container || (defaults.includes(item.dataset.key) ? 'customer' : 'work');
+                writeWidgetSetting(item.dataset.key, { container:current === 'work' ? 'customer' : 'work' });
             }
             if (event.target.closest('.card-layout-auto-color')) {
                 writeWidgetSetting(item.dataset.key, { color:'' });
@@ -2438,7 +2445,7 @@
         }
     }, true);
     document.addEventListener('click', event => {
-        const widget = event.target.closest('.work-card-widget');
+        const widget = event.target.closest('.work-card-subwidget,.work-card-widget');
         if (!widget || document.getElementById('workCardLayoutEditor') || event.target.closest('button,a,img')) return;
         if (!widget.matches('.widget-height-one,.widget-height-two')) return;
         event.preventDefault();
