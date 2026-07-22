@@ -2332,14 +2332,13 @@
         overlay.innerHTML = `<div class="card-layout-editor card-free-editor w95-out" role="dialog" aria-modal="true">
             <div class="w95-titlebar"><span>카드 자유 배치</span><button type="button" class="w95-btn card-layout-close">X</button></div>
             <div class="card-free-toolbar">
-                <button type="button" class="w95-btn" data-free-action="size-minus">−</button><button type="button" class="w95-btn" data-free-action="size-plus">＋</button><button type="button" class="w95-btn is-active" data-free-action="axis">가로</button>
-                <button type="button" class="w95-btn" data-free-action="hide">보관</button>
+                <button type="button" class="w95-btn card-free-settings-toggle" data-free-action="settings">설정</button>
             </div>
             <div class="card-free-canvas" aria-label="12칸 카드 배치 영역"></div>
             <div class="card-free-object-popup w95-out" role="group" aria-label="선택 객체 표시 설정">
-                <button type="button" class="w95-btn" data-free-action="title">제목</button><button type="button" class="w95-btn" data-free-action="title-position">제목: 상단</button><button type="button" class="w95-btn" data-free-action="emphasis">강조</button><button type="button" class="w95-btn" data-free-action="font">글자 중</button><button type="button" class="w95-btn" data-free-action="status">상태</button><input type="color" class="card-free-color" value="#64748b" title="객체 색상"><button type="button" class="w95-btn" data-free-action="auto-color">자동색</button>
+                <button type="button" class="w95-btn" data-free-action="title">제목</button><button type="button" class="w95-btn" data-free-action="title-position">제목: 상단</button><button type="button" class="w95-btn" data-free-action="emphasis">강조</button><button type="button" class="w95-btn" data-free-action="font">글자 중</button><button type="button" class="w95-btn" data-free-action="status">상태</button><label class="card-free-color-label">글자색<input type="color" class="card-free-color" value="#111827" title="글자 색상"></label><button type="button" class="w95-btn" data-free-action="auto-color">자동색</button>
             </div>
-            <div class="card-free-tray"><b>보관함</b><div class="card-free-tray-items"></div><button type="button" class="w95-btn card-layout-reset">초기화</button></div>
+            <div class="card-free-tray"><b>보관함</b><button type="button" class="w95-btn" data-free-action="size-minus">−</button><button type="button" class="w95-btn is-active" data-free-action="axis">가로</button><button type="button" class="w95-btn" data-free-action="size-plus">＋</button><button type="button" class="w95-btn" data-free-action="hide">보관</button><div class="card-free-tray-items"></div><button type="button" class="w95-btn card-layout-reset">초기화</button></div>
         </div>`;
         document.body.appendChild(overlay);
         const canvas = overlay.querySelector('.card-free-canvas');
@@ -2349,13 +2348,11 @@
         let selected = null;
         let dragged = null;
         let dragStart = null;
-        let itemPressTimer = null;
         let itemPressStart = null;
         let settingsUnlocked = false;
         let sizeAxis = 'w';
         const activeTouches = new Map();
         let twoFingerY = 0;
-        let suppressItemClickUntil = 0;
 
         const legacySize = (setting, section) => {
             const oldCols = Number(setting.cols || section.dataset.widgetCols || 4);
@@ -2394,10 +2391,11 @@
             selected = item;
             settingsUnlocked = false;
             overlay.classList.remove('is-object-settings');
+            overlay.querySelector('[data-free-action="settings"]')?.classList.remove('is-active');
             objectPopup.classList.remove('is-open');
             if (!item) return;
             item.classList.add('is-selected');
-            colorInput.value = settings[item.dataset.key]?.color || '#64748b';
+            colorInput.value = settings[item.dataset.key]?.color || '#111827';
         };
         const refreshAdvancedState = () => {
             if (!selected) return;
@@ -2465,8 +2463,7 @@
             const size = legacySize(setting, section); item.dataset.w = size.w; item.dataset.h = size.h;
             const pos = size.x > 0 && size.y > 0 ? { x:size.x, y:size.y } : firstSpace(size.w, size.h);
             item.dataset.x = Math.max(1, Math.min(13 - size.w, pos.x)); item.dataset.y = Math.max(1, pos.y);
-            item.innerHTML = `<span class="card-free-grip">⠿</span><span class="card-free-item-label"></span><div class="card-free-preview"></div>`;
-            item.querySelector('.card-free-item-label').textContent = label;
+            item.innerHTML = `<div class="card-free-preview"></div>`;
             const preview = section.cloneNode(true); preview.classList.remove('is-widget-hidden'); preview.removeAttribute('style');
             preview.classList.remove('widget-font-small','widget-font-normal','widget-font-large','widget-font-xlarge');
             preview.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
@@ -2480,7 +2477,7 @@
             item.classList.toggle('is-emphasis', !!setting.emphasis);
             item.classList.toggle('is-status-mode', !!setting.statusMode);
             item.dataset.fontSize = setting.fontSize || 'normal';
-            if (setting.color) item.style.setProperty('--widget-accent', setting.color);
+            if (setting.color) item.style.setProperty('--widget-text-color', setting.color);
             canvas.appendChild(item); place(item); persist(item);
         });
         const knownLabels = {
@@ -2511,9 +2508,18 @@
                 return;
             }
             const item = event.target.closest('.card-free-item');
-            if (item && Date.now() >= suppressItemClickUntil) select(item);
+            if (item) select(item);
             const action = event.target.closest('[data-free-action]')?.dataset.freeAction;
             if (!action || !selected) return;
+            if (action === 'settings') {
+                settingsUnlocked = !settingsUnlocked;
+                overlay.classList.toggle('is-object-settings', settingsUnlocked);
+                selected.classList.toggle('is-settings-open', settingsUnlocked);
+                event.target.classList.toggle('is-active', settingsUnlocked);
+                objectPopup.classList.toggle('is-open', settingsUnlocked);
+                if (settingsUnlocked) { refreshAdvancedState(); positionObjectPopup(selected); }
+                return;
+            }
             if (action === 'hide') {
                 settings[selected.dataset.key] = { ...(settings[selected.dataset.key] || {}), hidden:true };
                 localStorage.setItem(WIDGET_KEY, JSON.stringify(settings)); addToTray(selected.dataset.key, selected.dataset.label); selected.remove(); select(null); return;
@@ -2529,9 +2535,8 @@
             }
             if (action === 'status') {
                 settings[selected.dataset.key].statusMode = !settings[selected.dataset.key].statusMode; selected.classList.toggle('is-status-mode', settings[selected.dataset.key].statusMode);
-                if (settings[selected.dataset.key].statusMode) { selected.dataset.w = Math.min(+selected.dataset.w, 3); selected.dataset.h = Math.min(+selected.dataset.h, 2); }
             }
-            if (action === 'auto-color') { settings[selected.dataset.key].color = ''; selected.style.removeProperty('--widget-accent'); colorInput.value = '#64748b'; }
+            if (action === 'auto-color') { settings[selected.dataset.key].color = ''; selected.style.removeProperty('--widget-text-color'); colorInput.value = '#111827'; }
             if (action === 'size-minus' || action === 'size-plus') {
                 const delta = action === 'size-plus' ? 1 : -1;
                 const limit = sizeAxis === 'w' ? 12 : 8;
@@ -2549,28 +2554,17 @@
         colorInput.addEventListener('input', () => {
             if (!selected || !settingsUnlocked) return;
             settings[selected.dataset.key] = { ...(settings[selected.dataset.key] || {}), color:colorInput.value };
-            selected.style.setProperty('--widget-accent', colorInput.value); localStorage.setItem(WIDGET_KEY, JSON.stringify(settings));
+            selected.style.setProperty('--widget-text-color', colorInput.value); localStorage.setItem(WIDGET_KEY, JSON.stringify(settings));
         });
         canvas.addEventListener('pointerdown', event => {
             if (event.pointerType === 'touch') activeTouches.set(event.pointerId, event.clientY);
             if (activeTouches.size > 1) {
-                clearTimeout(itemPressTimer); dragged?.classList.remove('is-moving'); dragged = null;
+                dragged?.classList.remove('is-moving'); dragged = null;
                 twoFingerY = [...activeTouches.values()].reduce((sum, y) => sum + y, 0) / activeTouches.size;
                 return;
             }
             const item = event.target.closest('.card-free-item'); if (!item) return;
             select(item); dragged = item; dragStart = { ...rectOf(item) }; itemPressStart = { x:event.clientX, y:event.clientY };
-            clearTimeout(itemPressTimer);
-            itemPressTimer = setTimeout(() => {
-                if (!dragged) return;
-                settingsUnlocked = true;
-                suppressItemClickUntil = Date.now() + 900;
-                overlay.classList.add('is-object-settings');
-                dragged.classList.add('is-settings-open');
-                refreshAdvancedState();
-                positionObjectPopup(dragged);
-                navigator.vibrate?.(30);
-            }, 700);
             item.setPointerCapture?.(event.pointerId); event.preventDefault();
         });
         canvas.addEventListener('pointermove', event => {
@@ -2583,9 +2577,8 @@
             }
             if (!dragged) return;
             if (itemPressStart && Math.hypot(event.clientX - itemPressStart.x, event.clientY - itemPressStart.y) > 7) {
-                clearTimeout(itemPressTimer); dragged.classList.add('is-moving');
+                dragged.classList.add('is-moving');
             }
-            if (settingsUnlocked) return;
             const rect = canvas.getBoundingClientRect();
             dragged.dataset.x = Math.max(1, Math.min(13 - +dragged.dataset.w, Math.floor((event.clientX - rect.left) / (rect.width / 12)) + 1));
             dragged.dataset.y = Math.max(1, Math.floor((event.clientY - rect.top + canvas.scrollTop) / 28) + 1); place(dragged);
@@ -2593,8 +2586,6 @@
         const drop = event => {
             if (event?.pointerType === 'touch') activeTouches.delete(event.pointerId);
             if (!dragged) return;
-            clearTimeout(itemPressTimer);
-            if (settingsUnlocked) { dragged.classList.remove('is-moving'); dragged = null; dragStart = null; itemPressStart = null; return; }
             const hit = [...canvas.children].find(item => item !== dragged && overlaps(rectOf(dragged), rectOf(item)));
             if (hit) { hit.dataset.x = dragStart.x; hit.dataset.y = dragStart.y; place(hit); persist(hit); }
             dragged.classList.remove('is-moving'); persist(dragged); dragged = null; dragStart = null; itemPressStart = null;

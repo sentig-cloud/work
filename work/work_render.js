@@ -306,7 +306,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
             const placement = layout.hasPosition
                 ? `grid-column:${layout.x} / span ${layout.w};grid-row:${layout.y} / span ${layout.h};`
                 : `grid-column:span ${layout.w};grid-row:span ${layout.h};`;
-            return `${placement}${color ? `--widget-accent:${color};` : ''}`;
+            return `${placement}${color ? `--widget-text-color:${color};` : ''}`;
         };
         const makeCardObject = (key, label, inner, defaultCols = 4) => {
             const setting = window.getWorkCardWidgetSettings()[`object:${key}`] || {};
