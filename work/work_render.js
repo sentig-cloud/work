@@ -197,7 +197,15 @@ window.getWorkCardSectionOrder = (availableKeys = []) => {
     return [...saved.filter(key => availableKeys.includes(key)), ...availableKeys.filter(key => !saved.includes(key))];
 };
 window.getWorkCardWidgetSettings = () => {
-    try { return JSON.parse(localStorage.getItem('wm_work_card_widget_settings') || '{}'); } catch (_) { return {}; }
+    try {
+        const settings = JSON.parse(localStorage.getItem('wm_work_card_widget_settings') || '{}');
+        if (Number(settings?.__meta?.styleVersion || 0) < 2) {
+            Object.entries(settings || {}).forEach(([key, value]) => { if (key !== '__meta' && value && typeof value === 'object') value.fontSize = 'normal'; });
+            settings.__meta = { ...(settings.__meta || {}), styleVersion:2 };
+            localStorage.setItem('wm_work_card_widget_settings', JSON.stringify(settings));
+        }
+        return settings;
+    } catch (_) { return {}; }
 };
 
 window.getLogCardHtml = (l, indexStr = '') => {
@@ -303,10 +311,11 @@ window.getLogCardHtml = (l, indexStr = '') => {
         const freeWidgetStyle = (setting, defaultCols = 4) => {
             const layout = getFreeWidgetLayout(setting, defaultCols);
             const color = /^#[0-9a-f]{6}$/i.test(setting.color || '') ? setting.color : '';
+            const backgroundColor = /^#[0-9a-f]{6}$/i.test(setting.backgroundColor || '') ? setting.backgroundColor : '';
             const placement = layout.hasPosition
                 ? `grid-column:${layout.x} / span ${layout.w};grid-row:${layout.y} / span ${layout.h};`
                 : `grid-column:span ${layout.w};grid-row:span ${layout.h};`;
-            return `${placement}${color ? `--widget-text-color:${color};` : ''}`;
+            return `${placement}${color ? `--widget-text-color:${color};` : ''}${backgroundColor ? `--widget-bg-color:${backgroundColor};` : ''}`;
         };
         const makeCardObject = (key, label, inner, defaultCols = 4) => {
             const setting = window.getWorkCardWidgetSettings()[`object:${key}`] || {};
@@ -314,7 +323,10 @@ window.getLogCardHtml = (l, indexStr = '') => {
             const titlePosition = setting.titlePosition === 'inline' ? 'inline' : 'top';
             const title = setting.titleVisible ? `<b class="work-card-object-title">${label}${titlePosition === 'inline' ? ' : ' : ''}</b>` : '';
             const fontSize = ['small','normal','large','xlarge'].includes(setting.fontSize) ? setting.fontSize : 'normal';
-            return `<div class="work-card-subwidget title-position-${titlePosition} widget-font-${fontSize}${setting.emphasis ? ' is-emphasis' : ''}${setting.statusMode ? ' is-status-mode' : ''}${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="object:${key}" data-card-section-label="${label}" style="${freeWidgetStyle(setting, defaultCols)}">${title}${inner}</div>`;
+            const alignH = ['left','center','right'].includes(setting.alignH) ? setting.alignH : 'left';
+            const alignV = ['top','middle','bottom'].includes(setting.alignV) ? setting.alignV : 'middle';
+            const borderStyle = ['default','none','bold'].includes(setting.borderStyle) ? setting.borderStyle : 'default';
+            return `<div class="work-card-subwidget title-position-${titlePosition} widget-font-${fontSize} widget-align-h-${alignH} widget-align-v-${alignV} widget-border-${borderStyle}${setting.emphasis ? ' is-emphasis' : ''}${setting.statusMode ? ' is-status-mode' : ''}${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="object:${key}" data-card-section-label="${label}" style="${freeWidgetStyle(setting, defaultCols)}">${title}${inner}</div>`;
         };
         const sortCardObjects = items => {
             const order = window.getWorkCardSectionOrder(items.map(html => html.match(/data-card-section-key="([^"]+)"/)?.[1]).filter(Boolean));
@@ -406,7 +418,10 @@ window.getLogCardHtml = (l, indexStr = '') => {
                     const isContainer = section.key === 'work' || section.key === 'customer';
                     const layout = getFreeWidgetLayout(setting, 4);
                     const fontSize = ['small','normal','large','xlarge'].includes(setting.fontSize) ? setting.fontSize : 'normal';
-                    return `<div class="work-card-widget widget-font-${fontSize}${isContainer ? ' is-container-widget' : ''}${setting.emphasis ? ' is-emphasis' : ''}${setting.statusMode ? ' is-status-mode' : ''}${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="${section.key}" data-card-section-label="${section.label || section.key}" style="${isContainer ? '' : freeWidgetStyle(setting, 4)}">${section.html}</div>`;
+                    const alignH = ['left','center','right'].includes(setting.alignH) ? setting.alignH : 'left';
+                    const alignV = ['top','middle','bottom'].includes(setting.alignV) ? setting.alignV : 'middle';
+                    const borderStyle = ['default','none','bold'].includes(setting.borderStyle) ? setting.borderStyle : 'default';
+                    return `<div class="work-card-widget widget-font-${fontSize} widget-align-h-${alignH} widget-align-v-${alignV} widget-border-${borderStyle}${isContainer ? ' is-container-widget' : ''}${setting.emphasis ? ' is-emphasis' : ''}${setting.statusMode ? ' is-status-mode' : ''}${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="${section.key}" data-card-section-label="${section.label || section.key}" style="${isContainer ? '' : freeWidgetStyle(setting, 4)}">${section.html}</div>`;
                 }).join('')}</div>
             </div>
         `;

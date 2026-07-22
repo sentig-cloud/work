@@ -479,6 +479,8 @@
         });
         localStorage.setItem(LAYOUT_KEY, JSON.stringify({ version: 3, order, blocks, innerOrder, widgets }));
         localStorage.setItem("wm_work_drag_order", JSON.stringify(order));
+        window.markDirty?.('master', 'uiSettings', 'upsert');
+        window.scheduleSync?.();
     };
 
     window.readWorkLayout = () => {
@@ -2294,6 +2296,8 @@
 (() => {
     const STORAGE_KEY = 'wm_work_card_section_order';
     const WIDGET_KEY = 'wm_work_card_widget_settings';
+    const PRESET_KEY = 'wm_work_card_presets';
+    const ACTIVE_PRESET_KEY = 'wm_work_card_active_preset';
     let pressTimer = null;
     let pressCard = null;
     let pressX = 0;
@@ -2304,10 +2308,24 @@
     const isIgnoredTarget = target => !!target.closest('button, a, img, input, textarea, select, .log-img-list');
     const closeEditor = () => document.getElementById('workCardLayoutEditor')?.remove();
     const readWidgetSettings = () => { try { return JSON.parse(localStorage.getItem(WIDGET_KEY) || '{}'); } catch (_) { return {}; } };
+    const readPresets = () => { try { return JSON.parse(localStorage.getItem(PRESET_KEY) || '{}'); } catch (_) { return {}; } };
+    const queueUiSettingsSync = () => {
+        window.markDirty?.('master', 'uiSettings', 'upsert');
+        window.scheduleSync?.();
+    };
+    const commitWidgetSettings = (settings, updatePreset = true) => {
+        localStorage.setItem(WIDGET_KEY, JSON.stringify(settings || {}));
+        const activePreset = localStorage.getItem(ACTIVE_PRESET_KEY);
+        if (updatePreset && ['1','2','3'].includes(activePreset)) {
+            const presets = readPresets(); presets[activePreset] = JSON.parse(JSON.stringify(settings || {}));
+            localStorage.setItem(PRESET_KEY, JSON.stringify(presets));
+        }
+        queueUiSettingsSync();
+    };
     const writeWidgetSetting = (key, patch) => {
         const settings = readWidgetSettings();
         settings[key] = { ...(settings[key] || {}), ...patch };
-        localStorage.setItem(WIDGET_KEY, JSON.stringify(settings));
+        commitWidgetSettings(settings);
         window.updateUI?.();
     };
     const saveEditorOrder = list => {
@@ -2332,19 +2350,20 @@
         overlay.innerHTML = `<div class="card-layout-editor card-free-editor w95-out" role="dialog" aria-modal="true">
             <div class="w95-titlebar"><span>카드 자유 배치</span><button type="button" class="w95-btn card-layout-close">X</button></div>
             <div class="card-free-toolbar">
-                <button type="button" class="w95-btn card-free-settings-toggle" data-free-action="settings">설정</button>
+                <button type="button" class="w95-btn" data-free-action="size-minus">−</button><button type="button" class="w95-btn is-active" data-free-action="axis">가로</button><button type="button" class="w95-btn" data-free-action="size-plus">＋</button><button type="button" class="w95-btn card-free-preset" data-preset="1">1</button><button type="button" class="w95-btn card-free-preset" data-preset="2">2</button><button type="button" class="w95-btn card-free-preset" data-preset="3">3</button><span class="card-free-toolbar-spacer"></span><button type="button" class="w95-btn card-free-settings-toggle" data-free-action="settings">설정</button>
             </div>
             <div class="card-free-canvas" aria-label="12칸 카드 배치 영역"></div>
             <div class="card-free-object-popup w95-out" role="group" aria-label="선택 객체 표시 설정">
-                <button type="button" class="w95-btn" data-free-action="title">제목</button><button type="button" class="w95-btn" data-free-action="title-position">제목: 상단</button><button type="button" class="w95-btn" data-free-action="emphasis">강조</button><button type="button" class="w95-btn" data-free-action="font">글자 중</button><button type="button" class="w95-btn" data-free-action="status">상태</button><label class="card-free-color-label">글자색<input type="color" class="card-free-color" value="#111827" title="글자 색상"></label><button type="button" class="w95-btn" data-free-action="auto-color">자동색</button>
+                <button type="button" class="w95-btn" data-free-action="title">제목</button><button type="button" class="w95-btn" data-free-action="title-position">제목: 상단</button><button type="button" class="w95-btn" data-free-action="emphasis">강조</button><button type="button" class="w95-btn" data-free-action="font">글자 중</button><button type="button" class="w95-btn" data-free-action="align-h">가로: 왼쪽</button><button type="button" class="w95-btn" data-free-action="align-v">세로: 중앙</button><button type="button" class="w95-btn" data-free-action="border">테두리: 기본</button><button type="button" class="w95-btn" data-free-action="status">상태</button><label class="card-free-color-label">글자<input type="color" class="card-free-color" value="#111827" title="글자 색상"></label><label class="card-free-color-label">배경<input type="color" class="card-free-bg-color" value="#ffffff" title="배경 색상"></label><button type="button" class="w95-btn" data-free-action="auto-color">색상 초기화</button>
             </div>
-            <div class="card-free-tray"><b>보관함</b><button type="button" class="w95-btn" data-free-action="size-minus">−</button><button type="button" class="w95-btn is-active" data-free-action="axis">가로</button><button type="button" class="w95-btn" data-free-action="size-plus">＋</button><button type="button" class="w95-btn" data-free-action="hide">보관</button><div class="card-free-tray-items"></div><button type="button" class="w95-btn card-layout-reset">초기화</button></div>
+            <div class="card-free-tray"><button type="button" class="w95-btn card-free-store-button" data-free-action="hide">보관</button><div class="card-free-tray-items"></div><button type="button" class="w95-btn card-layout-reset">초기화</button></div>
         </div>`;
         document.body.appendChild(overlay);
         const canvas = overlay.querySelector('.card-free-canvas');
         const tray = overlay.querySelector('.card-free-tray-items');
         const objectPopup = overlay.querySelector('.card-free-object-popup');
         const colorInput = overlay.querySelector('.card-free-color');
+        const bgColorInput = overlay.querySelector('.card-free-bg-color');
         let selected = null;
         let dragged = null;
         let dragStart = null;
@@ -2371,7 +2390,7 @@
         const persist = item => {
             const key = item.dataset.key;
             settings[key] = { ...(settings[key] || {}), grid:12, x:+item.dataset.x, y:+item.dataset.y, w:+item.dataset.w, h:+item.dataset.h, hidden:false };
-            localStorage.setItem(WIDGET_KEY, JSON.stringify(settings));
+            commitWidgetSettings(settings);
         };
         const place = item => {
             const { x, y, w, h } = rectOf(item);
@@ -2396,6 +2415,7 @@
             if (!item) return;
             item.classList.add('is-selected');
             colorInput.value = settings[item.dataset.key]?.color || '#111827';
+            bgColorInput.value = settings[item.dataset.key]?.backgroundColor || '#ffffff';
         };
         const refreshAdvancedState = () => {
             if (!selected) return;
@@ -2409,6 +2429,12 @@
             if (fontButton) fontButton.textContent = fontLabels[setting.fontSize || 'normal'];
             const positionButton = overlay.querySelector('[data-free-action="title-position"]');
             if (positionButton) positionButton.textContent = setting.titlePosition === 'inline' ? '제목: 앞쪽' : '제목: 상단';
+            const hLabels = { left:'가로: 왼쪽', center:'가로: 중앙', right:'가로: 오른쪽' };
+            const vLabels = { top:'세로: 위', middle:'세로: 중앙', bottom:'세로: 아래' };
+            const borderLabels = { default:'테두리: 기본', none:'테두리: 없음', bold:'테두리: 굵게' };
+            const hButton = overlay.querySelector('[data-free-action="align-h"]'); if (hButton) hButton.textContent = hLabels[setting.alignH || 'left'];
+            const vButton = overlay.querySelector('[data-free-action="align-v"]'); if (vButton) vButton.textContent = vLabels[setting.alignV || 'middle'];
+            const borderButton = overlay.querySelector('[data-free-action="border"]'); if (borderButton) borderButton.textContent = borderLabels[setting.borderStyle || 'default'];
             selected.style.setProperty('--widget-font-size', { small:'.64rem', normal:'.76rem', large:'.92rem', xlarge:'1.08rem' }[setting.fontSize || 'normal']);
         };
         const refreshPreviewTitle = item => {
@@ -2472,12 +2498,14 @@
                 ? setting.titleVisible
                 : !!preview.querySelector('.work-card-object-title,.work-info-line.custom b');
             const titlePosition = setting.titlePosition || (key.startsWith('custom:') ? 'inline' : 'top');
-            settings[key] = { ...(settings[key] || {}), titleVisible, titlePosition, fontSize:setting.fontSize || 'normal' };
+            settings[key] = { ...(settings[key] || {}), titleVisible, titlePosition, fontSize:setting.fontSize || 'normal', alignH:setting.alignH || 'left', alignV:setting.alignV || 'middle', borderStyle:setting.borderStyle || 'default' };
             item.classList.toggle('is-title-visible', titleVisible);
             item.classList.toggle('is-emphasis', !!setting.emphasis);
             item.classList.toggle('is-status-mode', !!setting.statusMode);
             item.dataset.fontSize = setting.fontSize || 'normal';
+            item.dataset.alignH = setting.alignH || 'left'; item.dataset.alignV = setting.alignV || 'middle'; item.dataset.borderStyle = setting.borderStyle || 'default';
             if (setting.color) item.style.setProperty('--widget-text-color', setting.color);
+            if (setting.backgroundColor) item.style.setProperty('--widget-bg-color', setting.backgroundColor);
             canvas.appendChild(item); place(item); persist(item);
         });
         const knownLabels = {
@@ -2493,17 +2521,39 @@
                 addToTray(key, source?.dataset.cardSectionLabel || knownLabels[key] || key.replace(/^custom:/, '선택태그 '));
             }
         });
+        const activePreset = localStorage.getItem(ACTIVE_PRESET_KEY);
+        overlay.querySelector(`[data-preset="${activePreset}"]`)?.classList.add('is-active');
 
-        const finish = () => { closeEditor(); window.updateUI?.(); };
+        const finish = () => {
+            const items = [...canvas.children];
+            const minY = items.length ? Math.min(...items.map(item => +item.dataset.y || 1)) : 1;
+            if (minY > 1) items.forEach(item => { item.dataset.y = (+item.dataset.y || 1) - minY + 1; settings[item.dataset.key] = { ...(settings[item.dataset.key] || {}), y:+item.dataset.y }; });
+            commitWidgetSettings(settings);
+            closeEditor(); window.updateUI?.();
+        };
         overlay.addEventListener('click', event => {
             if (event.target === overlay || event.target.closest('.card-layout-close')) return finish();
+            const presetButton = event.target.closest('.card-free-preset');
+            if (presetButton) {
+                const slot = presetButton.dataset.preset; const presets = readPresets();
+                localStorage.setItem(ACTIVE_PRESET_KEY, slot);
+                if (presets[slot]) {
+                    commitWidgetSettings(JSON.parse(JSON.stringify(presets[slot])), false);
+                    closeEditor(); window.updateUI?.();
+                } else {
+                    presets[slot] = JSON.parse(JSON.stringify(settings)); localStorage.setItem(PRESET_KEY, JSON.stringify(presets));
+                    overlay.querySelectorAll('.card-free-preset').forEach(button => button.classList.toggle('is-active', button === presetButton));
+                    queueUiSettingsSync();
+                }
+                return;
+            }
             if (event.target.closest('.card-layout-reset')) {
-                localStorage.removeItem(WIDGET_KEY); localStorage.removeItem(STORAGE_KEY); return finish();
+                localStorage.removeItem(STORAGE_KEY); commitWidgetSettings({}, true); closeEditor(); window.updateUI?.(); return;
             }
             const restore = event.target.closest('.card-free-restore');
             if (restore) {
                 settings[restore.dataset.key] = { ...(settings[restore.dataset.key] || {}), hidden:false };
-                localStorage.setItem(WIDGET_KEY, JSON.stringify(settings));
+                commitWidgetSettings(settings);
                 finish();
                 return;
             }
@@ -2522,10 +2572,10 @@
             }
             if (action === 'hide') {
                 settings[selected.dataset.key] = { ...(settings[selected.dataset.key] || {}), hidden:true };
-                localStorage.setItem(WIDGET_KEY, JSON.stringify(settings)); addToTray(selected.dataset.key, selected.dataset.label); selected.remove(); select(null); return;
+                commitWidgetSettings(settings); addToTray(selected.dataset.key, selected.dataset.label); selected.remove(); select(null); return;
             }
             if (action === 'axis') { sizeAxis = sizeAxis === 'w' ? 'h' : 'w'; event.target.textContent = sizeAxis === 'w' ? '가로' : '세로'; return; }
-            if (['title','title-position','emphasis','font','status','auto-color'].includes(action) && !settingsUnlocked) return;
+            if (['title','title-position','emphasis','font','align-h','align-v','border','status','auto-color'].includes(action) && !settingsUnlocked) return;
             if (action === 'title') { settings[selected.dataset.key].titleVisible = !settings[selected.dataset.key].titleVisible; selected.classList.toggle('is-title-visible', settings[selected.dataset.key].titleVisible); refreshPreviewTitle(selected); }
             if (action === 'title-position') { settings[selected.dataset.key].titlePosition = settings[selected.dataset.key].titlePosition === 'inline' ? 'top' : 'inline'; refreshPreviewTitle(selected); }
             if (action === 'emphasis') { settings[selected.dataset.key].emphasis = !settings[selected.dataset.key].emphasis; selected.classList.toggle('is-emphasis', settings[selected.dataset.key].emphasis); }
@@ -2533,10 +2583,13 @@
                 const sizes = ['small','normal','large','xlarge']; const current = settings[selected.dataset.key].fontSize || 'normal';
                 settings[selected.dataset.key].fontSize = sizes[(sizes.indexOf(current) + 1) % sizes.length]; selected.dataset.fontSize = settings[selected.dataset.key].fontSize;
             }
+            if (action === 'align-h') { const values = ['left','center','right']; const current = settings[selected.dataset.key].alignH || 'left'; settings[selected.dataset.key].alignH = values[(values.indexOf(current) + 1) % values.length]; selected.dataset.alignH = settings[selected.dataset.key].alignH; }
+            if (action === 'align-v') { const values = ['top','middle','bottom']; const current = settings[selected.dataset.key].alignV || 'middle'; settings[selected.dataset.key].alignV = values[(values.indexOf(current) + 1) % values.length]; selected.dataset.alignV = settings[selected.dataset.key].alignV; }
+            if (action === 'border') { const values = ['default','none','bold']; const current = settings[selected.dataset.key].borderStyle || 'default'; settings[selected.dataset.key].borderStyle = values[(values.indexOf(current) + 1) % values.length]; selected.dataset.borderStyle = settings[selected.dataset.key].borderStyle; }
             if (action === 'status') {
                 settings[selected.dataset.key].statusMode = !settings[selected.dataset.key].statusMode; selected.classList.toggle('is-status-mode', settings[selected.dataset.key].statusMode);
             }
-            if (action === 'auto-color') { settings[selected.dataset.key].color = ''; selected.style.removeProperty('--widget-text-color'); colorInput.value = '#111827'; }
+            if (action === 'auto-color') { settings[selected.dataset.key].color = ''; settings[selected.dataset.key].backgroundColor = ''; selected.style.removeProperty('--widget-text-color'); selected.style.removeProperty('--widget-bg-color'); colorInput.value = '#111827'; bgColorInput.value = '#ffffff'; }
             if (action === 'size-minus' || action === 'size-plus') {
                 const delta = action === 'size-plus' ? 1 : -1;
                 const limit = sizeAxis === 'w' ? 12 : 8;
@@ -2554,7 +2607,12 @@
         colorInput.addEventListener('input', () => {
             if (!selected || !settingsUnlocked) return;
             settings[selected.dataset.key] = { ...(settings[selected.dataset.key] || {}), color:colorInput.value };
-            selected.style.setProperty('--widget-text-color', colorInput.value); localStorage.setItem(WIDGET_KEY, JSON.stringify(settings));
+            selected.style.setProperty('--widget-text-color', colorInput.value); commitWidgetSettings(settings);
+        });
+        bgColorInput.addEventListener('input', () => {
+            if (!selected || !settingsUnlocked) return;
+            settings[selected.dataset.key] = { ...(settings[selected.dataset.key] || {}), backgroundColor:bgColorInput.value };
+            selected.style.setProperty('--widget-bg-color', bgColorInput.value); commitWidgetSettings(settings);
         });
         canvas.addEventListener('pointerdown', event => {
             if (event.pointerType === 'touch') activeTouches.set(event.pointerId, event.clientY);

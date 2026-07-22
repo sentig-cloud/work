@@ -73,6 +73,7 @@ function createEmptyPayload() {
       statuses: [],
       equipments: [],
       memoTags: [],
+      uiSettings: {},
     },
   };
 }
@@ -104,6 +105,9 @@ function normalizePayload(payload) {
   // v2 groups 보장
   if (!Array.isArray(result.data.groups)) {
     result.data.groups = [];
+  }
+  if (!result.data.uiSettings || typeof result.data.uiSettings !== "object") {
+    result.data.uiSettings = {};
   }
 
   // v1 → v2 마이그레이션 (서버 측)
@@ -211,6 +215,10 @@ function applyOperations(data, operations) {
 // ─── v2: master = groups 배열 통합 ───
 function applyMaster(data, master) {
   if (!master || typeof master !== "object") return;
+
+  if (master.uiSettings && typeof master.uiSettings === "object") {
+    data.uiSettings = master.uiSettings;
+  }
 
   // v2: groups 통합 구조
   if (Array.isArray(master.groups)) {

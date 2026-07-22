@@ -220,9 +220,36 @@ window.migrateAllImagesToR2 = async function () {
 };
 
 // ─── v2: master payload = groups 배열 통합 ───
+window.getUiSettingsPayload = function () {
+    const readJson = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch (_) { return fallback; } };
+    return {
+        cardWidgets: readJson('wm_work_card_widget_settings', {}),
+        cardOrder: readJson('wm_work_card_section_order', []),
+        cardPresets: readJson('wm_work_card_presets', {}),
+        activeCardPreset: localStorage.getItem('wm_work_card_active_preset') || '',
+        workLayout: readJson('wm_work_layout_v3', {}),
+        workDragOrder: readJson('wm_work_drag_order', []),
+        exportConfig: readJson('wm_export_conf', {}),
+        basicGroupTitle: localStorage.getItem('wm_basic_group_title') || ''
+    };
+};
+window.applyUiSettingsPayload = function (uiSettings) {
+    if (!uiSettings || typeof uiSettings !== 'object' || Object.keys(uiSettings).length === 0) return;
+    const setJson = (key, value) => { if (value !== undefined) localStorage.setItem(key, JSON.stringify(value)); };
+    setJson('wm_work_card_widget_settings', uiSettings.cardWidgets || {});
+    setJson('wm_work_card_section_order', uiSettings.cardOrder || []);
+    setJson('wm_work_card_presets', uiSettings.cardPresets || {});
+    setJson('wm_work_layout_v3', uiSettings.workLayout || {});
+    setJson('wm_work_drag_order', uiSettings.workDragOrder || []);
+    setJson('wm_export_conf', uiSettings.exportConfig || {});
+    if (uiSettings.activeCardPreset) localStorage.setItem('wm_work_card_active_preset', uiSettings.activeCardPreset);
+    else localStorage.removeItem('wm_work_card_active_preset');
+    if (uiSettings.basicGroupTitle) localStorage.setItem('wm_basic_group_title', uiSettings.basicGroupTitle);
+};
 window.getMasterPayload = function () {
     return {
         groups: window.groups || [],
+        uiSettings: window.getUiSettingsPayload(),
         // v1 하위 호환 (구 서버가 읽을 경우 대비)
         taskTypes: window.taskTypes || [],
         coworkers: window.coworkers || [],
@@ -248,7 +275,8 @@ window.getFullPayload = function () {
             coworkers: window.coworkers || [],
             statuses: window.statuses || [],
             equipments: window.equipments || [],
-            memoTags: window.memoTags || []
+            memoTags: window.memoTags || [],
+            uiSettings: window.getUiSettingsPayload()
         }
     };
 };
@@ -271,6 +299,7 @@ window.applyServerData = function (data) {
         }
         // 서버 데이터에는 이 기기에서 새로 추가된 기본 그룹(duration 등)이 없을 수 있으므로 보정
         window.ensureDefaultGroups && window.ensureDefaultGroups();
+        window.applyUiSettingsPayload(data.uiSettings);
 
         window.saveAllLocalOnly();
     } finally {
@@ -321,6 +350,7 @@ window.applyRemoteOperations = function (operations, master) {
                     }
                 }
             }
+            window.applyUiSettingsPayload(master.uiSettings);
         }
 
         window.saveAllLocalOnly();

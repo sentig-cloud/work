@@ -121,6 +121,8 @@ window.WorkExportUI = {
             .filter(c => c.customName !== c.name)
             .map(c => ({ id: c.id, name: c.customName }));
         localStorage.setItem('wm_export_conf', JSON.stringify({ ...this.state, customNames }));
+        window.markDirty?.('master', 'uiSettings', 'upsert');
+        window.scheduleSync?.();
     },
 
     open: function (y, mArr, sort) {
