@@ -290,11 +290,14 @@ window.getLogCardHtml = (l, indexStr = '') => {
         const getFreeWidgetLayout = (setting, defaultCols = 4) => {
             const legacyCols = Math.max(1, Math.min(4, Number(setting.cols || defaultCols)));
             const legacyWidth = legacyCols >= 4 ? 6 : legacyCols === 2 ? 3 : 2;
-            const w = Math.max(1, Math.min(6, Number(setting.w || legacyWidth)));
-            const h = Math.max(1, Math.min(4, Number(setting.h || (setting.height === 'two' ? 2 : 1))));
+            const fineGrid = Number(setting.grid) === 12;
+            const w = Math.max(1, Math.min(12, fineGrid ? Number(setting.w || legacyWidth * 2) : Number(setting.w || legacyWidth) * 2));
+            const h = Math.max(1, Math.min(8, fineGrid ? Number(setting.h || 2) : Number(setting.h || (setting.height === 'two' ? 2 : 1)) * 2));
             const hasPosition = Number(setting.x) > 0 && Number(setting.y) > 0;
-            const x = Math.max(1, Math.min(7 - w, Number(setting.x || 1)));
-            const y = Math.max(1, Number(setting.y || 1));
+            const rawX = fineGrid ? Number(setting.x || 1) : ((Number(setting.x || 1) - 1) * 2 + 1);
+            const rawY = fineGrid ? Number(setting.y || 1) : ((Number(setting.y || 1) - 1) * 2 + 1);
+            const x = Math.max(1, Math.min(13 - w, rawX));
+            const y = Math.max(1, rawY);
             return { w, h, x, y, hasPosition };
         };
         const freeWidgetStyle = (setting, defaultCols = 4) => {
@@ -309,7 +312,8 @@ window.getLogCardHtml = (l, indexStr = '') => {
             const setting = window.getWorkCardWidgetSettings()[`object:${key}`] || {};
             const layout = getFreeWidgetLayout(setting, defaultCols);
             const title = setting.titleVisible ? `<b class="work-card-object-title">${label}</b>` : '';
-            return `<div class="work-card-subwidget${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="object:${key}" data-card-section-label="${label}" style="${freeWidgetStyle(setting, defaultCols)}">${title}${inner}</div>`;
+            const fontSize = ['small','normal','large','xlarge'].includes(setting.fontSize) ? setting.fontSize : 'normal';
+            return `<div class="work-card-subwidget widget-font-${fontSize}${setting.emphasis ? ' is-emphasis' : ''}${setting.statusMode ? ' is-status-mode' : ''}${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="object:${key}" data-card-section-label="${label}" style="${freeWidgetStyle(setting, defaultCols)}">${title}${inner}</div>`;
         };
         const sortCardObjects = items => {
             const order = window.getWorkCardSectionOrder(items.map(html => html.match(/data-card-section-key="([^"]+)"/)?.[1]).filter(Boolean));
@@ -399,7 +403,8 @@ window.getLogCardHtml = (l, indexStr = '') => {
                     const setting = window.getWorkCardWidgetSettings()[section.key] || {};
                     const isContainer = section.key === 'work' || section.key === 'customer';
                     const layout = getFreeWidgetLayout(setting, 4);
-                    return `<div class="work-card-widget${isContainer ? ' is-container-widget' : ''}${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="${section.key}" data-card-section-label="${section.label || section.key}" style="${isContainer ? '' : freeWidgetStyle(setting, 4)}">${section.html}</div>`;
+                    const fontSize = ['small','normal','large','xlarge'].includes(setting.fontSize) ? setting.fontSize : 'normal';
+                    return `<div class="work-card-widget widget-font-${fontSize}${isContainer ? ' is-container-widget' : ''}${setting.emphasis ? ' is-emphasis' : ''}${setting.statusMode ? ' is-status-mode' : ''}${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="${section.key}" data-card-section-label="${section.label || section.key}" style="${isContainer ? '' : freeWidgetStyle(setting, 4)}">${section.html}</div>`;
                 }).join('')}</div>
             </div>
         `;

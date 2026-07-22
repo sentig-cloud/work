@@ -2332,13 +2332,12 @@
         overlay.innerHTML = `<div class="card-layout-editor card-free-editor w95-out" role="dialog" aria-modal="true">
             <div class="w95-titlebar"><span>카드 자유 배치</span><button type="button" class="w95-btn card-layout-close">X</button></div>
             <div class="card-free-toolbar">
-                <button type="button" class="w95-btn" data-free-action="w-minus">가로 −</button><b data-free-value="w">-</b><button type="button" class="w95-btn" data-free-action="w-plus">가로 ＋</button>
-                <button type="button" class="w95-btn" data-free-action="h-minus">세로 −</button><b data-free-value="h">-</b><button type="button" class="w95-btn" data-free-action="h-plus">세로 ＋</button>
-                <input type="color" class="card-free-color" value="#64748b" title="객체 색상"><button type="button" class="w95-btn" data-free-action="auto-color">자동색</button><button type="button" class="w95-btn" data-free-action="hide">보관</button>
+                <button type="button" class="w95-btn" data-free-action="size-minus">−</button><button type="button" class="w95-btn" data-free-action="size-plus">＋</button><button type="button" class="w95-btn is-active" data-free-action="axis">가로</button>
+                <button type="button" class="w95-btn card-free-advanced" data-free-action="title">제목</button><button type="button" class="w95-btn card-free-advanced" data-free-action="emphasis">강조</button><button type="button" class="w95-btn card-free-advanced" data-free-action="font">글자</button><button type="button" class="w95-btn card-free-advanced" data-free-action="status">상태</button>
+                <input type="color" class="card-free-color card-free-advanced" value="#64748b" title="객체 색상"><button type="button" class="w95-btn card-free-advanced" data-free-action="auto-color">자동색</button><button type="button" class="w95-btn" data-free-action="hide">보관</button>
             </div>
-            <div class="card-free-canvas" aria-label="6칸 카드 배치 영역"></div>
-            <div class="card-layout-editor-actions"><button type="button" class="w95-btn card-layout-reset">초기화</button></div>
-            <div class="card-free-tray"><b>보관함</b><div class="card-free-tray-items"></div></div>
+            <div class="card-free-canvas" aria-label="12칸 카드 배치 영역"></div>
+            <div class="card-free-tray"><b>보관함</b><div class="card-free-tray-items"></div><button type="button" class="w95-btn card-layout-reset">초기화</button></div>
         </div>`;
         document.body.appendChild(overlay);
         const canvas = overlay.querySelector('.card-free-canvas');
@@ -2349,20 +2348,29 @@
         let dragStart = null;
         let itemPressTimer = null;
         let itemPressStart = null;
-        let titleToggled = false;
+        let settingsUnlocked = false;
+        let sizeAxis = 'w';
+        const activeTouches = new Map();
+        let twoFingerY = 0;
+        let suppressItemClickUntil = 0;
 
         const legacySize = (setting, section) => {
             const oldCols = Number(setting.cols || section.dataset.widgetCols || 4);
+            const fineGrid = Number(setting.grid) === 12;
+            const oldW = Number(setting.w || (oldCols >= 4 ? 6 : oldCols === 2 ? 3 : 2));
+            const oldH = Number(setting.h || (setting.height === 'two' ? 2 : 1));
             return {
-                w: Math.max(1, Math.min(6, Number(setting.w || (oldCols >= 4 ? 6 : oldCols === 2 ? 3 : 2)))),
-                h: Math.max(1, Math.min(4, Number(setting.h || (setting.height === 'two' ? 2 : 1))))
+                w: Math.max(1, Math.min(12, fineGrid ? oldW : oldW * 2)),
+                h: Math.max(1, Math.min(8, fineGrid ? oldH : oldH * 2)),
+                x: fineGrid ? Number(setting.x || 0) : (Number(setting.x) > 0 ? (Number(setting.x) - 1) * 2 + 1 : 0),
+                y: fineGrid ? Number(setting.y || 0) : (Number(setting.y) > 0 ? (Number(setting.y) - 1) * 2 + 1 : 0)
             };
         };
         const overlaps = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
         const rectOf = item => ({ x:+item.dataset.x, y:+item.dataset.y, w:+item.dataset.w, h:+item.dataset.h });
         const persist = item => {
             const key = item.dataset.key;
-            settings[key] = { ...(settings[key] || {}), x:+item.dataset.x, y:+item.dataset.y, w:+item.dataset.w, h:+item.dataset.h, hidden:false };
+            settings[key] = { ...(settings[key] || {}), grid:12, x:+item.dataset.x, y:+item.dataset.y, w:+item.dataset.w, h:+item.dataset.h, hidden:false };
             localStorage.setItem(WIDGET_KEY, JSON.stringify(settings));
         };
         const place = item => {
@@ -2372,20 +2380,32 @@
         };
         const firstSpace = (w, h, ignore = null) => {
             const others = [...canvas.children].filter(item => item !== ignore).map(rectOf);
-            for (let y = 1; y < 60; y++) for (let x = 1; x <= 7 - w; x++) {
+            for (let y = 1; y < 120; y++) for (let x = 1; x <= 13 - w; x++) {
                 const next = { x, y, w, h };
                 if (!others.some(other => overlaps(next, other))) return { x, y };
             }
-            return { x:1, y:60 };
+            return { x:1, y:120 };
         };
         const select = item => {
-            selected?.classList.remove('is-selected');
+            selected?.classList.remove('is-selected','is-settings-open');
             selected = item;
+            settingsUnlocked = false;
+            overlay.classList.remove('is-object-settings');
             if (!item) return;
             item.classList.add('is-selected');
-            overlay.querySelector('[data-free-value="w"]').textContent = `${item.dataset.w}/6`;
-            overlay.querySelector('[data-free-value="h"]').textContent = `${item.dataset.h}줄`;
             colorInput.value = settings[item.dataset.key]?.color || '#64748b';
+        };
+        const refreshAdvancedState = () => {
+            if (!selected) return;
+            const setting = settings[selected.dataset.key] || {};
+            ['title','emphasis','status'].forEach(action => {
+                const key = action === 'title' ? 'titleVisible' : action === 'status' ? 'statusMode' : action;
+                overlay.querySelector(`[data-free-action="${action}"]`)?.classList.toggle('is-active', !!setting[key]);
+            });
+            const fontLabels = { small:'글자 소', normal:'글자 중', large:'글자 대', xlarge:'글자 특대' };
+            const fontButton = overlay.querySelector('[data-free-action="font"]');
+            if (fontButton) fontButton.textContent = fontLabels[setting.fontSize || 'normal'];
+            selected.style.setProperty('--widget-font-size', { small:'.64rem', normal:'.76rem', large:'.92rem', xlarge:'1.08rem' }[setting.fontSize || 'normal']);
         };
         const addToTray = (key, label) => {
             if ([...tray.children].some(button => button.dataset.key === key)) return;
@@ -2402,17 +2422,22 @@
             const item = document.createElement('div');
             item.className = 'card-free-item'; item.dataset.key = key; item.dataset.label = label;
             const size = legacySize(setting, section); item.dataset.w = size.w; item.dataset.h = size.h;
-            const pos = Number(setting.x) > 0 && Number(setting.y) > 0 ? { x:+setting.x, y:+setting.y } : firstSpace(size.w, size.h);
-            item.dataset.x = Math.max(1, Math.min(7 - size.w, pos.x)); item.dataset.y = Math.max(1, pos.y);
+            const pos = size.x > 0 && size.y > 0 ? { x:size.x, y:size.y } : firstSpace(size.w, size.h);
+            item.dataset.x = Math.max(1, Math.min(13 - size.w, pos.x)); item.dataset.y = Math.max(1, pos.y);
             item.innerHTML = `<span class="card-free-grip">⠿</span><span class="card-free-item-label"></span><div class="card-free-preview"></div>`;
             item.querySelector('.card-free-item-label').textContent = label;
             const preview = section.cloneNode(true); preview.classList.remove('is-widget-hidden'); preview.removeAttribute('style');
+            preview.classList.remove('widget-font-small','widget-font-normal','widget-font-large','widget-font-xlarge');
             preview.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
             item.querySelector('.card-free-preview').appendChild(preview);
             const titleVisible = typeof setting.titleVisible === 'boolean'
                 ? setting.titleVisible
                 : !!preview.querySelector('.work-card-object-title,.work-info-line.custom b');
+            settings[key] = { ...(settings[key] || {}), titleVisible, fontSize:setting.fontSize || 'normal' };
             item.classList.toggle('is-title-visible', titleVisible);
+            item.classList.toggle('is-emphasis', !!setting.emphasis);
+            item.classList.toggle('is-status-mode', !!setting.statusMode);
+            item.dataset.fontSize = setting.fontSize || 'normal';
             if (setting.color) item.style.setProperty('--widget-accent', setting.color);
             canvas.appendChild(item); place(item); persist(item);
         });
@@ -2444,60 +2469,87 @@
                 return;
             }
             const item = event.target.closest('.card-free-item');
-            if (item) select(item);
+            if (item && Date.now() >= suppressItemClickUntil) select(item);
             const action = event.target.closest('[data-free-action]')?.dataset.freeAction;
             if (!action || !selected) return;
             if (action === 'hide') {
                 settings[selected.dataset.key] = { ...(settings[selected.dataset.key] || {}), hidden:true };
                 localStorage.setItem(WIDGET_KEY, JSON.stringify(settings)); addToTray(selected.dataset.key, selected.dataset.label); selected.remove(); select(null); return;
             }
+            if (action === 'axis') { sizeAxis = sizeAxis === 'w' ? 'h' : 'w'; event.target.textContent = sizeAxis === 'w' ? '가로' : '세로'; return; }
+            if (['title','emphasis','font','status','auto-color'].includes(action) && !settingsUnlocked) return;
+            if (action === 'title') { settings[selected.dataset.key].titleVisible = !settings[selected.dataset.key].titleVisible; selected.classList.toggle('is-title-visible', settings[selected.dataset.key].titleVisible); }
+            if (action === 'emphasis') { settings[selected.dataset.key].emphasis = !settings[selected.dataset.key].emphasis; selected.classList.toggle('is-emphasis', settings[selected.dataset.key].emphasis); }
+            if (action === 'font') {
+                const sizes = ['small','normal','large','xlarge']; const current = settings[selected.dataset.key].fontSize || 'normal';
+                settings[selected.dataset.key].fontSize = sizes[(sizes.indexOf(current) + 1) % sizes.length]; selected.dataset.fontSize = settings[selected.dataset.key].fontSize;
+            }
+            if (action === 'status') {
+                settings[selected.dataset.key].statusMode = !settings[selected.dataset.key].statusMode; selected.classList.toggle('is-status-mode', settings[selected.dataset.key].statusMode);
+                if (settings[selected.dataset.key].statusMode) { selected.dataset.w = Math.min(+selected.dataset.w, 3); selected.dataset.h = Math.min(+selected.dataset.h, 2); }
+            }
             if (action === 'auto-color') { settings[selected.dataset.key].color = ''; selected.style.removeProperty('--widget-accent'); colorInput.value = '#64748b'; }
-            if (action.startsWith('w-')) selected.dataset.w = Math.max(1, Math.min(6, +selected.dataset.w + (action === 'w-plus' ? 1 : -1)));
-            if (action.startsWith('h-')) selected.dataset.h = Math.max(1, Math.min(4, +selected.dataset.h + (action === 'h-plus' ? 1 : -1)));
-            selected.dataset.x = Math.min(+selected.dataset.x, 7 - +selected.dataset.w);
+            if (action === 'size-minus' || action === 'size-plus') {
+                const delta = action === 'size-plus' ? 1 : -1;
+                const limit = sizeAxis === 'w' ? 12 : 8;
+                selected.dataset[sizeAxis] = Math.max(1, Math.min(limit, +selected.dataset[sizeAxis] + delta));
+            }
+            selected.dataset.x = Math.min(+selected.dataset.x, 13 - +selected.dataset.w);
             const collision = [...canvas.children].some(item => item !== selected && overlaps(rectOf(selected), rectOf(item)));
             if (collision) {
                 const space = firstSpace(+selected.dataset.w, +selected.dataset.h, selected);
                 selected.dataset.x = space.x; selected.dataset.y = space.y;
             }
-            place(selected); persist(selected); select(selected);
+            place(selected); persist(selected); refreshAdvancedState();
         });
         colorInput.addEventListener('input', () => {
-            if (!selected) return;
+            if (!selected || !settingsUnlocked) return;
             settings[selected.dataset.key] = { ...(settings[selected.dataset.key] || {}), color:colorInput.value };
             selected.style.setProperty('--widget-accent', colorInput.value); localStorage.setItem(WIDGET_KEY, JSON.stringify(settings));
         });
         canvas.addEventListener('pointerdown', event => {
+            if (event.pointerType === 'touch') activeTouches.set(event.pointerId, event.clientY);
+            if (activeTouches.size > 1) {
+                clearTimeout(itemPressTimer); dragged?.classList.remove('is-moving'); dragged = null;
+                twoFingerY = [...activeTouches.values()].reduce((sum, y) => sum + y, 0) / activeTouches.size;
+                return;
+            }
             const item = event.target.closest('.card-free-item'); if (!item) return;
-            select(item); dragged = item; dragStart = { ...rectOf(item) }; itemPressStart = { x:event.clientX, y:event.clientY }; titleToggled = false;
+            select(item); dragged = item; dragStart = { ...rectOf(item) }; itemPressStart = { x:event.clientX, y:event.clientY };
             clearTimeout(itemPressTimer);
             itemPressTimer = setTimeout(() => {
                 if (!dragged) return;
-                titleToggled = true;
-                const current = typeof settings[dragged.dataset.key]?.titleVisible === 'boolean'
-                    ? settings[dragged.dataset.key].titleVisible
-                    : !!dragged.querySelector('.work-card-object-title,.work-info-line.custom b');
-                settings[dragged.dataset.key] = { ...(settings[dragged.dataset.key] || {}), titleVisible:!current };
-                localStorage.setItem(WIDGET_KEY, JSON.stringify(settings));
-                dragged.classList.toggle('is-title-visible', !current);
+                settingsUnlocked = true;
+                suppressItemClickUntil = Date.now() + 900;
+                overlay.classList.add('is-object-settings');
+                dragged.classList.add('is-settings-open');
+                refreshAdvancedState();
                 navigator.vibrate?.(30);
             }, 700);
             item.setPointerCapture?.(event.pointerId); event.preventDefault();
         });
         canvas.addEventListener('pointermove', event => {
+            if (event.pointerType === 'touch' && activeTouches.has(event.pointerId)) {
+                activeTouches.set(event.pointerId, event.clientY);
+                if (activeTouches.size > 1) {
+                    const nextY = [...activeTouches.values()].reduce((sum, y) => sum + y, 0) / activeTouches.size;
+                    canvas.scrollTop += twoFingerY - nextY; twoFingerY = nextY; return;
+                }
+            }
             if (!dragged) return;
             if (itemPressStart && Math.hypot(event.clientX - itemPressStart.x, event.clientY - itemPressStart.y) > 7) {
                 clearTimeout(itemPressTimer); dragged.classList.add('is-moving');
             }
-            if (titleToggled) return;
+            if (settingsUnlocked) return;
             const rect = canvas.getBoundingClientRect();
-            dragged.dataset.x = Math.max(1, Math.min(7 - +dragged.dataset.w, Math.floor((event.clientX - rect.left) / (rect.width / 6)) + 1));
-            dragged.dataset.y = Math.max(1, Math.floor((event.clientY - rect.top) / 46) + 1); place(dragged);
+            dragged.dataset.x = Math.max(1, Math.min(13 - +dragged.dataset.w, Math.floor((event.clientX - rect.left) / (rect.width / 12)) + 1));
+            dragged.dataset.y = Math.max(1, Math.floor((event.clientY - rect.top + canvas.scrollTop) / 28) + 1); place(dragged);
         });
-        const drop = () => {
+        const drop = event => {
+            if (event?.pointerType === 'touch') activeTouches.delete(event.pointerId);
             if (!dragged) return;
             clearTimeout(itemPressTimer);
-            if (titleToggled) { dragged.classList.remove('is-moving'); dragged = null; dragStart = null; itemPressStart = null; return; }
+            if (settingsUnlocked) { dragged.classList.remove('is-moving'); dragged = null; dragStart = null; itemPressStart = null; return; }
             const hit = [...canvas.children].find(item => item !== dragged && overlaps(rectOf(dragged), rectOf(item)));
             if (hit) { hit.dataset.x = dragStart.x; hit.dataset.y = dragStart.y; place(hit); persist(hit); }
             dragged.classList.remove('is-moving'); persist(dragged); dragged = null; dragStart = null; itemPressStart = null;
