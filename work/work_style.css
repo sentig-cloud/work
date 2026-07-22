@@ -1110,3 +1110,8 @@ input, textarea, [contenteditable="true"] {
 .work-card-widget:not(.is-container-widget) .work-info-line span { color:inherit !important; }
 .work-card-subwidget,.work-card-subwidget * { font-size:var(--widget-fit-font,var(--widget-font-size,.78rem)) !important; }
 .work-card-subwidget.is-emphasis,.work-card-subwidget.is-emphasis * { font-weight:900 !important; }
+
+/* 작업일지 카드의 완료 상태는 값만 남기고 카드 전체 전용 서식은 사용하지 않는다. */
+.log-card.card-work.status-completed { background:var(--w-gray) !important; border:2px solid !important; border-color:var(--w-white) var(--w-black) var(--w-black) var(--w-white) !important; }
+.log-card.card-work.status-completed .log-content,
+.log-card.card-work.status-completed .card-content-zone div { opacity:1 !important; }

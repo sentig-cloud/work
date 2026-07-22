@@ -1702,10 +1702,11 @@
         const qty = document.getElementById("tagQtyDisplay");
         const numberBtn = document.getElementById("tagShowCountBtn");
         const monthlyBtn = document.getElementById("tagMonthlyBtn");
-        const countBtn = document.getElementById("tagCountSuffixBtn");
+        const cardDisplayBtn = document.getElementById("tagCardDisplayBtn");
         const dupBtn = document.getElementById("tagDuplicateBtn");
         const qtyRow = document.getElementById("tagQtyControlRow");
         const groupId = window.typeToGroupId(window.editingTagType);
+        const editingTag = getTagArray(window.editingTagType)?.[window.editingTagIndex];
         const paintToggle = (button, on, label, available = true, hint = '') => {
             if (!button) return;
             button.disabled = !available;
@@ -1719,8 +1720,8 @@
         if (qtyRow) qtyRow.style.display = 'flex';
         paintToggle(numberBtn, window.groupShowsNumber(groupId), '숫자', true, '태그 앞에 이번 달 집계 숫자를 표시');
         paintToggle(monthlyBtn, window.groupIncludesMonthly(groupId), '월별', true, '이 그룹을 월별 집계에 포함');
-        paintToggle(countBtn, window.groupShowsCount(groupId), '갯수', true,
-            '태그 뒤에 직접 설정한 갯수를 표시');
+        paintToggle(cardDisplayBtn, !!editingTag?.cardCountVisible, '카드에 표시', true,
+            '이 항목의 집계 숫자를 작업일지 카드에 (갯수) 형식으로 표시');
         if (dupBtn) {
             const toggleable = canToggleSelectionMode(groupId);
             const g = window.getGroupById(groupId);
@@ -1784,16 +1785,15 @@
         window.renderChangedTagType(window.editingTagType);
     };
 
-    // "갯수": 그룹 전체 설정 — 켜면 태그 이름 뒤에 (개수)가 붙는다(장비의 실사용 수량 표시와는 별개)
-    window.toggleTagShowQty = () => {
-        const groupId = window.typeToGroupId(window.editingTagType);
-        const g = window.getGroupById(groupId);
-        if (!g) return;
-        g.showCount = !window.groupShowsCount(groupId);
+    window.toggleTagCardDisplay = () => {
+        const tag = getTagArray(window.editingTagType)?.[window.editingTagIndex];
+        if (!tag) return;
+        tag.cardCountVisible = !tag.cardCountVisible;
         window.refreshTagEditControls();
         window.markDirty?.("master", "groups", "upsert");
         if (window.saveLocal) window.saveLocal("group-settings");
         window.renderChangedTagType(window.editingTagType);
+        window.renderMain?.();
     };
 
     // 이름은 텍스트 입력이라 즉시 저장이 어려우므로, 포커스가 빠지거나(blur) 엔터를 누르면 그 순간 반영+저장

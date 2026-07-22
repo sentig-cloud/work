@@ -275,9 +275,24 @@ window.getLogCardHtml = (l, indexStr = '') => {
     if (isCommuteDetailCard || isCommuteCard || isMemoOrPhoto) taskNoHtml = '';
 
     if (l.cat === 'work') {
+        const formatCardTagValue = (groupId, name, workQty = 1) => {
+            const group = window.getGroupById?.(groupId);
+            const tag = group?.tags?.find(item => item.name === name);
+            const values = [];
+            if (tag?.cardCountVisible) {
+                const monthly = window.groupShowsNumber?.(groupId) && window.isTagNumberEnabled?.(tag) !== false
+                    ? Number(window.getGroupTagMonthlyCount?.(groupId, name) || 0) : 0;
+                const savedCount = window.groupShowsCount?.(groupId) ? Number(tag.count || 0) : 0;
+                if (monthly > 0) values.push(monthly);
+                if (savedCount > 0 && !values.includes(savedCount)) values.push(savedCount);
+            }
+            const qty = Number(workQty || 1);
+            if (qty > 1 && !values.includes(qty)) values.push(qty);
+            return `${name}${values.map(value => ` (${value})`).join('')}`;
+        };
         const formatWorkQtyNames = (names, groupId) => (names || []).map(name => {
             const qty = Number(l.tagQuantities?.[groupId]?.[name] || 1);
-            return qty > 1 ? `${name} × ${qty}` : name;
+            return formatCardTagValue(groupId, name, qty);
         }).join(', ');
         seqHtml = '';
         taskNoHtml = '';
@@ -289,7 +304,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
             '공사': 'sticker-construction', '이관': 'sticker-transfer'
         })[l.status] || 'sticker-default';
         const statusBadge = l.status
-            ? `<span class="work-status-sticker ${statusStickerClass}" style="${excludedCardStyle('statuses')}">${l.status}</span>`
+            ? `<span class="work-status-sticker ${statusStickerClass}" style="${excludedCardStyle('statuses')}">${formatCardTagValue('statuses', l.status)}</span>`
             : `<span class="work-status-sticker is-empty">상태 없음</span>`;
         const inlineTaskNo = l.taskNo
             ? `<button type="button" class="task-no-btn work-task-no" onclick="event.stopPropagation(); window.toggleLogOx('${l.id}')">${l.taskNo}</button>`
@@ -354,7 +369,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
         if (l.address) customerDetails.push(makeCardObject('address','주소',`<div class="work-info-line address"><i class="fa-solid fa-map-marker-alt"></i><span>${l.address}</span></div>`));
         if (l.equips) {
             let eqStr = Object.entries(l.equips).filter(e => e[1] > 0)
-                .map(e => Number(e[1]) > 1 ? `${e[0]} ${e[1]}` : e[0]).join(', ');
+                .map(e => formatCardTagValue('equipments', e[0], Number(e[1]) || 1)).join(', ');
             if (eqStr) customerDetails.push(makeCardObject('equipment','장비',`<div class="work-info-line equipment" style="${excludedCardStyle('equipments')}"><i class="fa-solid fa-box"></i><span>${eqStr}</span></div>`,2));
         }
 
@@ -377,7 +392,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
             const val = l.customGroups && l.customGroups[g.id];
             if (val && (Array.isArray(val) ? val.length > 0 : val)) {
                 const quantities = l.tagQuantities && l.tagQuantities[g.id] || {};
-                const valStr = Array.isArray(val) ? val.map(name => Number(quantities[name] || 1) > 1 ? `${name} × ${Number(quantities[name])}` : name).join(', ') : String(val);
+                const valStr = Array.isArray(val) ? val.map(name => formatCardTagValue(g.id, name, Number(quantities[name] || 1))).join(', ') : formatCardTagValue(g.id, String(val));
                 const safeGroupTitle = String(g.title || '선택태그').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 const palette = customCardPalette[groupIndex % customCardPalette.length];
                 const customWidgetSetting = window.getWorkCardWidgetSettings()[`custom:${g.id}`] || {};
