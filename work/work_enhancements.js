@@ -2325,93 +2325,160 @@
         const sections = [...card.querySelectorAll('.work-card-subwidget,.work-card-widget')]
             .filter(section => section.classList.contains('work-card-subwidget') || section.dataset.cardSectionKey?.startsWith('custom:'));
         if (!sections.length) return;
+        const settings = readWidgetSettings();
         const overlay = document.createElement('div');
         overlay.id = 'workCardLayoutEditor';
         overlay.className = 'card-layout-editor-layer';
-        overlay.innerHTML = `<div class="card-layout-editor w95-out" role="dialog" aria-modal="true">
-            <div class="w95-titlebar"><span>카드 내부 배치</span><button type="button" class="w95-btn card-layout-close">X</button></div>
-            <div class="card-layout-help">손잡이를 끌거나 ▲ ▼ 버튼으로 가로 칸의 위·아래 순서를 바꾸세요.</div>
-            <div class="card-layout-edit-list"></div>
-            <div class="card-layout-editor-actions"><button type="button" class="w95-btn card-layout-reset">기본 순서</button><button type="button" class="w95-btn card-layout-done">저장·닫기</button></div>
+        overlay.innerHTML = `<div class="card-layout-editor card-free-editor w95-out" role="dialog" aria-modal="true">
+            <div class="w95-titlebar"><span>카드 자유 배치</span><button type="button" class="w95-btn card-layout-close">X</button></div>
+            <div class="card-layout-help">객체를 눌러 선택하고 빈 칸으로 끌어 놓으세요. 겹치면 두 객체의 위치가 바뀝니다.</div>
+            <div class="card-free-toolbar">
+                <strong class="card-free-selected">객체를 선택하세요</strong>
+                <span>가로</span><button type="button" class="w95-btn" data-free-action="w-minus">−</button><b data-free-value="w">-</b><button type="button" class="w95-btn" data-free-action="w-plus">＋</button>
+                <span>세로</span><button type="button" class="w95-btn" data-free-action="h-minus">−</button><b data-free-value="h">-</b><button type="button" class="w95-btn" data-free-action="h-plus">＋</button>
+                <input type="color" class="card-free-color" value="#64748b" title="객체 색상"><button type="button" class="w95-btn" data-free-action="auto-color">자동색</button><button type="button" class="w95-btn" data-free-action="hide">보관</button>
+            </div>
+            <div class="card-free-canvas" aria-label="6칸 카드 배치 영역"></div>
+            <div class="card-free-tray"><b>보관함</b><div class="card-free-tray-items"></div></div>
+            <div class="card-layout-editor-actions"><button type="button" class="w95-btn card-layout-reset">기본 배치</button><button type="button" class="w95-btn card-layout-done">저장·닫기</button></div>
         </div>`;
-        const list = overlay.querySelector('.card-layout-edit-list');
+        document.body.appendChild(overlay);
+        const canvas = overlay.querySelector('.card-free-canvas');
+        const tray = overlay.querySelector('.card-free-tray-items');
+        const selectedLabel = overlay.querySelector('.card-free-selected');
+        const colorInput = overlay.querySelector('.card-free-color');
+        let selected = null;
+        let dragged = null;
+        let dragStart = null;
+
+        const legacySize = (setting, section) => {
+            const oldCols = Number(setting.cols || section.dataset.widgetCols || 4);
+            return {
+                w: Math.max(1, Math.min(6, Number(setting.w || (oldCols >= 4 ? 6 : oldCols === 2 ? 3 : 2)))),
+                h: Math.max(1, Math.min(4, Number(setting.h || (setting.height === 'two' ? 2 : 1))))
+            };
+        };
+        const overlaps = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+        const rectOf = item => ({ x:+item.dataset.x, y:+item.dataset.y, w:+item.dataset.w, h:+item.dataset.h });
+        const persist = item => {
+            const key = item.dataset.key;
+            settings[key] = { ...(settings[key] || {}), x:+item.dataset.x, y:+item.dataset.y, w:+item.dataset.w, h:+item.dataset.h, hidden:false };
+            localStorage.setItem(WIDGET_KEY, JSON.stringify(settings));
+        };
+        const place = item => {
+            const { x, y, w, h } = rectOf(item);
+            item.style.gridColumn = `${x} / span ${w}`;
+            item.style.gridRow = `${y} / span ${h}`;
+        };
+        const firstSpace = (w, h, ignore = null) => {
+            const others = [...canvas.children].filter(item => item !== ignore).map(rectOf);
+            for (let y = 1; y < 60; y++) for (let x = 1; x <= 7 - w; x++) {
+                const next = { x, y, w, h };
+                if (!others.some(other => overlaps(next, other))) return { x, y };
+            }
+            return { x:1, y:60 };
+        };
+        const select = item => {
+            selected?.classList.remove('is-selected');
+            selected = item;
+            if (!item) return;
+            item.classList.add('is-selected');
+            selectedLabel.textContent = item.dataset.label;
+            overlay.querySelector('[data-free-value="w"]').textContent = `${item.dataset.w}/6`;
+            overlay.querySelector('[data-free-value="h"]').textContent = `${item.dataset.h}줄`;
+            colorInput.value = settings[item.dataset.key]?.color || '#64748b';
+        };
+        const addToTray = (key, label) => {
+            if ([...tray.children].some(button => button.dataset.key === key)) return;
+            const button = document.createElement('button');
+            button.type = 'button'; button.className = 'w95-btn card-free-restore'; button.dataset.key = key; button.textContent = label;
+            tray.appendChild(button);
+        };
+
         sections.forEach((section, index) => {
+            const key = section.dataset.cardSectionKey;
+            const setting = settings[key] || {};
+            const label = section.dataset.cardSectionLabel || `객체 ${index + 1}`;
+            if (setting.hidden) { addToTray(key, label); return; }
             const item = document.createElement('div');
-            item.className = 'card-layout-edit-item w95-out';
-            item.dataset.key = section.dataset.cardSectionKey;
-            const setting = readWidgetSettings()[item.dataset.key] || {};
-            const heightLabel = { one:'1줄', two:'2줄', auto:'자동' }[setting.height || 'auto'];
-            item.innerHTML = `<span class="card-layout-drag-handle" title="끌어서 이동">⠿</span><span class="card-layout-edit-label"></span><button type="button" class="w95-btn card-layout-size">${Number(setting.cols || 4)}/4</button><button type="button" class="w95-btn card-layout-height">${heightLabel}</button><button type="button" class="w95-btn card-layout-container" title="작업/고객 칸 이동">↔</button><input type="color" class="card-layout-color" value="${setting.color || '#64748b'}"><button type="button" class="w95-btn card-layout-auto-color">A</button><button type="button" class="w95-btn card-layout-hide">${setting.hidden ? '넣기' : '빼기'}</button>`;
-            item.querySelector('.card-layout-edit-label').textContent = section.dataset.cardSectionLabel || `칸 ${index + 1}`;
-            if (!item.dataset.key.startsWith('object:')) item.querySelector('.card-layout-container').disabled = true;
-            list.appendChild(item);
+            item.className = 'card-free-item'; item.dataset.key = key; item.dataset.label = label;
+            const size = legacySize(setting, section); item.dataset.w = size.w; item.dataset.h = size.h;
+            const pos = Number(setting.x) > 0 && Number(setting.y) > 0 ? { x:+setting.x, y:+setting.y } : firstSpace(size.w, size.h);
+            item.dataset.x = Math.max(1, Math.min(7 - size.w, pos.x)); item.dataset.y = Math.max(1, pos.y);
+            item.innerHTML = `<span class="card-free-grip">⠿</span><span class="card-free-item-label"></span><div class="card-free-preview"></div>`;
+            item.querySelector('.card-free-item-label').textContent = label;
+            const preview = section.cloneNode(true); preview.classList.remove('is-widget-hidden'); preview.removeAttribute('style');
+            preview.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
+            item.querySelector('.card-free-preview').appendChild(preview);
+            if (setting.color) item.style.setProperty('--widget-accent', setting.color);
+            canvas.appendChild(item); place(item); persist(item);
         });
+        const knownLabels = {
+            'object:taskType':'작업유형', 'object:content':'작업내용', 'object:note':'특이사항',
+            'object:customer':'고객명', 'object:address':'주소', 'object:equipment':'장비', 'object:duration':'작업시간'
+        };
+        Object.entries(settings).forEach(([key, setting]) => {
+            if (setting?.hidden && (key.startsWith('object:') || key.startsWith('custom:'))) {
+                const source = sections.find(section => section.dataset.cardSectionKey === key);
+                addToTray(key, source?.dataset.cardSectionLabel || knownLabels[key] || key.replace(/^custom:/, '선택태그 '));
+            }
+        });
+
+        const finish = () => { closeEditor(); window.updateUI?.(); };
         overlay.addEventListener('click', event => {
-            const item = event.target.closest('.card-layout-edit-item');
-            if (event.target.closest('.card-layout-close,.card-layout-done')) return closeEditor();
+            if (event.target === overlay || event.target.closest('.card-layout-close,.card-layout-done')) return finish();
             if (event.target.closest('.card-layout-reset')) {
-                localStorage.removeItem(WIDGET_KEY);
-                const byKey = new Map([...list.children].map(el => [el.dataset.key, el]));
-                ['work', 'customer'].forEach(key => byKey.get(key) && list.appendChild(byKey.get(key)));
-                [...byKey.keys()].filter(key => key.startsWith('custom:')).forEach(key => list.appendChild(byKey.get(key)));
-                saveEditorOrder(list);
-                window.updateUI?.();
+                localStorage.removeItem(WIDGET_KEY); localStorage.removeItem(STORAGE_KEY); return finish();
+            }
+            const restore = event.target.closest('.card-free-restore');
+            if (restore) {
+                settings[restore.dataset.key] = { ...(settings[restore.dataset.key] || {}), hidden:false };
+                localStorage.setItem(WIDGET_KEY, JSON.stringify(settings));
+                finish();
                 return;
             }
-            if (!item) return;
-            if (event.target.closest('.card-layout-size')) {
-                const settings = readWidgetSettings(); const current = Number(settings[item.dataset.key]?.cols || 4);
-                const next = current === 4 ? 2 : current === 2 ? 1 : 4;
-                writeWidgetSetting(item.dataset.key, { cols:next }); event.target.textContent = `${next}/4`;
+            const item = event.target.closest('.card-free-item');
+            if (item) select(item);
+            const action = event.target.closest('[data-free-action]')?.dataset.freeAction;
+            if (!action || !selected) return;
+            if (action === 'hide') {
+                settings[selected.dataset.key] = { ...(settings[selected.dataset.key] || {}), hidden:true };
+                localStorage.setItem(WIDGET_KEY, JSON.stringify(settings)); addToTray(selected.dataset.key, selected.dataset.label); selected.remove(); select(null); return;
             }
-            if (event.target.closest('.card-layout-height')) {
-                const current = readWidgetSettings()[item.dataset.key]?.height || 'auto';
-                const next = current === 'auto' ? 'one' : current === 'one' ? 'two' : 'auto';
-                writeWidgetSetting(item.dataset.key, { height:next });
-                event.target.textContent = { one:'1줄', two:'2줄', auto:'자동' }[next];
+            if (action === 'auto-color') { settings[selected.dataset.key].color = ''; selected.style.removeProperty('--widget-accent'); colorInput.value = '#64748b'; }
+            if (action.startsWith('w-')) selected.dataset.w = Math.max(1, Math.min(6, +selected.dataset.w + (action === 'w-plus' ? 1 : -1)));
+            if (action.startsWith('h-')) selected.dataset.h = Math.max(1, Math.min(4, +selected.dataset.h + (action === 'h-plus' ? 1 : -1)));
+            selected.dataset.x = Math.min(+selected.dataset.x, 7 - +selected.dataset.w);
+            const collision = [...canvas.children].some(item => item !== selected && overlaps(rectOf(selected), rectOf(item)));
+            if (collision) {
+                const space = firstSpace(+selected.dataset.w, +selected.dataset.h, selected);
+                selected.dataset.x = space.x; selected.dataset.y = space.y;
             }
-            if (event.target.closest('.card-layout-container') && item.dataset.key.startsWith('object:')) {
-                const defaults = ['object:customer','object:address','object:equipment'];
-                const current = readWidgetSettings()[item.dataset.key]?.container || (defaults.includes(item.dataset.key) ? 'customer' : 'work');
-                writeWidgetSetting(item.dataset.key, { container:current === 'work' ? 'customer' : 'work' });
-            }
-            if (event.target.closest('.card-layout-auto-color')) {
-                writeWidgetSetting(item.dataset.key, { color:'' });
-                item.querySelector('.card-layout-color').value = '#64748b';
-            }
-            if (event.target.closest('.card-layout-hide')) {
-                const hidden = !(readWidgetSettings()[item.dataset.key]?.hidden);
-                writeWidgetSetting(item.dataset.key, { hidden }); event.target.textContent = hidden ? '넣기' : '빼기'; item.classList.toggle('is-in-tray', hidden);
-            }
-            saveEditorOrder(list);
+            place(selected); persist(selected); select(selected);
         });
-        list.addEventListener('change', event => {
-            if (!event.target.matches('.card-layout-color')) return;
-            const item = event.target.closest('.card-layout-edit-item');
-            if (item) writeWidgetSetting(item.dataset.key, { color:event.target.value });
+        colorInput.addEventListener('input', () => {
+            if (!selected) return;
+            settings[selected.dataset.key] = { ...(settings[selected.dataset.key] || {}), color:colorInput.value };
+            selected.style.setProperty('--widget-accent', colorInput.value); localStorage.setItem(WIDGET_KEY, JSON.stringify(settings));
         });
-        overlay.addEventListener('click', event => { if (event.target === overlay) closeEditor(); });
-
-        let dragged = null;
-        const stopDrag = () => { dragged?.classList.remove('is-moving'); dragged = null; };
-        list.addEventListener('pointerdown', event => {
-            const handle = event.target.closest('.card-layout-drag-handle');
-            if (!handle) return;
-            dragged = handle.closest('.card-layout-edit-item');
-            dragged.classList.add('is-moving');
-            handle.setPointerCapture?.(event.pointerId);
-            event.preventDefault();
+        canvas.addEventListener('pointerdown', event => {
+            const item = event.target.closest('.card-free-item'); if (!item) return;
+            select(item); dragged = item; dragStart = { ...rectOf(item) }; item.classList.add('is-moving');
+            item.setPointerCapture?.(event.pointerId); event.preventDefault();
         });
-        list.addEventListener('pointermove', event => {
+        canvas.addEventListener('pointermove', event => {
             if (!dragged) return;
-            const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('.card-layout-edit-item');
-            if (!target || target === dragged || target.parentElement !== list) return;
-            const rect = target.getBoundingClientRect();
-            list.insertBefore(dragged, event.clientY < rect.top + rect.height / 2 ? target : target.nextElementSibling);
+            const rect = canvas.getBoundingClientRect();
+            dragged.dataset.x = Math.max(1, Math.min(7 - +dragged.dataset.w, Math.floor((event.clientX - rect.left) / (rect.width / 6)) + 1));
+            dragged.dataset.y = Math.max(1, Math.floor((event.clientY - rect.top) / 46) + 1); place(dragged);
         });
-        list.addEventListener('pointerup', () => { if (dragged) saveEditorOrder(list); stopDrag(); });
-        list.addEventListener('pointercancel', stopDrag);
-        document.body.appendChild(overlay);
+        const drop = () => {
+            if (!dragged) return;
+            const hit = [...canvas.children].find(item => item !== dragged && overlaps(rectOf(dragged), rectOf(item)));
+            if (hit) { hit.dataset.x = dragStart.x; hit.dataset.y = dragStart.y; place(hit); persist(hit); }
+            dragged.classList.remove('is-moving'); persist(dragged); dragged = null; dragStart = null;
+        };
+        canvas.addEventListener('pointerup', drop); canvas.addEventListener('pointercancel', drop);
     };
 
     const cancelPress = () => { clearTimeout(pressTimer); pressTimer = null; pressCard = null; };

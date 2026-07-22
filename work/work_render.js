@@ -287,12 +287,28 @@ window.getLogCardHtml = (l, indexStr = '') => {
         let customerDetails = [];
         let workDetails = [];
         let customDetails = [];
+        const getFreeWidgetLayout = (setting, defaultCols = 4) => {
+            const legacyCols = Math.max(1, Math.min(4, Number(setting.cols || defaultCols)));
+            const legacyWidth = legacyCols >= 4 ? 6 : legacyCols === 2 ? 3 : 2;
+            const w = Math.max(1, Math.min(6, Number(setting.w || legacyWidth)));
+            const h = Math.max(1, Math.min(4, Number(setting.h || (setting.height === 'two' ? 2 : 1))));
+            const hasPosition = Number(setting.x) > 0 && Number(setting.y) > 0;
+            const x = Math.max(1, Math.min(7 - w, Number(setting.x || 1)));
+            const y = Math.max(1, Number(setting.y || 1));
+            return { w, h, x, y, hasPosition };
+        };
+        const freeWidgetStyle = (setting, defaultCols = 4) => {
+            const layout = getFreeWidgetLayout(setting, defaultCols);
+            const color = /^#[0-9a-f]{6}$/i.test(setting.color || '') ? setting.color : '';
+            const placement = layout.hasPosition
+                ? `grid-column:${layout.x} / span ${layout.w};grid-row:${layout.y} / span ${layout.h};`
+                : `grid-column:span ${layout.w};grid-row:span ${layout.h};`;
+            return `${placement}${color ? `--widget-accent:${color};` : ''}`;
+        };
         const makeCardObject = (key, label, inner, defaultCols = 4) => {
             const setting = window.getWorkCardWidgetSettings()[`object:${key}`] || {};
-            const cols = Math.max(1, Math.min(4, Number(setting.cols || defaultCols)));
-            const height = ['one','two','auto'].includes(setting.height) ? setting.height : 'auto';
-            const color = /^#[0-9a-f]{6}$/i.test(setting.color || '') ? setting.color : '';
-            return `<div class="work-card-subwidget widget-height-${height}${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-cols="${cols}" data-card-section-key="object:${key}" data-card-section-label="${label}" style="grid-column:span ${cols};${color ? `--widget-accent:${color};` : ''}">${inner}</div>`;
+            const layout = getFreeWidgetLayout(setting, defaultCols);
+            return `<div class="work-card-subwidget${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="object:${key}" data-card-section-label="${label}" style="${freeWidgetStyle(setting, defaultCols)}">${inner}</div>`;
         };
         const sortCardObjects = items => {
             const order = window.getWorkCardSectionOrder(items.map(html => html.match(/data-card-section-key="([^"]+)"/)?.[1]).filter(Boolean));
@@ -371,10 +387,9 @@ window.getLogCardHtml = (l, indexStr = '') => {
                 <div class="work-card-status-row">${statusBadge}${inlineTaskNo}</div>
                 <div class="work-card-columns${customDetails.length ? ' has-custom-column' : ''}">${orderedCardSections.map(section => {
                     const setting = window.getWorkCardWidgetSettings()[section.key] || {};
-                    const cols = Math.max(1, Math.min(4, Number(setting.cols || 4)));
-                    const color = /^#[0-9a-f]{6}$/i.test(setting.color || '') ? setting.color : '';
-                    const heightMode = ['one','two','auto'].includes(setting.height) ? setting.height : 'auto';
-                    return `<div class="work-card-widget widget-height-${heightMode}${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-cols="${cols}" data-card-section-key="${section.key}" data-card-section-label="${section.label || (section.key === 'work' ? '작업정보' : '고객정보')}" style="grid-column:span ${cols};${color ? `--widget-accent:${color};` : ''}">${section.html}</div>`;
+                    const isContainer = section.key === 'work' || section.key === 'customer';
+                    const layout = getFreeWidgetLayout(setting, 4);
+                    return `<div class="work-card-widget${isContainer ? ' is-container-widget' : ''}${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="${section.key}" data-card-section-label="${section.label || section.key}" style="${isContainer ? '' : freeWidgetStyle(setting, 4)}">${section.html}</div>`;
                 }).join('')}</div>
             </div>
         `;
