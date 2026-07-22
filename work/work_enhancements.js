@@ -2662,7 +2662,9 @@
                 const rect = canvas.getBoundingClientRect();
                 dragged.dataset.y = Math.max(1, Math.floor((lastDragPoint.y - rect.top + canvas.scrollTop) / 28) + 1); place(dragged);
             }, 32);
-            item.setPointerCapture?.(event.pointerId); event.preventDefault();
+            item.setPointerCapture?.(event.pointerId);
+            if (event.cancelable) event.preventDefault();
+            event.stopPropagation();
         });
         canvas.addEventListener('pointermove', event => {
             if (event.pointerType === 'touch' && activeTouches.has(event.pointerId)) {
@@ -2673,6 +2675,7 @@
                 }
             }
             if (!dragged) return;
+            if (event.cancelable) event.preventDefault();
             if (itemPressStart && Math.hypot(event.clientX - itemPressStart.x, event.clientY - itemPressStart.y) > 7) {
                 dragged.classList.add('is-moving');
             }
