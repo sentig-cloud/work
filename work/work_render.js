@@ -308,12 +308,20 @@ window.getLogCardHtml = (l, indexStr = '') => {
         const makeCardObject = (key, label, inner, defaultCols = 4) => {
             const setting = window.getWorkCardWidgetSettings()[`object:${key}`] || {};
             const layout = getFreeWidgetLayout(setting, defaultCols);
-            return `<div class="work-card-subwidget${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="object:${key}" data-card-section-label="${label}" style="${freeWidgetStyle(setting, defaultCols)}">${inner}</div>`;
+            const title = setting.titleVisible ? `<b class="work-card-object-title">${label}</b>` : '';
+            return `<div class="work-card-subwidget${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="object:${key}" data-card-section-label="${label}" style="${freeWidgetStyle(setting, defaultCols)}">${title}${inner}</div>`;
         };
         const sortCardObjects = items => {
             const order = window.getWorkCardSectionOrder(items.map(html => html.match(/data-card-section-key="([^"]+)"/)?.[1]).filter(Boolean));
             return [...items].sort((a,b) => order.indexOf(a.match(/data-card-section-key="([^"]+)"/)?.[1]) - order.indexOf(b.match(/data-card-section-key="([^"]+)"/)?.[1]));
         };
+        workDetails.push(makeCardObject('number','번호',`<div class="work-card-number">No.${indexStr || '-'}</div>`,2));
+        workDetails.push(makeCardObject('date','일자',`<div class="work-card-core-value work-card-core-date">${headerDateStr}</div>`,3));
+        workDetails.push(makeCardObject('time','시간',`<div class="work-card-core-value work-card-core-time">${l.workTime || '00:00'}</div>`,2));
+        workDetails.push(makeCardObject('status','상태',`<div class="work-card-status-only">${statusBadge}</div>`,2));
+        workDetails.push(makeCardObject('taskNo','타스크번호',inlineTaskNo,2));
+        if (dutyBadge || otBadge) workDetails.push(makeCardObject('alerts','OT·당직',`<div class="work-card-alerts">${dutyBadge}${otBadge}</div>`,2));
+        workDetails.push(makeCardObject('delete','삭제',`<button type="button" class="btn-del work-card-delete-object w95-btn" onclick="event.stopPropagation(); window.deleteEntry('${l.id}')">X</button>`,1));
         workDetails.push(makeCardObject('taskType','작업유형',`<div class="work-info-line task-type" style="${excludedCardStyle('taskTypes')}"><i class="fa-solid fa-screwdriver-wrench"></i><span>${formatWorkQtyNames(String(l.taskType || '기본').split(', '), 'taskTypes')}</span></div>`,2));
         workDetails.push(makeCardObject('content','작업내용',`<div class="work-info-line work-content-line"><i class="fa-solid fa-clipboard"></i><span>${l.content || '내용 없음'}</span></div>`));
         if (l.note) workDetails.push(makeCardObject('note','특이사항',`<div class="work-info-line note"><i class="fa-solid fa-triangle-exclamation"></i><span>${l.note}</span></div>`));
@@ -347,16 +355,23 @@ window.getLogCardHtml = (l, indexStr = '') => {
                 const valStr = Array.isArray(val) ? val.map(name => Number(quantities[name] || 1) > 1 ? `${name} × ${Number(quantities[name])}` : name).join(', ') : String(val);
                 const safeGroupTitle = String(g.title || '선택태그').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 const palette = customCardPalette[groupIndex % customCardPalette.length];
+                const customWidgetSetting = window.getWorkCardWidgetSettings()[`custom:${g.id}`] || {};
+                const customTitleVisible = typeof customWidgetSetting.titleVisible === 'boolean' ? customWidgetSetting.titleVisible : !!g.cardTitleVisible;
                 customDetails.push({
                     key: `custom:${g.id}`,
                     label: g.title || '선택태그',
-                    html: `<aside class="work-custom-panel work-card-section" style="--custom-accent:${palette[0]};--custom-bg:${palette[1]};" data-card-section-key="custom:${g.id}" data-card-section-label="${safeGroupTitle}"><div class="work-info-line custom" style="${excludedCardStyle(g.id)}"><i class="fa-solid fa-tag"></i><span>${g.cardTitleVisible ? `<b>${safeGroupTitle}</b><span class="work-custom-title-separator"> : </span>` : ''}${valStr}</span></div></aside>`
+                    html: `<aside class="work-custom-panel work-card-section" style="--custom-accent:${palette[0]};--custom-bg:${palette[1]};" data-card-section-key="custom:${g.id}" data-card-section-label="${safeGroupTitle}"><div class="work-info-line custom" style="${excludedCardStyle(g.id)}"><i class="fa-solid fa-tag"></i><span>${customTitleVisible ? `<b>${safeGroupTitle}</b><span class="work-custom-title-separator"> : </span>` : ''}${valStr}</span></div></aside>`
                 });
             }
         });
 
         if (l.coworkers && l.coworkers.length > 0) {
-            bottomManagerHtml = `<div style="color:var(--w-blue); font-size:0.8rem; font-weight:bold; ${excludedCardStyle('coworkers')}"><i class="fa-solid fa-user-group"></i> ${formatWorkQtyNames(l.coworkers, 'coworkers')}</div>`;
+            workDetails.push(makeCardObject('manager','매니저',`<div class="work-info-line manager" style="${excludedCardStyle('coworkers')}"><i class="fa-solid fa-user-group"></i><span>${formatWorkQtyNames(l.coworkers, 'coworkers')}</span></div>`,3));
+        }
+        workDetails.push(makeCardObject('modified','수정시간',`<div class="log-time work-card-modified">${l.m}/${l.d}(${dayStr}) ${l.time || ''}</div>`,3));
+        if (l.imgs && l.imgs.length > 0) {
+            workDetails.push(makeCardObject('images','사진',`<div class="log-img-list work-card-images">${l.imgs.map((i, imgIdx) => `<img src="${i.src}" onclick="event.stopPropagation(); window.openImageViewer(${imgIdx}, 'log', '${l.id}')">`).join('')}</div>`));
+            imgsHtml = '';
         }
 
         const allStandardObjects = [
@@ -380,11 +395,6 @@ window.getLogCardHtml = (l, indexStr = '') => {
 
         workDetailsHtml = `
             <div class="card-content-zone work-card-layout">
-                <div class="work-card-head">
-                    <div class="work-card-date"><b>No.${indexStr || '-'}</b><span>${headerDateStr}</span><strong>${l.workTime || '00:00'}</strong></div>
-                    <div class="work-card-alerts">${dutyBadge}${otBadge}</div>
-                </div>
-                <div class="work-card-status-row">${statusBadge}${inlineTaskNo}</div>
                 <div class="work-card-columns${customDetails.length ? ' has-custom-column' : ''}">${orderedCardSections.map(section => {
                     const setting = window.getWorkCardWidgetSettings()[section.key] || {};
                     const isContainer = section.key === 'work' || section.key === 'customer';
@@ -393,6 +403,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
                 }).join('')}</div>
             </div>
         `;
+        bottomManagerHtml = '';
     } else if (l.cat === 'commute_in' || l.cat === 'commute_out') {
         let isOut = l.cat === 'commute_out';
         let imgH = l.imgs && l.imgs[0] ? `<img src="${l.imgs[0].src}" style="width:50px; height:50px; object-fit:cover; border-radius:4px; border:1px solid #999; margin-right:10px; cursor:zoom-in;" onclick="event.stopPropagation(); window.openImageViewer(0, 'log', '${l.id}')">` : '';
@@ -459,14 +470,14 @@ window.getLogCardHtml = (l, indexStr = '') => {
         `;
     }
 
-    let bottomTimeHtml = (isCommuteDetailCard || isCommuteCard)
+    let bottomTimeHtml = (isCommuteDetailCard || isCommuteCard || l.cat === 'work')
         ? ''
         : `<div class="log-time" style="padding:0;">${l.m}/${l.d}(${dayStr}) ${l.time || ''}</div>`;
 
     return `
     <div class="log-card w95-out ${cardClass}" data-log-id="${l.id}" data-log-cat="${l.cat}" style="${cardStyle}" onclick="window.handleCardClick('${l.id}', '${l.cat}')">
         ${oxWatermark}
-        <button type="button" class="btn-del w95-btn" onclick="event.stopPropagation(); window.deleteEntry('${l.id}')">X</button>
+        ${l.cat === 'work' ? '' : `<button type="button" class="btn-del w95-btn" onclick="event.stopPropagation(); window.deleteEntry('${l.id}')">X</button>`}
         ${taskNoHtml}
         ${seqHtml}
         ${workDetailsHtml}

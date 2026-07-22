@@ -269,15 +269,6 @@ window.renameBoxTitle = (id) => {
     if (!el) return;
     document.getElementById('titleEditTargetId').value = id;
     document.getElementById('titleEditInput').value = el.innerText;
-    const group = window.getGroupById && window.getGroupById(id);
-    const builtIn = window.BUILT_IN_GROUP_IDS || ['taskTypes', 'coworkers', 'statuses', 'equipments', 'memoTags', 'duration'];
-    const toggleBtn = document.getElementById('cardTitleVisibleBtn');
-    window.pendingCardTitleVisible = !!group?.cardTitleVisible;
-    if (toggleBtn) {
-        toggleBtn.style.display = group && !builtIn.includes(id) ? '' : 'none';
-        toggleBtn.classList.toggle('active-btn', window.pendingCardTitleVisible);
-        toggleBtn.textContent = window.pendingCardTitleVisible ? '카드 제목 표시' : '카드 제목 숨김';
-    }
     document.getElementById('titleEditModal').style.display = 'flex';
     setTimeout(() => { document.getElementById('titleEditInput').focus(); document.getElementById('titleEditInput').select(); }, 50);
 };
@@ -294,8 +285,6 @@ window.saveBoxTitle = () => {
     const g = window.getGroupById && window.getGroupById(id);
     if (g) {
         g.title = newName;
-        const builtIn = window.BUILT_IN_GROUP_IDS || ['taskTypes', 'coworkers', 'statuses', 'equipments', 'memoTags', 'duration'];
-        if (!builtIn.includes(id)) g.cardTitleVisible = !!window.pendingCardTitleVisible;
         window.markDirty('master', 'groups', 'upsert');
         window.saveLocal('group-title');
     } else if (id === 'basicFields') {
@@ -805,14 +794,6 @@ window.closeImageViewer = () => {
     document.getElementById('imageViewer').style.display = 'none';
     document.getElementById('viewerImg').src = "";
     window.currentViewerIndex = -1;
-};
-
-window.toggleCardTitleVisible = () => {
-    window.pendingCardTitleVisible = !window.pendingCardTitleVisible;
-    const btn = document.getElementById('cardTitleVisibleBtn');
-    if (!btn) return;
-    btn.classList.toggle('active-btn', window.pendingCardTitleVisible);
-    btn.textContent = window.pendingCardTitleVisible ? '카드 제목 표시' : '카드 제목 숨김';
 };
 
 window.toggleCurrentWorkGroupExcluded = (id) => {

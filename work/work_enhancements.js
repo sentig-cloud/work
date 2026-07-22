@@ -2331,25 +2331,25 @@
         overlay.className = 'card-layout-editor-layer';
         overlay.innerHTML = `<div class="card-layout-editor card-free-editor w95-out" role="dialog" aria-modal="true">
             <div class="w95-titlebar"><span>카드 자유 배치</span><button type="button" class="w95-btn card-layout-close">X</button></div>
-            <div class="card-layout-help">객체를 눌러 선택하고 빈 칸으로 끌어 놓으세요. 겹치면 두 객체의 위치가 바뀝니다.</div>
             <div class="card-free-toolbar">
-                <strong class="card-free-selected">객체를 선택하세요</strong>
-                <span>가로</span><button type="button" class="w95-btn" data-free-action="w-minus">−</button><b data-free-value="w">-</b><button type="button" class="w95-btn" data-free-action="w-plus">＋</button>
-                <span>세로</span><button type="button" class="w95-btn" data-free-action="h-minus">−</button><b data-free-value="h">-</b><button type="button" class="w95-btn" data-free-action="h-plus">＋</button>
+                <button type="button" class="w95-btn" data-free-action="w-minus">가로 −</button><b data-free-value="w">-</b><button type="button" class="w95-btn" data-free-action="w-plus">가로 ＋</button>
+                <button type="button" class="w95-btn" data-free-action="h-minus">세로 −</button><b data-free-value="h">-</b><button type="button" class="w95-btn" data-free-action="h-plus">세로 ＋</button>
                 <input type="color" class="card-free-color" value="#64748b" title="객체 색상"><button type="button" class="w95-btn" data-free-action="auto-color">자동색</button><button type="button" class="w95-btn" data-free-action="hide">보관</button>
             </div>
             <div class="card-free-canvas" aria-label="6칸 카드 배치 영역"></div>
+            <div class="card-layout-editor-actions"><button type="button" class="w95-btn card-layout-reset">초기화</button></div>
             <div class="card-free-tray"><b>보관함</b><div class="card-free-tray-items"></div></div>
-            <div class="card-layout-editor-actions"><button type="button" class="w95-btn card-layout-reset">기본 배치</button><button type="button" class="w95-btn card-layout-done">저장·닫기</button></div>
         </div>`;
         document.body.appendChild(overlay);
         const canvas = overlay.querySelector('.card-free-canvas');
         const tray = overlay.querySelector('.card-free-tray-items');
-        const selectedLabel = overlay.querySelector('.card-free-selected');
         const colorInput = overlay.querySelector('.card-free-color');
         let selected = null;
         let dragged = null;
         let dragStart = null;
+        let itemPressTimer = null;
+        let itemPressStart = null;
+        let titleToggled = false;
 
         const legacySize = (setting, section) => {
             const oldCols = Number(setting.cols || section.dataset.widgetCols || 4);
@@ -2383,7 +2383,6 @@
             selected = item;
             if (!item) return;
             item.classList.add('is-selected');
-            selectedLabel.textContent = item.dataset.label;
             overlay.querySelector('[data-free-value="w"]').textContent = `${item.dataset.w}/6`;
             overlay.querySelector('[data-free-value="h"]').textContent = `${item.dataset.h}줄`;
             colorInput.value = settings[item.dataset.key]?.color || '#64748b';
@@ -2410,12 +2409,19 @@
             const preview = section.cloneNode(true); preview.classList.remove('is-widget-hidden'); preview.removeAttribute('style');
             preview.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
             item.querySelector('.card-free-preview').appendChild(preview);
+            const titleVisible = typeof setting.titleVisible === 'boolean'
+                ? setting.titleVisible
+                : !!preview.querySelector('.work-card-object-title,.work-info-line.custom b');
+            item.classList.toggle('is-title-visible', titleVisible);
             if (setting.color) item.style.setProperty('--widget-accent', setting.color);
             canvas.appendChild(item); place(item); persist(item);
         });
         const knownLabels = {
+            'object:number':'번호', 'object:date':'일자', 'object:time':'시간', 'object:status':'상태',
+            'object:taskNo':'타스크번호', 'object:alerts':'OT·당직', 'object:delete':'삭제',
             'object:taskType':'작업유형', 'object:content':'작업내용', 'object:note':'특이사항',
-            'object:customer':'고객명', 'object:address':'주소', 'object:equipment':'장비', 'object:duration':'작업시간'
+            'object:customer':'고객명', 'object:address':'주소', 'object:equipment':'장비', 'object:duration':'작업시간',
+            'object:manager':'매니저', 'object:modified':'수정시간', 'object:images':'사진'
         };
         Object.entries(settings).forEach(([key, setting]) => {
             if (setting?.hidden && (key.startsWith('object:') || key.startsWith('custom:'))) {
@@ -2426,7 +2432,7 @@
 
         const finish = () => { closeEditor(); window.updateUI?.(); };
         overlay.addEventListener('click', event => {
-            if (event.target === overlay || event.target.closest('.card-layout-close,.card-layout-done')) return finish();
+            if (event.target === overlay || event.target.closest('.card-layout-close')) return finish();
             if (event.target.closest('.card-layout-reset')) {
                 localStorage.removeItem(WIDGET_KEY); localStorage.removeItem(STORAGE_KEY); return finish();
             }
@@ -2463,20 +2469,38 @@
         });
         canvas.addEventListener('pointerdown', event => {
             const item = event.target.closest('.card-free-item'); if (!item) return;
-            select(item); dragged = item; dragStart = { ...rectOf(item) }; item.classList.add('is-moving');
+            select(item); dragged = item; dragStart = { ...rectOf(item) }; itemPressStart = { x:event.clientX, y:event.clientY }; titleToggled = false;
+            clearTimeout(itemPressTimer);
+            itemPressTimer = setTimeout(() => {
+                if (!dragged) return;
+                titleToggled = true;
+                const current = typeof settings[dragged.dataset.key]?.titleVisible === 'boolean'
+                    ? settings[dragged.dataset.key].titleVisible
+                    : !!dragged.querySelector('.work-card-object-title,.work-info-line.custom b');
+                settings[dragged.dataset.key] = { ...(settings[dragged.dataset.key] || {}), titleVisible:!current };
+                localStorage.setItem(WIDGET_KEY, JSON.stringify(settings));
+                dragged.classList.toggle('is-title-visible', !current);
+                navigator.vibrate?.(30);
+            }, 700);
             item.setPointerCapture?.(event.pointerId); event.preventDefault();
         });
         canvas.addEventListener('pointermove', event => {
             if (!dragged) return;
+            if (itemPressStart && Math.hypot(event.clientX - itemPressStart.x, event.clientY - itemPressStart.y) > 7) {
+                clearTimeout(itemPressTimer); dragged.classList.add('is-moving');
+            }
+            if (titleToggled) return;
             const rect = canvas.getBoundingClientRect();
             dragged.dataset.x = Math.max(1, Math.min(7 - +dragged.dataset.w, Math.floor((event.clientX - rect.left) / (rect.width / 6)) + 1));
             dragged.dataset.y = Math.max(1, Math.floor((event.clientY - rect.top) / 46) + 1); place(dragged);
         });
         const drop = () => {
             if (!dragged) return;
+            clearTimeout(itemPressTimer);
+            if (titleToggled) { dragged.classList.remove('is-moving'); dragged = null; dragStart = null; itemPressStart = null; return; }
             const hit = [...canvas.children].find(item => item !== dragged && overlaps(rectOf(dragged), rectOf(item)));
             if (hit) { hit.dataset.x = dragStart.x; hit.dataset.y = dragStart.y; place(hit); persist(hit); }
-            dragged.classList.remove('is-moving'); persist(dragged); dragged = null; dragStart = null;
+            dragged.classList.remove('is-moving'); persist(dragged); dragged = null; dragStart = null; itemPressStart = null;
         };
         canvas.addEventListener('pointerup', drop); canvas.addEventListener('pointercancel', drop);
     };
