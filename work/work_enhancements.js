@@ -2354,7 +2354,10 @@
             </div>
             <div class="card-free-canvas" aria-label="12칸 카드 배치 영역"></div>
             <div class="card-free-object-popup w95-out" role="group" aria-label="선택 객체 표시 설정">
-                <button type="button" class="w95-btn" data-free-action="title">제목</button><button type="button" class="w95-btn" data-free-action="title-position">제목: 상단</button><button type="button" class="w95-btn" data-free-action="emphasis">강조</button><button type="button" class="w95-btn" data-free-action="font">글자 중</button><button type="button" class="w95-btn" data-free-action="align-h">가로: 왼쪽</button><button type="button" class="w95-btn" data-free-action="align-v">세로: 중앙</button><button type="button" class="w95-btn" data-free-action="border">테두리: 기본</button><button type="button" class="w95-btn" data-free-action="status">상태</button><label class="card-free-color-label">글자<input type="color" class="card-free-color" value="#111827" title="글자 색상"></label><label class="card-free-color-label">배경<input type="color" class="card-free-bg-color" value="#ffffff" title="배경 색상"></label><button type="button" class="w95-btn" data-free-action="auto-color">색상 초기화</button>
+                <div class="card-free-setting-group"><b>표시</b><button type="button" class="w95-btn" data-free-action="title">제목</button><button type="button" class="w95-btn" data-free-action="title-position">제목: 상단</button><button type="button" class="w95-btn" data-free-action="status">상태</button></div>
+                <div class="card-free-setting-group"><b>글자</b><button type="button" class="w95-btn" data-free-action="font">글자 중</button><button type="button" class="w95-btn" data-free-action="emphasis">강조</button><button type="button" class="w95-btn" data-free-action="underline">밑줄</button><button type="button" class="w95-btn" data-free-action="italic">기울임</button><label class="card-free-color-label">색<input type="color" class="card-free-color" value="#111827" title="글자 색상"></label></div>
+                <div class="card-free-setting-group"><b>정렬</b><button type="button" class="w95-btn" data-free-action="align-h">가로: 중앙</button><button type="button" class="w95-btn" data-free-action="align-v">세로: 중앙</button></div>
+                <div class="card-free-setting-group"><b>박스</b><button type="button" class="w95-btn" data-free-action="box">박스: 기본</button><button type="button" class="w95-btn" data-free-action="border">테두리: 기본</button><button type="button" class="w95-btn" data-free-action="shadow">음영: 없음</button><label class="card-free-color-label">배경<input type="color" class="card-free-bg-color" value="#ffffff" title="배경 색상"></label><label class="card-free-color-label">선<input type="color" class="card-free-border-color" value="#334155" title="테두리 색상"></label><button type="button" class="w95-btn" data-free-action="reset-style">꾸미기 초기화</button></div>
             </div>
             <div class="card-free-tray"><button type="button" class="w95-btn card-free-store-button" data-free-action="hide">보관</button><div class="card-free-tray-items"></div><button type="button" class="w95-btn card-layout-reset">초기화</button></div>
         </div>`;
@@ -2364,6 +2367,7 @@
         const objectPopup = overlay.querySelector('.card-free-object-popup');
         const colorInput = overlay.querySelector('.card-free-color');
         const bgColorInput = overlay.querySelector('.card-free-bg-color');
+        const borderColorInput = overlay.querySelector('.card-free-border-color');
         let selected = null;
         let dragged = null;
         let dragStart = null;
@@ -2372,6 +2376,9 @@
         let sizeAxis = 'w';
         const activeTouches = new Map();
         let twoFingerY = 0;
+        let edgeScrollSpeed = 0;
+        let edgeScrollTimer = null;
+        let lastDragPoint = null;
 
         const legacySize = (setting, section) => {
             const oldCols = Number(setting.cols || section.dataset.widgetCols || 4);
@@ -2416,11 +2423,12 @@
             item.classList.add('is-selected');
             colorInput.value = settings[item.dataset.key]?.color || '#111827';
             bgColorInput.value = settings[item.dataset.key]?.backgroundColor || '#ffffff';
+            borderColorInput.value = settings[item.dataset.key]?.borderColor || '#334155';
         };
         const refreshAdvancedState = () => {
             if (!selected) return;
             const setting = settings[selected.dataset.key] || {};
-            ['title','emphasis','status'].forEach(action => {
+            ['title','emphasis','underline','italic','status'].forEach(action => {
                 const key = action === 'title' ? 'titleVisible' : action === 'status' ? 'statusMode' : action;
                 overlay.querySelector(`[data-free-action="${action}"]`)?.classList.toggle('is-active', !!setting[key]);
             });
@@ -2435,6 +2443,10 @@
             const hButton = overlay.querySelector('[data-free-action="align-h"]'); if (hButton) hButton.textContent = hLabels[setting.alignH || 'left'];
             const vButton = overlay.querySelector('[data-free-action="align-v"]'); if (vButton) vButton.textContent = vLabels[setting.alignV || 'middle'];
             const borderButton = overlay.querySelector('[data-free-action="border"]'); if (borderButton) borderButton.textContent = borderLabels[setting.borderStyle || 'default'];
+            const boxLabels = { plain:'박스: 기본', square:'박스: 사각', rounded:'박스: 둥근' };
+            const shadowLabels = { none:'음영: 없음', soft:'음영: 보통', strong:'음영: 강하게' };
+            const boxButton = overlay.querySelector('[data-free-action="box"]'); if (boxButton) boxButton.textContent = boxLabels[setting.boxStyle || 'plain'];
+            const shadowButton = overlay.querySelector('[data-free-action="shadow"]'); if (shadowButton) shadowButton.textContent = shadowLabels[setting.shadowStyle || 'none'];
             selected.style.setProperty('--widget-font-size', { small:'.64rem', normal:'.76rem', large:'.92rem', xlarge:'1.08rem' }[setting.fontSize || 'normal']);
         };
         const refreshPreviewTitle = item => {
@@ -2498,14 +2510,19 @@
                 ? setting.titleVisible
                 : !!preview.querySelector('.work-card-object-title,.work-info-line.custom b');
             const titlePosition = setting.titlePosition || (key.startsWith('custom:') ? 'inline' : 'top');
-            settings[key] = { ...(settings[key] || {}), titleVisible, titlePosition, fontSize:setting.fontSize || 'normal', alignH:setting.alignH || 'left', alignV:setting.alignV || 'middle', borderStyle:setting.borderStyle || 'default' };
+            const exceptionKeys = ['object:content','object:note','object:address','object:images'];
+            settings[key] = { ...(settings[key] || {}), titleVisible, titlePosition, fontSize:setting.fontSize || 'normal', alignH:setting.alignH || (exceptionKeys.includes(key) ? 'left' : 'center'), alignV:setting.alignV || 'middle', borderStyle:setting.borderStyle || 'default', boxStyle:setting.boxStyle || 'plain', shadowStyle:setting.shadowStyle || 'none' };
             item.classList.toggle('is-title-visible', titleVisible);
             item.classList.toggle('is-emphasis', !!setting.emphasis);
             item.classList.toggle('is-status-mode', !!setting.statusMode);
-            item.dataset.fontSize = setting.fontSize || 'normal';
-            item.dataset.alignH = setting.alignH || 'left'; item.dataset.alignV = setting.alignV || 'middle'; item.dataset.borderStyle = setting.borderStyle || 'default';
+            item.dataset.fontSize = settings[key].fontSize;
+            item.style.setProperty('--widget-font-size', { small:'.64rem', normal:'.76rem', large:'.92rem', xlarge:'1.08rem' }[settings[key].fontSize] || '.76rem');
+            item.dataset.alignH = settings[key].alignH; item.dataset.alignV = settings[key].alignV; item.dataset.borderStyle = settings[key].borderStyle;
+            item.dataset.boxStyle = settings[key].boxStyle; item.dataset.shadowStyle = settings[key].shadowStyle;
+            item.classList.toggle('is-underlined', !!settings[key].underline); item.classList.toggle('is-italic', !!settings[key].italic);
             if (setting.color) item.style.setProperty('--widget-text-color', setting.color);
             if (setting.backgroundColor) item.style.setProperty('--widget-bg-color', setting.backgroundColor);
+            if (setting.borderColor) item.style.setProperty('--widget-border-color', setting.borderColor);
             canvas.appendChild(item); place(item); persist(item);
         });
         const knownLabels = {
@@ -2525,6 +2542,7 @@
         overlay.querySelector(`[data-preset="${activePreset}"]`)?.classList.add('is-active');
 
         const finish = () => {
+            clearInterval(edgeScrollTimer); edgeScrollTimer = null;
             const items = [...canvas.children];
             const minY = items.length ? Math.min(...items.map(item => +item.dataset.y || 1)) : 1;
             if (minY > 1) items.forEach(item => { item.dataset.y = (+item.dataset.y || 1) - minY + 1; settings[item.dataset.key] = { ...(settings[item.dataset.key] || {}), y:+item.dataset.y }; });
@@ -2575,10 +2593,12 @@
                 commitWidgetSettings(settings); addToTray(selected.dataset.key, selected.dataset.label); selected.remove(); select(null); return;
             }
             if (action === 'axis') { sizeAxis = sizeAxis === 'w' ? 'h' : 'w'; event.target.textContent = sizeAxis === 'w' ? '가로' : '세로'; return; }
-            if (['title','title-position','emphasis','font','align-h','align-v','border','status','auto-color'].includes(action) && !settingsUnlocked) return;
+            if (['title','title-position','emphasis','underline','italic','font','align-h','align-v','box','border','shadow','status','reset-style'].includes(action) && !settingsUnlocked) return;
             if (action === 'title') { settings[selected.dataset.key].titleVisible = !settings[selected.dataset.key].titleVisible; selected.classList.toggle('is-title-visible', settings[selected.dataset.key].titleVisible); refreshPreviewTitle(selected); }
             if (action === 'title-position') { settings[selected.dataset.key].titlePosition = settings[selected.dataset.key].titlePosition === 'inline' ? 'top' : 'inline'; refreshPreviewTitle(selected); }
             if (action === 'emphasis') { settings[selected.dataset.key].emphasis = !settings[selected.dataset.key].emphasis; selected.classList.toggle('is-emphasis', settings[selected.dataset.key].emphasis); }
+            if (action === 'underline') { settings[selected.dataset.key].underline = !settings[selected.dataset.key].underline; selected.classList.toggle('is-underlined', settings[selected.dataset.key].underline); }
+            if (action === 'italic') { settings[selected.dataset.key].italic = !settings[selected.dataset.key].italic; selected.classList.toggle('is-italic', settings[selected.dataset.key].italic); }
             if (action === 'font') {
                 const sizes = ['small','normal','large','xlarge']; const current = settings[selected.dataset.key].fontSize || 'normal';
                 settings[selected.dataset.key].fontSize = sizes[(sizes.indexOf(current) + 1) % sizes.length]; selected.dataset.fontSize = settings[selected.dataset.key].fontSize;
@@ -2586,10 +2606,17 @@
             if (action === 'align-h') { const values = ['left','center','right']; const current = settings[selected.dataset.key].alignH || 'left'; settings[selected.dataset.key].alignH = values[(values.indexOf(current) + 1) % values.length]; selected.dataset.alignH = settings[selected.dataset.key].alignH; }
             if (action === 'align-v') { const values = ['top','middle','bottom']; const current = settings[selected.dataset.key].alignV || 'middle'; settings[selected.dataset.key].alignV = values[(values.indexOf(current) + 1) % values.length]; selected.dataset.alignV = settings[selected.dataset.key].alignV; }
             if (action === 'border') { const values = ['default','none','bold']; const current = settings[selected.dataset.key].borderStyle || 'default'; settings[selected.dataset.key].borderStyle = values[(values.indexOf(current) + 1) % values.length]; selected.dataset.borderStyle = settings[selected.dataset.key].borderStyle; }
+            if (action === 'box') { const values = ['plain','square','rounded']; const current = settings[selected.dataset.key].boxStyle || 'plain'; settings[selected.dataset.key].boxStyle = values[(values.indexOf(current) + 1) % values.length]; selected.dataset.boxStyle = settings[selected.dataset.key].boxStyle; }
+            if (action === 'shadow') { const values = ['none','soft','strong']; const current = settings[selected.dataset.key].shadowStyle || 'none'; settings[selected.dataset.key].shadowStyle = values[(values.indexOf(current) + 1) % values.length]; selected.dataset.shadowStyle = settings[selected.dataset.key].shadowStyle; }
             if (action === 'status') {
                 settings[selected.dataset.key].statusMode = !settings[selected.dataset.key].statusMode; selected.classList.toggle('is-status-mode', settings[selected.dataset.key].statusMode);
             }
-            if (action === 'auto-color') { settings[selected.dataset.key].color = ''; settings[selected.dataset.key].backgroundColor = ''; selected.style.removeProperty('--widget-text-color'); selected.style.removeProperty('--widget-bg-color'); colorInput.value = '#111827'; bgColorInput.value = '#ffffff'; }
+            if (action === 'reset-style') {
+                const isException = ['object:content','object:note','object:address','object:images'].includes(selected.dataset.key);
+                Object.assign(settings[selected.dataset.key], { fontSize:'normal', emphasis:false, underline:false, italic:false, alignH:isException ? 'left' : 'center', alignV:'middle', boxStyle:'plain', borderStyle:'default', shadowStyle:'none', color:'', backgroundColor:'', borderColor:'' });
+                selected.dataset.fontSize = 'normal'; selected.dataset.alignH = settings[selected.dataset.key].alignH; selected.dataset.alignV = 'middle'; selected.dataset.boxStyle = 'plain'; selected.dataset.borderStyle = 'default'; selected.dataset.shadowStyle = 'none';
+                selected.classList.remove('is-emphasis','is-underlined','is-italic'); selected.style.removeProperty('--widget-text-color'); selected.style.removeProperty('--widget-bg-color'); selected.style.removeProperty('--widget-border-color'); colorInput.value = '#111827'; bgColorInput.value = '#ffffff'; borderColorInput.value = '#334155';
+            }
             if (action === 'size-minus' || action === 'size-plus') {
                 const delta = action === 'size-plus' ? 1 : -1;
                 const limit = sizeAxis === 'w' ? 12 : 8;
@@ -2614,15 +2641,27 @@
             settings[selected.dataset.key] = { ...(settings[selected.dataset.key] || {}), backgroundColor:bgColorInput.value };
             selected.style.setProperty('--widget-bg-color', bgColorInput.value); commitWidgetSettings(settings);
         });
+        borderColorInput.addEventListener('input', () => {
+            if (!selected || !settingsUnlocked) return;
+            settings[selected.dataset.key] = { ...(settings[selected.dataset.key] || {}), borderColor:borderColorInput.value };
+            selected.style.setProperty('--widget-border-color', borderColorInput.value); commitWidgetSettings(settings);
+        });
         canvas.addEventListener('pointerdown', event => {
             if (event.pointerType === 'touch') activeTouches.set(event.pointerId, event.clientY);
             if (activeTouches.size > 1) {
-                dragged?.classList.remove('is-moving'); dragged = null;
+                dragged?.classList.remove('is-moving'); dragged = null; edgeScrollSpeed = 0; clearInterval(edgeScrollTimer);
                 twoFingerY = [...activeTouches.values()].reduce((sum, y) => sum + y, 0) / activeTouches.size;
                 return;
             }
             const item = event.target.closest('.card-free-item'); if (!item) return;
             select(item); dragged = item; dragStart = { ...rectOf(item) }; itemPressStart = { x:event.clientX, y:event.clientY };
+            lastDragPoint = { x:event.clientX, y:event.clientY }; edgeScrollSpeed = 0; clearInterval(edgeScrollTimer);
+            edgeScrollTimer = setInterval(() => {
+                if (!dragged || !edgeScrollSpeed || !lastDragPoint) return;
+                canvas.scrollTop += edgeScrollSpeed;
+                const rect = canvas.getBoundingClientRect();
+                dragged.dataset.y = Math.max(1, Math.floor((lastDragPoint.y - rect.top + canvas.scrollTop) / 28) + 1); place(dragged);
+            }, 32);
             item.setPointerCapture?.(event.pointerId); event.preventDefault();
         });
         canvas.addEventListener('pointermove', event => {
@@ -2638,12 +2677,16 @@
                 dragged.classList.add('is-moving');
             }
             const rect = canvas.getBoundingClientRect();
+            const edgeZone = 52;
+            lastDragPoint = { x:event.clientX, y:event.clientY };
+            edgeScrollSpeed = event.clientY < rect.top + edgeZone ? -12 : event.clientY > rect.bottom - edgeZone ? 12 : 0;
             dragged.dataset.x = Math.max(1, Math.min(13 - +dragged.dataset.w, Math.floor((event.clientX - rect.left) / (rect.width / 12)) + 1));
             dragged.dataset.y = Math.max(1, Math.floor((event.clientY - rect.top + canvas.scrollTop) / 28) + 1); place(dragged);
         });
         const drop = event => {
             if (event?.pointerType === 'touch') activeTouches.delete(event.pointerId);
             if (!dragged) return;
+            edgeScrollSpeed = 0; clearInterval(edgeScrollTimer); edgeScrollTimer = null; lastDragPoint = null;
             const hit = [...canvas.children].find(item => item !== dragged && overlaps(rectOf(dragged), rectOf(item)));
             if (hit) { hit.dataset.x = dragStart.x; hit.dataset.y = dragStart.y; place(hit); persist(hit); }
             dragged.classList.remove('is-moving'); persist(dragged); dragged = null; dragStart = null; itemPressStart = null;
