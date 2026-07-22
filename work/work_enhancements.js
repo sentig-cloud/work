@@ -1699,12 +1699,11 @@
     };
 
     window.refreshTagEditControls = () => {
-        const qty = document.getElementById("tagQtyDisplay");
         const numberBtn = document.getElementById("tagShowCountBtn");
         const monthlyBtn = document.getElementById("tagMonthlyBtn");
+        const countBtn = document.getElementById("tagCountSuffixBtn");
         const cardDisplayBtn = document.getElementById("tagCardDisplayBtn");
         const dupBtn = document.getElementById("tagDuplicateBtn");
-        const qtyRow = document.getElementById("tagQtyControlRow");
         const groupId = window.typeToGroupId(window.editingTagType);
         const editingTag = getTagArray(window.editingTagType)?.[window.editingTagIndex];
         const paintToggle = (button, on, label, available = true, hint = '') => {
@@ -1716,10 +1715,10 @@
             button.setAttribute('aria-pressed', on && available ? 'true' : 'false');
             button.title = hint || `${label} ${on ? '켜짐' : '꺼짐'}`;
         };
-        if (qty) qty.innerText = String(window.tempTagQty || 0);
-        if (qtyRow) qtyRow.style.display = 'flex';
         paintToggle(numberBtn, window.groupShowsNumber(groupId), '숫자', true, '태그 앞에 이번 달 집계 숫자를 표시');
         paintToggle(monthlyBtn, window.groupIncludesMonthly(groupId), '월별', true, '이 그룹을 월별 집계에 포함');
+        paintToggle(countBtn, window.groupShowsCount(groupId), '갯수', true,
+            '선택태그상자에서 태그 뒤에 직접 설정된 갯수를 표시');
         paintToggle(cardDisplayBtn, !!editingTag?.cardCountVisible, '카드에 표시', true,
             '이 항목의 집계 숫자를 작업일지 카드에 (갯수) 형식으로 표시');
         if (dupBtn) {
@@ -1779,6 +1778,17 @@
         const g = window.getGroupById(groupId);
         if (!g) return;
         g.includeMonthly = !window.groupIncludesMonthly(groupId);
+        window.refreshTagEditControls();
+        window.markDirty?.("master", "groups", "upsert");
+        if (window.saveLocal) window.saveLocal("group-settings");
+        window.renderChangedTagType(window.editingTagType);
+    };
+
+    window.toggleTagShowQty = () => {
+        const groupId = window.typeToGroupId(window.editingTagType);
+        const g = window.getGroupById(groupId);
+        if (!g) return;
+        g.showCount = !window.groupShowsCount(groupId);
         window.refreshTagEditControls();
         window.markDirty?.("master", "groups", "upsert");
         if (window.saveLocal) window.saveLocal("group-settings");
