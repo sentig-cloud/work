@@ -2333,15 +2333,18 @@
             <div class="w95-titlebar"><span>카드 자유 배치</span><button type="button" class="w95-btn card-layout-close">X</button></div>
             <div class="card-free-toolbar">
                 <button type="button" class="w95-btn" data-free-action="size-minus">−</button><button type="button" class="w95-btn" data-free-action="size-plus">＋</button><button type="button" class="w95-btn is-active" data-free-action="axis">가로</button>
-                <button type="button" class="w95-btn card-free-advanced" data-free-action="title">제목</button><button type="button" class="w95-btn card-free-advanced" data-free-action="emphasis">강조</button><button type="button" class="w95-btn card-free-advanced" data-free-action="font">글자</button><button type="button" class="w95-btn card-free-advanced" data-free-action="status">상태</button>
-                <input type="color" class="card-free-color card-free-advanced" value="#64748b" title="객체 색상"><button type="button" class="w95-btn card-free-advanced" data-free-action="auto-color">자동색</button><button type="button" class="w95-btn" data-free-action="hide">보관</button>
+                <button type="button" class="w95-btn" data-free-action="hide">보관</button>
             </div>
             <div class="card-free-canvas" aria-label="12칸 카드 배치 영역"></div>
+            <div class="card-free-object-popup w95-out" role="group" aria-label="선택 객체 표시 설정">
+                <button type="button" class="w95-btn" data-free-action="title">제목</button><button type="button" class="w95-btn" data-free-action="title-position">제목: 상단</button><button type="button" class="w95-btn" data-free-action="emphasis">강조</button><button type="button" class="w95-btn" data-free-action="font">글자 중</button><button type="button" class="w95-btn" data-free-action="status">상태</button><input type="color" class="card-free-color" value="#64748b" title="객체 색상"><button type="button" class="w95-btn" data-free-action="auto-color">자동색</button>
+            </div>
             <div class="card-free-tray"><b>보관함</b><div class="card-free-tray-items"></div><button type="button" class="w95-btn card-layout-reset">초기화</button></div>
         </div>`;
         document.body.appendChild(overlay);
         const canvas = overlay.querySelector('.card-free-canvas');
         const tray = overlay.querySelector('.card-free-tray-items');
+        const objectPopup = overlay.querySelector('.card-free-object-popup');
         const colorInput = overlay.querySelector('.card-free-color');
         let selected = null;
         let dragged = null;
@@ -2391,6 +2394,7 @@
             selected = item;
             settingsUnlocked = false;
             overlay.classList.remove('is-object-settings');
+            objectPopup.classList.remove('is-open');
             if (!item) return;
             item.classList.add('is-selected');
             colorInput.value = settings[item.dataset.key]?.color || '#64748b';
@@ -2405,7 +2409,44 @@
             const fontLabels = { small:'글자 소', normal:'글자 중', large:'글자 대', xlarge:'글자 특대' };
             const fontButton = overlay.querySelector('[data-free-action="font"]');
             if (fontButton) fontButton.textContent = fontLabels[setting.fontSize || 'normal'];
+            const positionButton = overlay.querySelector('[data-free-action="title-position"]');
+            if (positionButton) positionButton.textContent = setting.titlePosition === 'inline' ? '제목: 앞쪽' : '제목: 상단';
             selected.style.setProperty('--widget-font-size', { small:'.64rem', normal:'.76rem', large:'.92rem', xlarge:'1.08rem' }[setting.fontSize || 'normal']);
+        };
+        const refreshPreviewTitle = item => {
+            if (!item) return;
+            const setting = settings[item.dataset.key] || {};
+            const previewRoot = item.querySelector('.card-free-preview > *');
+            const target = item.dataset.key.startsWith('custom:') ? previewRoot?.querySelector('.work-custom-panel') : previewRoot;
+            if (!target) return;
+            [...target.children].filter(child => child.classList?.contains('work-card-object-title')).forEach(child => child.remove());
+            target.classList.remove('title-position-top','title-position-inline');
+            target.classList.add(setting.titlePosition === 'inline' ? 'title-position-inline' : 'title-position-top');
+            if (item.dataset.key.startsWith('custom:')) {
+                const span = target.querySelector('.work-info-line.custom span');
+                span?.querySelector('b')?.remove(); span?.querySelector('.work-custom-title-separator')?.remove();
+                if (!setting.titleVisible || !span) return;
+                if (setting.titlePosition === 'inline') {
+                    const title = document.createElement('b'); title.textContent = item.dataset.label;
+                    const separator = document.createElement('span'); separator.className = 'work-custom-title-separator'; separator.textContent = ' : ';
+                    span.prepend(separator); span.prepend(title);
+                } else {
+                    const title = document.createElement('b'); title.className = 'work-card-object-title'; title.textContent = item.dataset.label; target.prepend(title);
+                }
+                return;
+            }
+            if (!setting.titleVisible) return;
+            const title = document.createElement('b'); title.className = 'work-card-object-title';
+            title.textContent = `${item.dataset.label}${setting.titlePosition === 'inline' ? ' : ' : ''}`; target.prepend(title);
+        };
+        const positionObjectPopup = item => {
+            const rect = item.getBoundingClientRect();
+            objectPopup.classList.add('is-open');
+            const popupRect = objectPopup.getBoundingClientRect();
+            const left = Math.max(6, Math.min(window.innerWidth - popupRect.width - 6, rect.left));
+            const below = rect.bottom + 6;
+            const top = below + popupRect.height <= window.innerHeight - 6 ? below : Math.max(6, rect.top - popupRect.height - 6);
+            objectPopup.style.left = `${left}px`; objectPopup.style.top = `${top}px`;
         };
         const addToTray = (key, label) => {
             if ([...tray.children].some(button => button.dataset.key === key)) return;
@@ -2433,7 +2474,8 @@
             const titleVisible = typeof setting.titleVisible === 'boolean'
                 ? setting.titleVisible
                 : !!preview.querySelector('.work-card-object-title,.work-info-line.custom b');
-            settings[key] = { ...(settings[key] || {}), titleVisible, fontSize:setting.fontSize || 'normal' };
+            const titlePosition = setting.titlePosition || (key.startsWith('custom:') ? 'inline' : 'top');
+            settings[key] = { ...(settings[key] || {}), titleVisible, titlePosition, fontSize:setting.fontSize || 'normal' };
             item.classList.toggle('is-title-visible', titleVisible);
             item.classList.toggle('is-emphasis', !!setting.emphasis);
             item.classList.toggle('is-status-mode', !!setting.statusMode);
@@ -2477,8 +2519,9 @@
                 localStorage.setItem(WIDGET_KEY, JSON.stringify(settings)); addToTray(selected.dataset.key, selected.dataset.label); selected.remove(); select(null); return;
             }
             if (action === 'axis') { sizeAxis = sizeAxis === 'w' ? 'h' : 'w'; event.target.textContent = sizeAxis === 'w' ? '가로' : '세로'; return; }
-            if (['title','emphasis','font','status','auto-color'].includes(action) && !settingsUnlocked) return;
-            if (action === 'title') { settings[selected.dataset.key].titleVisible = !settings[selected.dataset.key].titleVisible; selected.classList.toggle('is-title-visible', settings[selected.dataset.key].titleVisible); }
+            if (['title','title-position','emphasis','font','status','auto-color'].includes(action) && !settingsUnlocked) return;
+            if (action === 'title') { settings[selected.dataset.key].titleVisible = !settings[selected.dataset.key].titleVisible; selected.classList.toggle('is-title-visible', settings[selected.dataset.key].titleVisible); refreshPreviewTitle(selected); }
+            if (action === 'title-position') { settings[selected.dataset.key].titlePosition = settings[selected.dataset.key].titlePosition === 'inline' ? 'top' : 'inline'; refreshPreviewTitle(selected); }
             if (action === 'emphasis') { settings[selected.dataset.key].emphasis = !settings[selected.dataset.key].emphasis; selected.classList.toggle('is-emphasis', settings[selected.dataset.key].emphasis); }
             if (action === 'font') {
                 const sizes = ['small','normal','large','xlarge']; const current = settings[selected.dataset.key].fontSize || 'normal';
@@ -2501,6 +2544,7 @@
                 selected.dataset.x = space.x; selected.dataset.y = space.y;
             }
             place(selected); persist(selected); refreshAdvancedState();
+            if (settingsUnlocked) positionObjectPopup(selected);
         });
         colorInput.addEventListener('input', () => {
             if (!selected || !settingsUnlocked) return;
@@ -2524,6 +2568,7 @@
                 overlay.classList.add('is-object-settings');
                 dragged.classList.add('is-settings-open');
                 refreshAdvancedState();
+                positionObjectPopup(dragged);
                 navigator.vibrate?.(30);
             }, 700);
             item.setPointerCapture?.(event.pointerId); event.preventDefault();
@@ -2555,6 +2600,9 @@
             dragged.classList.remove('is-moving'); persist(dragged); dragged = null; dragStart = null; itemPressStart = null;
         };
         canvas.addEventListener('pointerup', drop); canvas.addEventListener('pointercancel', drop);
+        canvas.addEventListener('scroll', () => {
+            if (settingsUnlocked && selected && objectPopup.classList.contains('is-open')) positionObjectPopup(selected);
+        }, { passive:true });
     };
 
     const cancelPress = () => { clearTimeout(pressTimer); pressTimer = null; pressCard = null; };

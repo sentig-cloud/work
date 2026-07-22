@@ -311,9 +311,10 @@ window.getLogCardHtml = (l, indexStr = '') => {
         const makeCardObject = (key, label, inner, defaultCols = 4) => {
             const setting = window.getWorkCardWidgetSettings()[`object:${key}`] || {};
             const layout = getFreeWidgetLayout(setting, defaultCols);
-            const title = setting.titleVisible ? `<b class="work-card-object-title">${label}</b>` : '';
+            const titlePosition = setting.titlePosition === 'inline' ? 'inline' : 'top';
+            const title = setting.titleVisible ? `<b class="work-card-object-title">${label}${titlePosition === 'inline' ? ' : ' : ''}</b>` : '';
             const fontSize = ['small','normal','large','xlarge'].includes(setting.fontSize) ? setting.fontSize : 'normal';
-            return `<div class="work-card-subwidget widget-font-${fontSize}${setting.emphasis ? ' is-emphasis' : ''}${setting.statusMode ? ' is-status-mode' : ''}${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="object:${key}" data-card-section-label="${label}" style="${freeWidgetStyle(setting, defaultCols)}">${title}${inner}</div>`;
+            return `<div class="work-card-subwidget title-position-${titlePosition} widget-font-${fontSize}${setting.emphasis ? ' is-emphasis' : ''}${setting.statusMode ? ' is-status-mode' : ''}${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="object:${key}" data-card-section-label="${label}" style="${freeWidgetStyle(setting, defaultCols)}">${title}${inner}</div>`;
         };
         const sortCardObjects = items => {
             const order = window.getWorkCardSectionOrder(items.map(html => html.match(/data-card-section-key="([^"]+)"/)?.[1]).filter(Boolean));
@@ -361,10 +362,11 @@ window.getLogCardHtml = (l, indexStr = '') => {
                 const palette = customCardPalette[groupIndex % customCardPalette.length];
                 const customWidgetSetting = window.getWorkCardWidgetSettings()[`custom:${g.id}`] || {};
                 const customTitleVisible = typeof customWidgetSetting.titleVisible === 'boolean' ? customWidgetSetting.titleVisible : !!g.cardTitleVisible;
+                const customTitlePosition = customWidgetSetting.titlePosition === 'top' ? 'top' : 'inline';
                 customDetails.push({
                     key: `custom:${g.id}`,
                     label: g.title || '선택태그',
-                    html: `<aside class="work-custom-panel work-card-section" style="--custom-accent:${palette[0]};--custom-bg:${palette[1]};" data-card-section-key="custom:${g.id}" data-card-section-label="${safeGroupTitle}"><div class="work-info-line custom" style="${excludedCardStyle(g.id)}"><i class="fa-solid fa-tag"></i><span>${customTitleVisible ? `<b>${safeGroupTitle}</b><span class="work-custom-title-separator"> : </span>` : ''}${valStr}</span></div></aside>`
+                    html: `<aside class="work-custom-panel work-card-section title-position-${customTitlePosition}" style="--custom-accent:${palette[0]};--custom-bg:${palette[1]};" data-card-section-key="custom:${g.id}" data-card-section-label="${safeGroupTitle}">${customTitleVisible && customTitlePosition === 'top' ? `<b class="work-card-object-title">${safeGroupTitle}</b>` : ''}<div class="work-info-line custom" style="${excludedCardStyle(g.id)}"><i class="fa-solid fa-tag"></i><span>${customTitleVisible && customTitlePosition === 'inline' ? `<b>${safeGroupTitle}</b><span class="work-custom-title-separator"> : </span>` : ''}${valStr}</span></div></aside>`
                 });
             }
         });

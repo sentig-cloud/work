@@ -297,6 +297,9 @@ html, body {
 .work-main-panel,.work-customer-panel { display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:3px; align-content:start; }
 .work-card-subwidget { min-width:0; padding:2px 3px; border-left:3px solid var(--widget-accent,transparent); background:rgba(255,255,255,.6); box-sizing:border-box; }
 .work-card-object-title { display:block; margin:0 0 2px; color:var(--widget-accent,#334155); font-size:.66rem; line-height:1.1; font-weight:950; }
+.work-card-subwidget.title-position-inline { display:flex; align-items:flex-start; gap:3px; }
+.work-card-subwidget.title-position-inline > .work-card-object-title { display:inline; flex:0 0 auto; margin:3px 0 0; white-space:nowrap; }
+.work-card-subwidget.title-position-inline > :not(.work-card-object-title) { min-width:0; flex:1; }
 .work-card-number { color:#dc2626; font-size:1.02rem; line-height:1.3; font-weight:950; }
 .work-card-core-value { font-weight:950; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .work-card-core-date { color:#334155; font-size:.9rem; }
@@ -378,7 +381,7 @@ html, body {
 .is-object-settings .card-free-color { opacity:1; }
 .card-free-canvas { display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); grid-auto-rows:24px; gap:3px; height:min(62vh,560px); min-height:390px; margin:6px 4px; padding:5px; overflow-x:hidden; overflow-y:scroll; overscroll-behavior:contain; touch-action:pan-y pinch-zoom; background-color:#eef2f7; background-image:linear-gradient(to right,rgba(37,99,235,.13) 1px,transparent 1px),linear-gradient(to bottom,rgba(37,99,235,.13) 1px,transparent 1px); background-size:calc(100% / 12) 27px; border:2px inset #fff; box-sizing:border-box; }
 .card-free-item { position:relative; min-width:0; padding:18px 3px 3px; overflow:hidden; background:#fff; border:2px outset #d4d0c8; border-left:4px solid var(--widget-accent,#64748b); box-sizing:border-box; cursor:grab; user-select:none; }
-.card-free-item.is-selected { outline:3px solid #f59e0b; z-index:3; }
+.card-free-item.is-selected { outline:4px solid #f59e0b; outline-offset:1px; box-shadow:0 0 0 3px rgba(124,58,237,.42),0 4px 12px rgba(15,23,42,.38); z-index:3; }
 .card-free-item.is-settings-open { outline-color:#7c3aed; }
 .card-free-item.is-emphasis { font-weight:950; box-shadow:inset 0 0 0 2px var(--widget-accent,#f59e0b); }
 .card-free-item.is-status-mode .card-free-preview { display:flex; align-items:center; justify-content:center; overflow:hidden; }
@@ -386,12 +389,17 @@ html, body {
 .card-free-item[data-font-size="large"] .card-free-preview { font-size:.92rem; }
 .card-free-item[data-font-size="xlarge"] .card-free-preview { font-size:1.08rem; }
 .card-free-item.is-title-visible::after { content:'제목'; position:absolute; right:2px; top:1px; padding:0 3px; background:#7c3aed; color:#fff; font-size:.58rem; font-weight:900; }
+.card-free-item.is-title-visible .card-free-item-label { display:none; }
 .card-free-item.is-moving { opacity:.72; z-index:5; cursor:grabbing; }
 .card-free-grip { position:absolute; left:2px; top:1px; color:#1d4ed8; font-weight:900; }
 .card-free-item-label { position:absolute; left:18px; right:2px; top:1px; overflow:hidden; color:#111827; font-size:.67rem; font-weight:950; text-overflow:ellipsis; white-space:nowrap; }
 .card-free-preview,.card-free-preview > * { min-width:0; height:100%; pointer-events:none !important; }
 .card-free-preview .work-card-subwidget,.card-free-preview .work-card-widget,.card-free-preview .work-card-section { display:block; padding:0; border:0; background:transparent; box-shadow:none; }
 .card-free-preview .work-info-line { font-size:.66rem; }
+.card-free-object-popup { position:fixed; z-index:5100; display:none; align-items:center; gap:4px; width:min(520px,calc(100vw - 12px)); padding:6px; overflow-x:auto; background:#fff8cc; border:3px solid #7c3aed; box-shadow:0 0 0 3px #f59e0b,0 8px 20px rgba(15,23,42,.5); box-sizing:border-box; }
+.card-free-object-popup.is-open { display:flex; }
+.card-free-object-popup .w95-btn { flex:1 0 62px; min-width:62px; height:32px; padding:1px 4px; font-size:.69rem; font-weight:900; white-space:nowrap; }
+.card-free-object-popup .w95-btn.is-active { background:#000080; color:#fff; }
 .card-free-tray { display:flex; align-items:flex-start; gap:6px; min-height:38px; margin:2px 4px 5px; padding:5px; background:#fff7ed; border:1px solid #c2410c; font-size:.72rem; }
 .card-free-tray > b { flex-shrink:0; color:#9a3412; }
 .card-free-tray-items { display:flex; flex:1; flex-wrap:wrap; gap:4px; }
@@ -502,8 +510,9 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
 
 /* 선택된 블록 */
 .drag-item.is-block-selected {
-    outline: 2px solid #f59e0b;
-    outline-offset: 1px;
+    outline: 4px solid #f59e0b;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 3px rgba(124,58,237,.38), 0 5px 14px rgba(15,23,42,.35);
     z-index: 10;
 }
 
@@ -774,6 +783,7 @@ textarea.m-input { height: auto; line-height: 1.4; padding: 6px; }
 }
 /* 선택된 객체에만 점 표시 — 나머지 칸은 평상시 색/모양 그대로 유지 */
 .layout-edit-mode .inner-layout-cell.is-widget-selected > .widget-resize-handle { display: block; }
+.layout-edit-mode .inner-layout-cell.is-widget-selected { outline:4px solid #f59e0b; outline-offset:2px; box-shadow:0 0 0 3px rgba(124,58,237,.42),0 5px 14px rgba(15,23,42,.38); z-index:18; }
 .inner-layout-cell.is-widget-dragging { opacity: 0.58; outline: 2px dashed #d97706; z-index: 20; }
 /* 점을 살짝 빗나가도(칸 안이면) 브라우저가 스크롤로 가로채지 않도록 칸 전체에서 스크롤 차단 —
    실제 선택/이동/리사이즈 여부는 JS가 판단하므로 여기서 막아도 안전함 */
@@ -810,6 +820,7 @@ input, textarea, [contenteditable="true"] {
 .work-undo-btn:disabled { color: #999; opacity: 0.65; }
 
 .tag-edit-name-row, .tag-edit-control-row { display: flex; align-items: center; gap: 6px; }
+#tagEditModal .modal-box { border:3px solid #7c3aed !important; box-shadow:0 0 0 4px #f59e0b,0 10px 24px rgba(15,23,42,.55); }
 .tag-edit-name-row { margin-bottom: 8px; }
 .tag-edit-name-row .m-input { flex: 1; min-width: 0; }
 .tag-delete-btn { width: 46px; height: 28px; flex-shrink: 0; font-weight: bold; color: #dc2626; }
