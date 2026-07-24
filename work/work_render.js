@@ -311,12 +311,11 @@ window.getLogCardHtml = (l, indexStr = '') => {
                 const showMonthly = window.groupShowsNumber?.(groupId)
                     && window.groupIncludesMonthly?.(groupId)
                     && window.isTagNumberEnabled?.(tag) !== false;
-                const showWorkCount = window.groupShowsCount?.(groupId);
                 const monthly = showMonthly ? getCardMonthCount(groupId, name) : 0;
-                const workCount = showWorkCount ? Number(workQty || 1) : 0;
                 if (showMonthly && monthly >= 2) values.push(monthly);
-                if (showWorkCount && workCount >= 2 && !values.includes(workCount)) values.push(workCount);
             }
+            const workCount = Number(workQty || 1);
+            if (workCount >= 2 && !values.includes(workCount)) values.push(workCount);
             const safeName = String(name).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
             const text = `${safeName}${values.map(value => ` (${value})`).join('')}`;
             return `<span class="work-card-tag-value">${text}</span>`;
@@ -336,7 +335,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
         })[l.status] || 'sticker-default';
         const statusBadge = l.status
             ? `<span class="work-status-text">${formatCardTagValue('statuses', l.status)}</span>`
-            : `<span class="work-status-text is-empty">상태 없음</span>`;
+            : '';
         const inlineTaskNo = l.taskNo
             ? `<button type="button" class="task-no-btn work-task-no" onclick="event.stopPropagation(); window.toggleLogOx('${l.id}')">${l.taskNo}</button>`
             : `<button type="button" class="task-no-btn work-task-no" onclick="event.stopPropagation(); window.toggleLogOx('${l.id}')">O/X</button>`;
@@ -344,6 +343,11 @@ window.getLogCardHtml = (l, indexStr = '') => {
         let customerDetails = [];
         let workDetails = [];
         let customDetails = [];
+        const cardWidgetSettings = window.getWorkCardWidgetSettings();
+        const keepsEmptyObject = key => {
+            const setting = cardWidgetSettings[`object:${key}`];
+            return !!setting && setting.hidden !== true;
+        };
         const getFreeWidgetLayout = (setting, defaultCols = 4) => {
             const legacyCols = Math.max(1, Math.min(4, Number(setting.cols || defaultCols)));
             const legacyWidth = legacyCols >= 4 ? 6 : legacyCols === 2 ? 3 : 2;
@@ -370,7 +374,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
         };
         const seenCardZones = new Set();
         const makeCardObject = (key, label, inner, defaultCols = 4) => {
-            const setting = window.getWorkCardWidgetSettings()[`object:${key}`] || {};
+            const setting = cardWidgetSettings[`object:${key}`] || {};
             const layout = getFreeWidgetLayout(setting, defaultCols);
             const titlePosition = setting.titlePosition === 'inline' ? 'inline' : 'top';
             const marker = setting.titleMarker ? '<span class="work-card-title-marker" aria-hidden="true"></span>' : '';
@@ -396,23 +400,22 @@ window.getLogCardHtml = (l, indexStr = '') => {
         workDetails.push(makeCardObject('time','시간',`<div class="work-card-core-value work-card-core-time">${l.workTime || '00:00'}</div>`,2));
         workDetails.push(makeCardObject('status','상태',`<div class="work-card-status-only">${statusBadge}</div>`,2));
         workDetails.push(makeCardObject('taskNo','타스크번호',inlineTaskNo,2));
-        if (dutyBadge || otBadge) workDetails.push(makeCardObject('alerts','OT·당직',`<div class="work-card-alerts">${dutyBadge}${otBadge}</div>`,2));
+        if (dutyBadge || otBadge || keepsEmptyObject('alerts')) workDetails.push(makeCardObject('alerts','OT·당직',`<div class="work-card-alerts">${dutyBadge}${otBadge}</div>`,2));
         workDetails.push(makeCardObject('delete','삭제',`<button type="button" class="btn-del work-card-delete-object w95-btn" onclick="event.stopPropagation(); window.deleteEntry('${l.id}')">X</button>`,1));
         workDetails.push(makeCardObject('taskType','작업유형',`<div class="work-info-line task-type" style="${excludedCardStyle('taskTypes')}"><i class="fa-solid fa-screwdriver-wrench"></i><span>${formatWorkQtyNames(String(l.taskType || '기본').split(', '), 'taskTypes')}</span></div>`,2));
         workDetails.push(makeCardObject('content','작업내용',`<div class="work-info-line work-content-line"><i class="fa-solid fa-clipboard"></i><span>${l.content || '내용 없음'}</span></div>`));
-        if (l.note) workDetails.push(makeCardObject('note','특이사항',`<div class="work-info-line note"><i class="fa-solid fa-triangle-exclamation"></i><span>${l.note}</span></div>`));
-        if (l.customerName) customerDetails.push(makeCardObject('customer','고객명',`<div class="work-info-line customer"><i class="fa-solid fa-user"></i><span>${l.customerName}</span></div>`,2));
-        if (l.address) customerDetails.push(makeCardObject('address','주소',`<div class="work-info-line address"><i class="fa-solid fa-map-marker-alt"></i><span>${l.address}</span></div>`));
-        if (l.equips) {
-            let eqStr = Object.entries(l.equips).filter(e => e[1] > 0)
-                .map(e => formatCardTagValue('equipments', e[0], Number(e[1]) || 1)).join(', ');
-            if (eqStr) customerDetails.push(makeCardObject('equipment','장비',`<div class="work-info-line equipment" style="${excludedCardStyle('equipments')}"><i class="fa-solid fa-box"></i><span>${eqStr}</span></div>`,2));
-        }
+        if (l.note || keepsEmptyObject('note')) workDetails.push(makeCardObject('note','특이사항',`<div class="work-info-line note">${l.note ? '<i class="fa-solid fa-triangle-exclamation"></i>' : ''}<span>${l.note || ''}</span></div>`));
+        if (l.customerName || keepsEmptyObject('customer')) customerDetails.push(makeCardObject('customer','고객명',`<div class="work-info-line customer">${l.customerName ? '<i class="fa-solid fa-user"></i>' : ''}<span>${l.customerName || ''}</span></div>`,2));
+        if (l.address || keepsEmptyObject('address')) customerDetails.push(makeCardObject('address','주소',`<div class="work-info-line address">${l.address ? '<i class="fa-solid fa-map-marker-alt"></i>' : ''}<span>${l.address || ''}</span></div>`));
+        const eqStr = Object.entries(l.equips || {}).filter(e => Number(e[1]) > 0)
+            .map(e => formatCardTagValue('equipments', e[0], Number(e[1]) || 1)).join(', ');
+        if (eqStr || keepsEmptyObject('equipment')) customerDetails.push(makeCardObject('equipment','장비',`<div class="work-info-line equipment" style="${excludedCardStyle('equipments')}">${eqStr ? '<i class="fa-solid fa-box"></i>' : ''}<span>${eqStr}</span></div>`,2));
 
         // 시작/종료/총시간 (특수 그룹 — 태그 목록이 아니라 log.startTime/endTime/totalMin에 직접 저장)
-        if (l.startTime || l.endTime) {
+        if (l.startTime || l.endTime || keepsEmptyObject('duration')) {
             const totalStr = l.totalMin ? window.formatDurationMin(l.totalMin) : '--:--';
-            workDetails.push(makeCardObject('duration','작업시간',`<div class="work-info-line duration"><i class="fa-solid fa-hourglass-half"></i><span>${l.startTime || '--:--'}~${l.endTime || '--:--'} (${totalStr})</span></div>`,2));
+            const durationText = l.startTime || l.endTime ? `${l.startTime || '--:--'}~${l.endTime || '--:--'} (${totalStr})` : '';
+            workDetails.push(makeCardObject('duration','작업시간',`<div class="work-info-line duration">${durationText ? '<i class="fa-solid fa-hourglass-half"></i>' : ''}<span>${durationText}</span></div>`,2));
         }
 
         // 커스텀 그룹 값 카드에 표시
@@ -426,29 +429,30 @@ window.getLogCardHtml = (l, indexStr = '') => {
         ];
         customGroups.forEach((g, groupIndex) => {
             const val = l.customGroups && l.customGroups[g.id];
-            if (val && (Array.isArray(val) ? val.length > 0 : val)) {
+            const customWidgetSetting = cardWidgetSettings[`custom:${g.id}`] || {};
+            if ((val && (Array.isArray(val) ? val.length > 0 : val)) || (Object.keys(customWidgetSetting).length && customWidgetSetting.hidden !== true)) {
                 const quantities = l.tagQuantities && l.tagQuantities[g.id] || {};
-                const valStr = Array.isArray(val) ? val.map(name => formatCardTagValue(g.id, name, Number(quantities[name] || 1))).join(', ') : formatCardTagValue(g.id, String(val));
+                const valStr = Array.isArray(val) ? val.map(name => formatCardTagValue(g.id, name, Number(quantities[name] || 1))).join(', ') : (val ? formatCardTagValue(g.id, String(val)) : '');
                 const safeGroupTitle = String(g.title || '선택태그').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 const palette = customCardPalette[groupIndex % customCardPalette.length];
-                const customWidgetSetting = window.getWorkCardWidgetSettings()[`custom:${g.id}`] || {};
                 const customTitleVisible = !!customWidgetSetting.titleVisible;
                 const customTitlePosition = customWidgetSetting.titlePosition === 'top' ? 'top' : 'inline';
                 const customTitleMarker = customWidgetSetting.titleMarker ? '<span class="work-card-title-marker" aria-hidden="true"></span>' : '';
                 customDetails.push({
                     key: `custom:${g.id}`,
                     label: g.title || '선택태그',
-                    html: `<aside class="work-custom-panel work-card-section title-position-${customTitlePosition}" data-card-zone="work" style="--custom-accent:${palette[0]};--custom-bg:${palette[1]};" data-card-section-key="custom:${g.id}" data-card-section-label="${safeGroupTitle}">${customTitleVisible && customTitlePosition === 'top' ? `<b class="work-card-object-title">${customTitleMarker}${safeGroupTitle}</b>` : ''}<div class="work-info-line custom" style="${excludedCardStyle(g.id)}"><i class="fa-solid fa-tag"></i><span>${customTitleVisible && customTitlePosition === 'inline' ? `<b>${customTitleMarker}${safeGroupTitle}</b><span class="work-custom-title-separator"> : </span>` : ''}${valStr}</span></div></aside>`
+                    html: `<aside class="work-custom-panel work-card-section title-position-${customTitlePosition}" data-card-zone="work" style="--custom-accent:${palette[0]};--custom-bg:${palette[1]};" data-card-section-key="custom:${g.id}" data-card-section-label="${safeGroupTitle}">${customTitleVisible && customTitlePosition === 'top' ? `<b class="work-card-object-title">${customTitleMarker}${safeGroupTitle}</b>` : ''}<div class="work-info-line custom" style="${excludedCardStyle(g.id)}">${valStr ? '<i class="fa-solid fa-tag"></i>' : ''}<span>${customTitleVisible && customTitlePosition === 'inline' ? `<b>${customTitleMarker}${safeGroupTitle}</b><span class="work-custom-title-separator"> : </span>` : ''}${valStr}</span></div></aside>`
                 });
             }
         });
 
-        if (l.coworkers && l.coworkers.length > 0) {
-            workDetails.push(makeCardObject('manager','매니저',`<div class="work-info-line manager" style="${excludedCardStyle('coworkers')}"><i class="fa-solid fa-user-group"></i><span>${formatWorkQtyNames(l.coworkers, 'coworkers')}</span></div>`,3));
+        if ((l.coworkers && l.coworkers.length > 0) || keepsEmptyObject('manager')) {
+            const managerText = formatWorkQtyNames(l.coworkers || [], 'coworkers');
+            workDetails.push(makeCardObject('manager','매니저',`<div class="work-info-line manager" style="${excludedCardStyle('coworkers')}">${managerText ? '<i class="fa-solid fa-user-group"></i>' : ''}<span>${managerText}</span></div>`,3));
         }
         workDetails.push(makeCardObject('modified','수정시간',`<div class="log-time work-card-modified">${l.m}/${l.d}(${dayStr}) ${l.time || ''}</div>`,3));
-        if (l.imgs && l.imgs.length > 0) {
-            workDetails.push(makeCardObject('images','사진',`<div class="log-img-list work-card-images">${l.imgs.map((i, imgIdx) => `<img src="${i.src}" onclick="event.stopPropagation(); window.openImageViewer(${imgIdx}, 'log', '${l.id}')">`).join('')}</div>`));
+        if ((l.imgs && l.imgs.length > 0) || keepsEmptyObject('images')) {
+            workDetails.push(makeCardObject('images','사진',`<div class="log-img-list work-card-images">${(l.imgs || []).map((i, imgIdx) => `<img src="${i.src}" onclick="event.stopPropagation(); window.openImageViewer(${imgIdx}, 'log', '${l.id}')">`).join('')}</div>`));
             imgsHtml = '';
         }
 
