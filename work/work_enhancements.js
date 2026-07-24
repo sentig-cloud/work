@@ -949,6 +949,7 @@
     window.isSearchEditMode = false;
     window.isSearchOrderMode = false;
     window.selectedSearchGroupIds = new Set();
+    window.searchMultiValues = window.searchMultiValues instanceof Map ? window.searchMultiValues : new Map();
     const ensureSearchPicker = () => {
         let picker = document.getElementById('searchWin95Picker');
         if (picker) return picker;
@@ -961,7 +962,21 @@
             <div id="searchPickerOptions" class="search-picker-options"></div>
         </div>`;
         picker.addEventListener('pointerdown', event => {
-            if (event.target === picker || event.target.closest('.search-picker-close')) window.closeSearchPicker();
+            if (event.target === picker || event.target.closest('.search-picker-close')) {
+                event.stopPropagation();
+            }
+        });
+        picker.addEventListener('pointerup', event => {
+            if (event.target === picker || event.target.closest('.search-picker-close')) {
+                event.stopPropagation();
+            }
+        });
+        picker.addEventListener('click', event => {
+            if (event.target === picker || event.target.closest('.search-picker-close')) {
+                event.preventDefault();
+                event.stopPropagation();
+                window.closeSearchPicker();
+            }
         });
         document.getElementById('searchLayer')?.appendChild(picker);
         return picker;
@@ -973,8 +988,16 @@
         document.querySelectorAll('#searchLayer select.search-picker-native').forEach(select => {
             const trigger = select.nextElementSibling;
             if (!trigger?.classList.contains('search-picker-trigger')) return;
-            trigger.textContent = select.options[select.selectedIndex]?.textContent || '선택';
-            trigger.classList.toggle('has-selection', !!select.value);
+            const selectedValues = select.dataset.searchGroup
+                ? [...(window.searchMultiValues.get(select.id) || [])]
+                : (select.value ? [select.value] : []);
+            const selectedLabels = selectedValues.map(value =>
+                [...select.options].find(option => option.value === value)?.textContent || value
+            );
+            trigger.textContent = selectedLabels.length
+                ? selectedLabels.join(' + ')
+                : (select.options[0]?.textContent || '선택');
+            trigger.classList.toggle('has-selection', selectedLabels.length > 0);
         });
     };
     window.openSearchPicker = selectId => {
@@ -982,16 +1005,34 @@
         const select = document.getElementById(selectId);
         if (!select) return;
         const picker = ensureSearchPicker();
+        const isMulti = !!select.dataset.searchGroup;
+        const multiValues = isMulti
+            ? new Set(window.searchMultiValues.get(select.id) || (select.value ? [select.value] : []))
+            : null;
         const title = select.options[0]?.textContent?.replace(/[\[\]]/g, '').trim() || '선택';
-        document.getElementById('searchPickerTitle').textContent = title;
+        document.getElementById('searchPickerTitle').textContent = `${title}${isMulti ? ' · 다중 선택' : ''}`;
         const optionsArea = document.getElementById('searchPickerOptions');
         optionsArea.innerHTML = '';
         [...select.options].forEach(option => {
             const button = document.createElement('button');
             button.type = 'button';
-            button.className = `w95-btn search-picker-option${option.value === select.value ? ' is-selected' : ''}`;
+            const selected = isMulti
+                ? (option.value ? multiValues.has(option.value) : multiValues.size === 0)
+                : option.value === select.value;
+            button.className = `w95-btn search-picker-option${selected ? ' is-selected' : ''}`;
             button.textContent = option.textContent;
             button.addEventListener('click', () => {
+                if (isMulti) {
+                    if (!option.value) multiValues.clear();
+                    else if (multiValues.has(option.value)) multiValues.delete(option.value);
+                    else multiValues.add(option.value);
+                    window.searchMultiValues.set(select.id, multiValues);
+                    select.value = [...multiValues][0] || '';
+                    window.handleSelectChange?.(select);
+                    window.refreshSearchPickerTriggers();
+                    window.openSearchPicker(select.id);
+                    return;
+                }
                 select.value = option.value;
                 window.handleSelectChange?.(select);
                 window.refreshSearchPickerTriggers();
@@ -1172,6 +1213,12 @@
     searchGrid?.addEventListener('pointerup', endSearchDrag);
     searchGrid?.addEventListener('pointercancel', endSearchDrag);
 
+    const openSearchBase = window.openSearch;
+    window.openSearch = () => {
+        window.searchMultiValues.clear();
+        openSearchBase?.();
+        window.enhanceSearchSelects();
+    };
     const closeSearchBase = window.closeSearch;
     window.closeSearch = () => {
         window.closeSearchPicker();
@@ -1181,7 +1228,19 @@
 
     window.removeFilter = selectId => {
         const el = document.getElementById(selectId); if (el) el.value = '';
+        window.searchMultiValues.delete(selectId);
         if (selectId === 'searchMonth') window.updateSearchFilters(null);
+        window.refreshSearchPickerTriggers();
+        window.doSearch();
+    };
+    window.removeSearchMultiValue = (selectId, encodedValue) => {
+        const value = decodeURIComponent(encodedValue || '');
+        const values = new Set(window.searchMultiValues.get(selectId) || []);
+        values.delete(value);
+        if (values.size) window.searchMultiValues.set(selectId, values);
+        else window.searchMultiValues.delete(selectId);
+        const select = document.getElementById(selectId);
+        if (select) select.value = [...values][0] || '';
         window.refreshSearchPickerTriggers();
         window.doSearch();
     };
@@ -1223,11 +1282,14 @@
         const ot = document.getElementById('searchOT')?.value || '';
         const duty = document.getElementById('searchDuty')?.value || '';
         const selections = [...document.querySelectorAll('#searchFilterGrid select[data-search-group]')]
-            .filter(el => el.value).map(el => ({ groupId: el.dataset.searchGroup, value: el.value, id: el.id }));
+            .flatMap(el => {
+                const values = [...(window.searchMultiValues.get(el.id) || (el.value ? [el.value] : []))];
+                return values.map(value => ({ groupId: el.dataset.searchGroup, value, id: el.id }));
+            });
         const filtersArea = document.getElementById('activeFiltersArea');
         const chips = [];
         if (monthValue) chips.push(`<button class="w95-btn" onclick="window.removeFilter('searchMonth')">${monthValue}월 ×</button>`);
-        selections.forEach(s => chips.push(`<button class="w95-btn" onclick="window.removeFilter('${s.id}')">${esc(s.value)} ×</button>`));
+        selections.forEach(s => chips.push(`<button class="w95-btn" onclick="window.removeSearchMultiValue('${s.id}','${encodeURIComponent(s.value)}')">${esc(s.value)} ×</button>`));
         if (ox) chips.push(`<button class="w95-btn" onclick="window.removeFilter('searchOX')">${ox === 'none' ? 'O/X 표시 안 됨' : `${ox} 표시`} ×</button>`);
         if (ot) chips.push(`<button class="w95-btn" onclick="window.removeFilter('searchOT')">OT ${ot === 'yes' ? '있음' : '없음'} ×</button>`);
         if (duty) chips.push(`<button class="w95-btn" onclick="window.removeFilter('searchDuty')">당직 ${duty === 'yes' ? '있음' : '없음'} ×</button>`);

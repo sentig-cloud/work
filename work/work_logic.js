@@ -827,7 +827,9 @@ window.downloadViewerImage = async () => {
         };
         const pad = value => String(value || 0).padStart(2, "0");
         const timestampFromImage = String(image.id || "").match(/(\d{13})/);
-        const createdDate = timestampFromImage ? new Date(Number(timestampFromImage[1])) : null;
+        const createdDate = timestampFromImage
+            ? new Date(Number(timestampFromImage[1]))
+            : (image.createdAt || image.updatedAt ? new Date(image.createdAt || image.updatedAt) : null);
         const validCreatedDate = createdDate && !Number.isNaN(createdDate.getTime()) ? createdDate : null;
         const ymd = owningLog
             ? `${owningLog.y}${pad(owningLog.m)}${pad(owningLog.d)}`
@@ -840,7 +842,9 @@ window.downloadViewerImage = async () => {
             ? `${pad(validCreatedDate.getHours())}${pad(validCreatedDate.getMinutes())}${pad(validCreatedDate.getSeconds())}`
             : logTime || "000000";
         const inferredName = ymd ? `${ymd}-${hms}.${extension}` : `image.${extension}`;
-        const rawOriginalName = meaningfulName(image.originalName) || meaningfulName(headerName) || inferredName;
+        // 다운로드 파일명은 촬영/등록 시각을 찾기 쉬운 고정 형식으로 통일한다.
+        // 원본명은 서버 메타데이터에 계속 보존하되 다운로드명에는 날짜-시간을 우선한다.
+        const rawOriginalName = inferredName || meaningfulName(image.originalName) || meaningfulName(headerName);
         let defaultFileName = String(rawOriginalName)
             .normalize("NFC")
             .replace(/^.*[\\/]/, "")
