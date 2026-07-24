@@ -294,6 +294,14 @@ window.getLogCardHtml = (l, indexStr = '') => {
         };
         const selectedCardColor = getSelectedCardColor();
         if (selectedCardColor) cardStyle += `--work-card-color:${selectedCardColor};`;
+        const getCardMonthCount = (groupId, name) => (window.logs || []).reduce((sum, log) => {
+            if (!log || log.cat !== 'work' || log.y !== l.y || log.m !== l.m) return sum;
+            if (window.isLogGroupExcluded?.(log, groupId)) return sum;
+            const value = window.getGroupValueFromLog?.(log, groupId);
+            if (groupId === 'equipments') return sum + (Number(value?.[name] || 0) > 0 ? 1 : 0);
+            if (Array.isArray(value)) return sum + (value.includes(name) ? 1 : 0);
+            return sum + (value === name ? 1 : 0);
+        }, 0);
 
         const formatCardTagValue = (groupId, name, workQty = 1) => {
             const group = window.getGroupById?.(groupId);
@@ -304,7 +312,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
                     && window.groupIncludesMonthly?.(groupId)
                     && window.isTagNumberEnabled?.(tag) !== false;
                 const showWorkCount = window.groupShowsCount?.(groupId);
-                const monthly = showMonthly ? Number(window.getGroupTagMonthlyCount?.(groupId, name) || 0) : 0;
+                const monthly = showMonthly ? getCardMonthCount(groupId, name) : 0;
                 const workCount = showWorkCount ? Number(workQty || 1) : 0;
                 if (showMonthly && monthly >= 2) values.push(monthly);
                 if (showWorkCount && workCount >= 2 && !values.includes(workCount)) values.push(workCount);

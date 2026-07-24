@@ -1690,6 +1690,7 @@
         if (!input || !modal) return;
         input.value = tag.name;
         modal.style.display = "flex";
+        document.getElementById('tagColorPickerPanel')?.classList.remove('is-open');
         window.refreshTagEditControls();
         setTimeout(() => input.select(), 80);
     };
@@ -1820,6 +1821,13 @@
         window.renderMain?.();
     };
 
+    window.toggleTagColorPicker = force => {
+        const panel = document.getElementById('tagColorPickerPanel');
+        if (!panel) return;
+        const open = typeof force === 'boolean' ? force : !panel.classList.contains('is-open');
+        panel.classList.toggle('is-open', open);
+    };
+
     window.setTagCardColor = color => {
         const tag = getTagArray(window.editingTagType)?.[window.editingTagIndex];
         if (!tag || !/^#[0-9a-f]{6}$/i.test(color || '')) return;
@@ -1829,6 +1837,7 @@
         if (window.saveLocal) window.saveLocal("group-settings");
         window.renderChangedTagType(window.editingTagType);
         window.renderMain?.();
+        window.toggleTagColorPicker(false);
     };
 
     // 이름은 텍스트 입력이라 즉시 저장이 어려우므로, 포커스가 빠지거나(blur) 엔터를 누르면 그 순간 반영+저장
@@ -2571,6 +2580,34 @@
             [...target.classList].filter(name => name.startsWith('widget-align-h-') || name.startsWith('widget-align-v-')).forEach(name => target.classList.remove(name));
             target.classList.add(`widget-align-h-${setting.alignH || 'none'}`, `widget-align-v-${setting.alignV || 'none'}`);
         };
+        const refreshPreviewAppearance = item => {
+            if (!item) return;
+            const setting = settings[item.dataset.key] || {};
+            const target = item.querySelector('.card-free-preview > .work-card-subwidget,.card-free-preview > .work-card-widget');
+            if (!target) return;
+            ['is-status-mode','has-content-box','is-emphasis','is-underlined','is-italic'].forEach(name => {
+                const enabled = name === 'is-status-mode' ? !!setting.statusMode
+                    : name === 'has-content-box' ? !!setting.contentBox
+                    : name === 'is-emphasis' ? !!setting.emphasis
+                    : name === 'is-underlined' ? !!setting.underline : !!setting.italic;
+                item.classList.toggle(name, enabled);
+                target.classList.toggle(name, enabled);
+            });
+            [...target.classList].filter(name => name.startsWith('widget-font-')).forEach(name => target.classList.remove(name));
+            target.classList.add(`widget-font-${setting.fontSize || 'normal'}`);
+            const vars = [
+                ['--widget-text-color', setting.color],
+                ['--widget-bg-color', setting.backgroundColor],
+                ['--widget-border-color', setting.borderColor],
+                ['--widget-content-bg', setting.contentBackgroundColor]
+            ];
+            vars.forEach(([name, value]) => {
+                if (value) { item.style.setProperty(name, value); target.style.setProperty(name, value); }
+                else { item.style.removeProperty(name); target.style.removeProperty(name); }
+            });
+            refreshPreviewAlignment(item);
+            refreshPreviewTitle(item);
+        };
         const positionObjectPopup = item => {
             objectPopup.classList.add('is-open');
             const dock = () => {
@@ -2624,8 +2661,11 @@
             item.dataset.boxStyle = settings[key].boxStyle; item.dataset.shadowStyle = settings[key].shadowStyle;
             item.classList.toggle('is-underlined', !!settings[key].underline); item.classList.toggle('is-italic', !!settings[key].italic);
             if (setting.color) item.style.setProperty('--widget-text-color', setting.color);
+            if (setting.backgroundColor) item.style.setProperty('--widget-bg-color', setting.backgroundColor);
             if (setting.borderColor) item.style.setProperty('--widget-border-color', setting.borderColor);
+            if (setting.contentBackgroundColor) item.style.setProperty('--widget-content-bg', setting.contentBackgroundColor);
             canvas.appendChild(item); place(item); persist(item);
+            refreshPreviewAppearance(item);
         });
         const knownLabels = {
             'object:number':'번호', 'object:date':'일자', 'object:time':'시간', 'object:status':'상태',
@@ -2758,28 +2798,29 @@
                 const space = nearestSpace(+selected.dataset.w, +selected.dataset.h, +selected.dataset.x, +selected.dataset.y, selected);
                 selected.dataset.x = space.x; selected.dataset.y = space.y;
             }
+            refreshPreviewAppearance(selected);
             place(selected); persist(selected); refreshAdvancedState();
             if (settingsUnlocked) positionObjectPopup(selected);
         });
         colorInput.addEventListener('input', () => {
             if (!selected || !settingsUnlocked) return;
             settings[selected.dataset.key] = { ...(settings[selected.dataset.key] || {}), color:colorInput.value };
-            selected.style.setProperty('--widget-text-color', colorInput.value); commitWidgetSettings(settings);
+            selected.style.setProperty('--widget-text-color', colorInput.value); refreshPreviewAppearance(selected); commitWidgetSettings(settings);
         });
         bgColorInput.addEventListener('input', () => {
             if (!selected || !settingsUnlocked) return;
             settings[selected.dataset.key] = { ...(settings[selected.dataset.key] || {}), backgroundColor:bgColorInput.value };
-            selected.style.setProperty('--widget-bg-color', bgColorInput.value); commitWidgetSettings(settings);
+            selected.style.setProperty('--widget-bg-color', bgColorInput.value); refreshPreviewAppearance(selected); commitWidgetSettings(settings);
         });
         borderColorInput.addEventListener('input', () => {
             if (!selected || !settingsUnlocked) return;
             settings[selected.dataset.key] = { ...(settings[selected.dataset.key] || {}), borderColor:borderColorInput.value };
-            selected.style.setProperty('--widget-border-color', borderColorInput.value); commitWidgetSettings(settings);
+            selected.style.setProperty('--widget-border-color', borderColorInput.value); refreshPreviewAppearance(selected); commitWidgetSettings(settings);
         });
         contentBgColorInput.addEventListener('input', () => {
             if (!selected || !settingsUnlocked) return;
             settings[selected.dataset.key] = { ...(settings[selected.dataset.key] || {}), contentBackgroundColor:contentBgColorInput.value, contentBox:true };
-            selected.classList.add('has-content-box'); selected.style.setProperty('--widget-content-bg', contentBgColorInput.value); commitWidgetSettings(settings); refreshAdvancedState();
+            selected.classList.add('has-content-box'); selected.style.setProperty('--widget-content-bg', contentBgColorInput.value); refreshPreviewAppearance(selected); commitWidgetSettings(settings); refreshAdvancedState();
         });
         canvas.addEventListener('pointerdown', event => {
             if (event.pointerType === 'touch') activeTouches.set(event.pointerId, event.clientY);

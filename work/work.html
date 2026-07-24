@@ -6,7 +6,7 @@
     <title>Work Master Local Pro</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-<link rel="stylesheet" href="work_style.css?v=20260724-32">
+<link rel="stylesheet" href="work_style.css?v=20260724-33">
 </head>
 <body>
 
@@ -293,7 +293,7 @@
     </div>
         
     <div id="mapAppModal" class="modal-overlay" style="z-index: 2600;">
-        <div class="modal-box w95-window" style="max-width: 250px;">
+        <div class="modal-box w95-window tag-edit-window" style="max-width:300px;">
             <div class="w95-titlebar"><span>지도 앱 선택</span><button type="button" class="w95-btn" onclick="window.closeMapAppModal()">X</button></div>
             <div style="padding:10px; display:flex; flex-direction:column; gap:8px;">
                 <button type="button" class="w95-btn" style="height:40px; font-size:1.1rem; font-weight:bold;" onclick="window.openSpecificMap('tmap')">T맵</button>
@@ -338,14 +338,16 @@
                 </div>
                 <div class="tag-edit-control-row tag-edit-options-row" style="margin-top:6px;">
                     <button type="button" id="tagCardDisplayBtn" class="w95-btn tag-toggle-btn" onclick="window.toggleTagCardDisplay()">카드</button>
-                    <button type="button" id="tagCardColorBtn" class="w95-btn tag-toggle-btn" onclick="document.getElementById('tagCardColorInput').click()">색변</button>
+                    <button type="button" id="tagCardColorBtn" class="w95-btn tag-toggle-btn" onclick="window.toggleTagColorPicker()">색변</button>
                     <input type="color" id="tagCardColorInput" value="#334155" hidden onchange="window.setTagCardColor(this.value)">
                     <button type="button" id="tagShowCountBtn" class="w95-btn tag-toggle-btn" onclick="window.toggleTagShowCount()">숫자</button>
                     <button type="button" id="tagMonthlyBtn" class="w95-btn tag-toggle-btn" onclick="window.toggleTagMonthly()">월별</button>
                     <button type="button" id="tagCountSuffixBtn" class="w95-btn tag-toggle-btn" onclick="window.toggleTagShowQty()">갯수</button>
                     <button type="button" id="tagDuplicateBtn" class="w95-btn tag-toggle-btn" title="켜면 그룹 내 여러 항목을 동시에 선택 가능" onclick="window.toggleGroupSelectionMode()">중복</button>
                 </div>
-                <div class="tag-card-color-palette" aria-label="카드 배경색 빠른 선택">
+                <div id="tagColorPickerPanel" class="tag-color-picker-panel w95-window" aria-label="카드 배경색 선택">
+                    <div class="w95-titlebar"><span>색변</span><button type="button" class="w95-btn" onclick="window.toggleTagColorPicker(false)">X</button></div>
+                    <div class="tag-card-color-palette" aria-label="카드 배경색 빠른 선택">
                     <button type="button" style="--swatch:#c7c9cc" onclick="window.setTagCardColor('#c7c9cc')" title="회색"></button>
                     <button type="button" style="--swatch:#f3d7b5" onclick="window.setTagCardColor('#f3d7b5')" title="베이지"></button>
                     <button type="button" style="--swatch:#fecaca" onclick="window.setTagCardColor('#fecaca')" title="빨강"></button>
@@ -358,6 +360,8 @@
                     <button type="button" style="--swatch:#ddd6fe" onclick="window.setTagCardColor('#ddd6fe')" title="보라"></button>
                     <button type="button" style="--swatch:#fbcfe8" onclick="window.setTagCardColor('#fbcfe8')" title="분홍"></button>
                     <button type="button" style="--swatch:#d6d3d1" onclick="window.setTagCardColor('#d6d3d1')" title="진회색"></button>
+                    </div>
+                    <button type="button" class="w95-btn tag-color-custom-button" onclick="document.getElementById('tagCardColorInput').click()">다른 색상…</button>
                 </div>
             </div>
         </div>
@@ -455,11 +459,11 @@
 <script src="work_commute.js"></script>
 <script src="work_tag_manager.js"></script>
 <script src="work_sync.js?v=20260722-10"></script>
-<script src="work_render.js?v=20260724-32"></script>
+<script src="work_render.js?v=20260724-33"></script>
 <script src="work_ui.js?v=20260722-1"></script>
 <script src="work_modal.js?v=20260722-4"></script>
 <script src="work_logic.js?v=20260722-3"></script>
-<script src="work_enhancements.js?v=20260724-32"></script>
+<script src="work_enhancements.js?v=20260724-33"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 <script src="work_export_html.js?v=20260721-2"></script>
