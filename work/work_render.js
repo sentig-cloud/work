@@ -224,7 +224,8 @@ window.getLogCardHtml = (l, indexStr = '') => {
     else if (l.status === '공사') statusClass = 'status-construction';
     else if (l.status === '이관') statusClass = 'status-transfer';
 
-    let cardClass = `card-${l.cat} ${statusClass}`;
+    // 작업 카드의 상태는 배지로만 표현한다. 상태 클래스가 카드 본문/외곽 서식을 다시 만들지 않게 분리한다.
+    let cardClass = `card-${l.cat} ${l.cat === 'work' ? '' : statusClass}`;
     let cardStyle = '';
     let displayMemo = l.memo;
 
@@ -332,14 +333,15 @@ window.getLogCardHtml = (l, indexStr = '') => {
         const freeWidgetStyle = (setting, defaultCols = 4) => {
             const layout = getFreeWidgetLayout(setting, defaultCols);
             const color = /^#[0-9a-f]{6}$/i.test(setting.color || '') ? setting.color : '';
-            const backgroundColor = /^#[0-9a-f]{6}$/i.test(setting.backgroundColor || '') ? setting.backgroundColor : '';
             const borderColor = /^#[0-9a-f]{6}$/i.test(setting.borderColor || '') ? setting.borderColor : '';
-            const contentBackgroundColor = /^#[0-9a-f]{6}$/i.test(setting.contentBackgroundColor || '') ? setting.contentBackgroundColor : '';
             const placement = layout.hasPosition
                 ? `grid-column:${layout.x} / span ${layout.w};grid-row:${layout.y} / span ${layout.h};`
                 : `grid-column:span ${layout.w};grid-row:span ${layout.h};`;
-            return `${placement}${color ? `--widget-text-color:${color};` : ''}${backgroundColor ? `--widget-bg-color:${backgroundColor};` : ''}${borderColor ? `--widget-border-color:${borderColor};` : ''}${contentBackgroundColor ? `--widget-content-bg:${contentBackgroundColor};` : ''}`;
+            const zoneLineLeft = -((layout.x - 1) / layout.w * 100);
+            const zoneLineWidth = 12 / layout.w * 100;
+            return `${placement}--widget-x:${layout.x};--widget-w:${layout.w};--zone-line-left:${zoneLineLeft}%;--zone-line-width:${zoneLineWidth}%;${color ? `--widget-text-color:${color};` : ''}${borderColor ? `--widget-border-color:${borderColor};` : ''}`;
         };
+        const seenCardZones = new Set();
         const makeCardObject = (key, label, inner, defaultCols = 4) => {
             const setting = window.getWorkCardWidgetSettings()[`object:${key}`] || {};
             const layout = getFreeWidgetLayout(setting, defaultCols);
@@ -355,7 +357,8 @@ window.getLogCardHtml = (l, indexStr = '') => {
             const zone = ['number','date','time','status','taskNo','alerts','delete','duration'].includes(key) ? 'basic'
                 : ['customer','address','manager'].includes(key) ? 'customer'
                 : ['images','modified'].includes(key) ? 'other' : 'work';
-            return `<div class="work-card-subwidget title-position-${titlePosition} widget-font-${fontSize} widget-align-h-${alignH} widget-align-v-${alignV} widget-border-${borderStyle} widget-box-${boxStyle} widget-shadow-${shadowStyle}${setting.emphasis ? ' is-emphasis' : ''}${setting.underline ? ' is-underlined' : ''}${setting.italic ? ' is-italic' : ''}${setting.statusMode ? ' is-status-mode' : ''}${setting.contentBox ? ' has-content-box' : ''}${setting.hidden ? ' is-widget-hidden' : ''}" data-card-zone="${zone}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="object:${key}" data-card-section-label="${label}" style="${freeWidgetStyle(setting, defaultCols)}">${title}${inner}</div>`;
+            const zoneStart = !seenCardZones.has(zone); seenCardZones.add(zone);
+            return `<div class="work-card-subwidget title-position-${titlePosition} widget-font-${fontSize} widget-align-h-${alignH} widget-align-v-${alignV} widget-border-none widget-box-plain widget-shadow-none${setting.emphasis ? ' is-emphasis' : ''}${setting.underline ? ' is-underlined' : ''}${setting.italic ? ' is-italic' : ''}${setting.hidden ? ' is-widget-hidden' : ''}${zoneStart ? ' is-zone-start' : ''}" data-card-zone="${zone}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="object:${key}" data-card-section-label="${label}" style="${freeWidgetStyle(setting, defaultCols)}">${title}${inner}</div>`;
         };
         const sortCardObjects = items => {
             const order = window.getWorkCardSectionOrder(items.map(html => html.match(/data-card-section-key="([^"]+)"/)?.[1]).filter(Boolean));
@@ -453,7 +456,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
                     const borderStyle = ['default','none','bold'].includes(setting.borderStyle) ? setting.borderStyle : 'none';
                     const boxStyle = ['plain','square','rounded'].includes(setting.boxStyle) ? setting.boxStyle : 'plain';
                     const shadowStyle = ['none','soft','strong'].includes(setting.shadowStyle) ? setting.shadowStyle : 'none';
-                    return `<div class="work-card-widget widget-font-${fontSize} widget-align-h-${alignH} widget-align-v-${alignV} widget-border-${borderStyle} widget-box-${boxStyle} widget-shadow-${shadowStyle}${isContainer ? ' is-container-widget' : ''}${setting.emphasis ? ' is-emphasis' : ''}${setting.underline ? ' is-underlined' : ''}${setting.italic ? ' is-italic' : ''}${setting.statusMode ? ' is-status-mode' : ''}${setting.contentBox ? ' has-content-box' : ''}${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="${section.key}" data-card-section-label="${section.label || section.key}" style="${isContainer ? '' : freeWidgetStyle(setting, 4)}">${section.html}</div>`;
+                    return `<div class="work-card-widget widget-font-${fontSize} widget-align-h-${alignH} widget-align-v-${alignV} widget-border-none widget-box-plain widget-shadow-none${isContainer ? ' is-container-widget' : ''}${setting.emphasis ? ' is-emphasis' : ''}${setting.underline ? ' is-underlined' : ''}${setting.italic ? ' is-italic' : ''}${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="${section.key}" data-card-section-label="${section.label || section.key}" style="${isContainer ? '' : freeWidgetStyle(setting, 4)}">${section.html}</div>`;
                 }).join('')}</div>
             </div>
         `;

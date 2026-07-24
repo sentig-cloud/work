@@ -2392,10 +2392,10 @@
             </div>
             <div class="card-free-canvas" aria-label="12칸 카드 배치 영역"></div>
             <div class="card-free-object-popup w95-out" role="group" aria-label="선택 객체 표시 설정">
-                <div class="card-free-setting-group"><b>표시</b><button type="button" class="w95-btn" data-free-action="title">제목</button><button type="button" class="w95-btn" data-free-action="title-marker">제목 점</button><button type="button" class="w95-btn" data-free-action="title-position">제목: 상단</button><button type="button" class="w95-btn" data-free-action="status">상태</button></div>
+                <div class="card-free-setting-group"><b>표시</b><button type="button" class="w95-btn" data-free-action="title">제목</button><button type="button" class="w95-btn" data-free-action="title-marker">제목 점</button><button type="button" class="w95-btn" data-free-action="title-position">제목: 상단</button></div>
                 <div class="card-free-setting-group"><b>글자</b><button type="button" class="w95-btn" data-free-action="font">글자 중</button><button type="button" class="w95-btn" data-free-action="emphasis">강조</button><button type="button" class="w95-btn" data-free-action="underline">밑줄</button><button type="button" class="w95-btn" data-free-action="italic">기울임</button><label class="card-free-color-label">색<input type="color" class="card-free-color" value="#111827" title="글자 색상"></label></div>
                 <div class="card-free-setting-group"><b>칸 기준 정렬</b><button type="button" class="w95-btn" data-free-action="align-h">칸 가로: 없음</button><button type="button" class="w95-btn" data-free-action="align-v">칸 세로: 없음</button></div>
-                <div class="card-free-setting-group"><b>상자</b><button type="button" class="w95-btn" data-free-action="content-box">내용 상자</button><label class="card-free-color-label">상자색<input type="color" class="card-free-content-bg-color" value="#e2e8f0" title="내용 상자 색상"></label><button type="button" class="w95-btn" data-free-action="box">외곽: 기본</button><button type="button" class="w95-btn" data-free-action="border">테두리: 없음</button><button type="button" class="w95-btn" data-free-action="shadow">음영: 없음</button><label class="card-free-color-label">배경<input type="color" class="card-free-bg-color" value="#ffffff" title="배경 색상"></label><label class="card-free-color-label">선<input type="color" class="card-free-border-color" value="#334155" title="테두리 색상"></label></div>
+                <div class="card-free-setting-group card-free-box-settings"><b>상자</b><button type="button" class="w95-btn" data-free-action="content-box">내용 상자</button><label class="card-free-color-label">상자색<input type="color" class="card-free-content-bg-color" value="#e2e8f0" title="내용 상자 색상"></label><button type="button" class="w95-btn" data-free-action="box">외곽: 기본</button><button type="button" class="w95-btn" data-free-action="border">테두리: 없음</button><button type="button" class="w95-btn" data-free-action="shadow">음영: 없음</button><label class="card-free-color-label">배경<input type="color" class="card-free-bg-color" value="#ffffff" title="배경 색상"></label><label class="card-free-color-label">선<input type="color" class="card-free-border-color" value="#334155" title="테두리 색상"></label></div>
                 <div class="card-free-setting-group card-free-auto-group"><b>자동 설정</b><button type="button" class="w95-btn" data-free-action="auto-color">선택 색상 자동</button><button type="button" class="w95-btn" data-free-action="auto-all">전체 자동 설정</button></div>
                 <div class="card-free-popup-actions"><button type="button" class="w95-btn" data-free-action="reset-style">꾸미기 초기화</button><button type="button" class="w95-btn" data-free-action="close-settings">닫기</button></div>
             </div>
@@ -2437,14 +2437,13 @@
         })[key] || '#f1f5f9';
         const applyAutomaticTemplate = () => {
             const centered = new Set(['object:number','object:date','object:time','object:status','object:taskNo','object:alerts','object:duration','object:modified']);
-            const boxed = new Set(['object:status','object:taskNo','object:alerts']);
             Object.keys(settings).forEach(key => {
                 if (key === '__meta' || key === 'object:delete' || !settings[key] || typeof settings[key] !== 'object') return;
                 const preserved = resetDecoration(settings[key]);
                 Object.assign(settings[key], preserved, {
                     color:autoColorForKey(key), alignH:centered.has(key) ? 'center' : 'left', alignV:'middle',
                     emphasis:['object:number','object:date','object:time','object:status','object:taskNo','object:alerts'].includes(key),
-                    contentBox:boxed.has(key), contentBackgroundColor:boxed.has(key) ? autoBoxColorForKey(key) : ''
+                    contentBox:false, contentBackgroundColor:'', backgroundColor:'', borderColor:'', boxStyle:'plain', borderStyle:'none', shadowStyle:'none'
                 });
             });
             settings.__meta = { ...(settings.__meta || {}), styleVersion:6, autoTemplate:'balanced' };
@@ -2473,6 +2472,8 @@
             const { x, y, w, h } = rectOf(item);
             item.style.gridColumn = `${x} / span ${w}`;
             item.style.gridRow = `${y} / span ${h}`;
+            item.style.setProperty('--zone-line-left', `${-((x - 1) / w * 100)}%`);
+            item.style.setProperty('--zone-line-width', `${12 / w * 100}%`);
         };
         const firstSpace = (w, h, ignore = null) => {
             const others = [...canvas.children].filter(item => item !== ignore).map(rectOf);
@@ -2610,17 +2611,14 @@
             settings[key] = { ...(settings[key] || {}), titleVisible, titleMarker:!!setting.titleMarker, titlePosition, contentBox:!!setting.contentBox, fontSize:setting.fontSize || 'normal', alignH:setting.alignH || 'none', alignV:setting.alignV || 'none', borderStyle:setting.borderStyle || 'none', boxStyle:setting.boxStyle || 'plain', shadowStyle:setting.shadowStyle || 'none' };
             item.classList.toggle('is-title-visible', titleVisible);
             item.classList.toggle('is-emphasis', !!setting.emphasis);
-            item.classList.toggle('is-status-mode', !!setting.statusMode);
-            item.classList.toggle('has-content-box', !!setting.contentBox);
+            item.classList.remove('is-status-mode','has-content-box');
             item.dataset.fontSize = settings[key].fontSize;
             item.style.setProperty('--widget-font-size', { tiny:'.56rem', small:'.66rem', normal:'.78rem', large:'.92rem', xlarge:'1.08rem', xxlarge:'1.28rem' }[settings[key].fontSize] || '.78rem');
             item.dataset.alignH = settings[key].alignH; item.dataset.alignV = settings[key].alignV; item.dataset.borderStyle = settings[key].borderStyle;
             item.dataset.boxStyle = settings[key].boxStyle; item.dataset.shadowStyle = settings[key].shadowStyle;
             item.classList.toggle('is-underlined', !!settings[key].underline); item.classList.toggle('is-italic', !!settings[key].italic);
             if (setting.color) item.style.setProperty('--widget-text-color', setting.color);
-            if (setting.backgroundColor) item.style.setProperty('--widget-bg-color', setting.backgroundColor);
             if (setting.borderColor) item.style.setProperty('--widget-border-color', setting.borderColor);
-            if (setting.contentBackgroundColor) item.style.setProperty('--widget-content-bg', setting.contentBackgroundColor);
             canvas.appendChild(item); place(item); persist(item);
         });
         const knownLabels = {
