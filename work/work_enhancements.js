@@ -922,12 +922,25 @@
         .filter(g => g && g.id !== 'duration')
         .sort((a, b) => Number(a.searchOrder ?? a.order ?? 999) - Number(b.searchOrder ?? b.order ?? 999));
     const groupSearchValue = (log, groupId) => window.getGroupValueFromLog?.(log, groupId);
-    const groupHasSearchValue = (log, groupId, name) => {
-        if (window.isLogGroupExcluded?.(log, groupId)) return false;
+    const groupSearchNames = (log, groupId) => {
         const value = groupSearchValue(log, groupId);
-        if (groupId === 'equipments') return Number(value && value[name] || 0) > 0;
-        if (Array.isArray(value)) return value.includes(name);
-        return value === name;
+        const names = new Set();
+        if (groupId === 'equipments') {
+            Object.entries(value || {}).forEach(([name, qty]) => {
+                if (Number(qty || 0) > 0) names.add(name);
+            });
+        } else if (Array.isArray(value)) {
+            value.filter(Boolean).forEach(name => names.add(String(name)));
+        } else if (value) {
+            names.add(String(value));
+        }
+        Object.entries(log?.tagQuantities?.[groupId] || {}).forEach(([name, qty]) => {
+            if (Number(qty || 0) > 0) names.add(name);
+        });
+        return [...names];
+    };
+    const groupHasSearchValue = (log, groupId, name) => {
+        return groupSearchNames(log, groupId).includes(String(name));
     };
     const searchOptionCount = (logs, groupId, name) =>
         (logs || []).reduce((n, log) => n + (groupHasSearchValue(log, groupId, name) ? 1 : 0), 0);
@@ -954,9 +967,11 @@
             const value = oldValues[g.id] || '';
             const title = g.title || searchTypeLabels[g.id] || '선택태그';
             const state = `${g.searchExcluded ? ' is-search-excluded' : ''}${g.searchHidden ? ' is-search-hidden' : ''}${window.selectedSearchGroupIds.has(g.id) ? ' is-search-selected' : ''}`;
-            const options = (g.tags || []).map(tag => {
-                const count = searchOptionCount(logs, g.id, tag.name);
-                return `<option value="${esc(tag.name)}" ${value === tag.name ? 'selected' : ''}>[${count}] ${esc(tag.name)}</option>`;
+            const optionNames = new Set((g.tags || []).map(tag => tag?.name).filter(Boolean));
+            logs.forEach(log => groupSearchNames(log, g.id).forEach(name => optionNames.add(name)));
+            const options = [...optionNames].map(name => {
+                const count = searchOptionCount(logs, g.id, name);
+                return `<option value="${esc(name)}" ${value === name ? 'selected' : ''}>[${count}] ${esc(name)}</option>`;
             }).join('');
             return `<div class="search-filter-cell${state}" data-search-group="${esc(g.id)}"><span class="search-order-handle">⠿</span>
                 <select id="${searchSelectId(g.id)}" data-search-group="${esc(g.id)}" class="m-input w95-in search-group-select" onchange="window.handleSelectChange(this)">
@@ -1097,6 +1112,36 @@
         if (selectId === 'searchMonth') window.updateSearchFilters(null);
         window.doSearch();
     };
+    const flattenSearchValues = value => {
+        if (value == null) return [];
+        if (Array.isArray(value)) return value.flatMap(flattenSearchValues);
+        if (typeof value === 'object') {
+            return Object.entries(value).flatMap(([key, child]) => [key, ...flattenSearchValues(child)]);
+        }
+        return [String(value)];
+    };
+    const buildLogKeywordText = log => {
+        const dateTokens = log?.y && log?.m && log?.d
+            ? [
+                `${log.y}-${String(log.m).padStart(2, '0')}-${String(log.d).padStart(2, '0')}`,
+                `${log.y}${String(log.m).padStart(2, '0')}${String(log.d).padStart(2, '0')}`,
+                `${log.m}월 ${log.d}일`
+            ]
+            : [];
+        return [
+            log?.memo, log?.content, log?.note, log?.taskNo, log?.address, log?.customerName,
+            log?.commuteNote, log?.taskType, log?.status, log?.workTime, log?.startTime, log?.endTime,
+            log?.personalCheck, ...dateTokens,
+            ...(Number(log?.otCount || 0) > 0 ? ['OT', `OT ${log.otCount}`] : []),
+            ...(log?.isDuty || log?.isDutyLog || log?.cat === 'duty' ? ['당직'] : []),
+            ...flattenSearchValues(log?.coworkers),
+            ...flattenSearchValues(log?.tags),
+            ...flattenSearchValues(log?.equips),
+            ...flattenSearchValues(log?.customGroups),
+            ...flattenSearchValues(log?.tagQuantities),
+            ...(log?.imgs || []).map(image => image?.originalName || '')
+        ].filter(Boolean).join(' ').toLowerCase();
+    };
     window.doSearch = () => {
         if (window.isSearchEditMode) return;
         const keyword = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
@@ -1118,9 +1163,7 @@
         const summary = document.getElementById('searchSummary');
         if (!keyword && !monthValue && !ox && !ot && !duty && !selections.length) { resultList.innerHTML = ''; summary.style.display = 'none'; return; }
         const results = (window.logs || []).filter(log => {
-            const keywordText = [log.memo, log.content, log.taskNo, log.address, log.customerName, log.commuteNote,
-                log.taskType, log.status, ...(log.coworkers || []), ...(log.tags || []),
-                ...Object.keys(log.equips || {}), ...Object.values(log.customGroups || {}).flat()].filter(Boolean).join(' ').toLowerCase();
+            const keywordText = buildLogKeywordText(log);
             return (!keyword || keywordText.includes(keyword)) &&
                 (!monthValue || Number(log.m) === Number(monthValue)) &&
                 (!ox || log.personalCheck === ox) &&
