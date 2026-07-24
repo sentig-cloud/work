@@ -2674,6 +2674,63 @@
             'object:customer':'고객명', 'object:address':'주소', 'object:equipment':'장비', 'object:duration':'작업시간',
             'object:manager':'매니저', 'object:modified':'수정시간', 'object:images':'사진'
         };
+        const restoreTrayItem = restoreButton => {
+            const key = restoreButton.dataset.key;
+            const setting = settings[key] || {};
+            const source = sections.find(section => section.dataset.cardSectionKey === key);
+            const label = source?.dataset.cardSectionLabel || restoreButton.textContent || knownLabels[key] || key.replace(/^custom:/, '선택태그 ');
+            const previewSource = source?.cloneNode(true) || (() => {
+                const blank = document.createElement('div');
+                blank.className = 'work-card-subwidget';
+                blank.dataset.cardSectionKey = key;
+                blank.dataset.cardSectionLabel = label;
+                blank.innerHTML = '<div class="work-info-line"><span></span></div>';
+                return blank;
+            })();
+            previewSource.classList.remove('is-widget-hidden');
+            previewSource.removeAttribute('style');
+            previewSource.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
+
+            const item = document.createElement('div');
+            item.className = 'card-free-item';
+            item.dataset.key = key;
+            item.dataset.label = label;
+            const size = legacySize(setting, previewSource);
+            item.dataset.w = size.w;
+            item.dataset.h = size.h;
+            const pos = firstSpace(size.w, size.h);
+            item.dataset.x = pos.x;
+            item.dataset.y = pos.y;
+            item.innerHTML = '<div class="card-free-preview"></div>';
+            item.querySelector('.card-free-preview').appendChild(previewSource);
+
+            settings[key] = {
+                ...setting, hidden:false, grid:12, x:pos.x, y:pos.y, w:size.w, h:size.h,
+                titleVisible:!!setting.titleVisible,
+                titleMarker:!!setting.titleMarker,
+                titlePosition:setting.titlePosition || (key.startsWith('custom:') ? 'inline' : 'top'),
+                contentBox:!!setting.contentBox,
+                fontSize:setting.fontSize || 'normal',
+                alignH:setting.alignH || 'none',
+                alignV:setting.alignV || 'none',
+                borderStyle:setting.borderStyle || 'none',
+                boxStyle:setting.boxStyle || 'plain',
+                shadowStyle:setting.shadowStyle || 'none'
+            };
+            item.dataset.fontSize = settings[key].fontSize;
+            item.dataset.alignH = settings[key].alignH;
+            item.dataset.alignV = settings[key].alignV;
+            item.dataset.borderStyle = settings[key].borderStyle;
+            item.dataset.boxStyle = settings[key].boxStyle;
+            item.dataset.shadowStyle = settings[key].shadowStyle;
+            item.style.setProperty('--widget-font-size', { tiny:'.56rem', small:'.66rem', normal:'.78rem', large:'.92rem', xlarge:'1.08rem', xxlarge:'1.28rem' }[settings[key].fontSize] || '.78rem');
+            canvas.appendChild(item);
+            place(item);
+            refreshPreviewAppearance(item);
+            persist(item);
+            restoreButton.remove();
+            select(item);
+        };
         Object.entries(settings).forEach(([key, setting]) => {
             if (setting?.hidden && (key.startsWith('object:') || key.startsWith('custom:'))) {
                 const source = sections.find(section => section.dataset.cardSectionKey === key);
@@ -2717,9 +2774,7 @@
             }
             const restore = event.target.closest('.card-free-restore');
             if (restore) {
-                settings[restore.dataset.key] = { ...(settings[restore.dataset.key] || {}), hidden:false };
-                commitWidgetSettings(settings);
-                finish();
+                restoreTrayItem(restore);
                 return;
             }
             const item = event.target.closest('.card-free-item');
