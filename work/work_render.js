@@ -303,15 +303,12 @@ window.getLogCardHtml = (l, indexStr = '') => {
                 const showMonthly = window.groupShowsNumber?.(groupId)
                     && window.groupIncludesMonthly?.(groupId)
                     && window.isTagNumberEnabled?.(tag) !== false;
-                const showSavedCount = window.groupShowsCount?.(groupId);
+                const showWorkCount = window.groupShowsCount?.(groupId);
                 const monthly = showMonthly ? Number(window.getGroupTagMonthlyCount?.(groupId, name) || 0) : 0;
-                const savedCount = showSavedCount ? Number(tag.count || 0) : 0;
-                if (showMonthly && showSavedCount) values.push(`월 ${monthly} · ${savedCount}`);
-                else if (showMonthly) values.push(monthly);
-                else if (showSavedCount) values.push(savedCount);
+                const workCount = showWorkCount ? Number(workQty || 1) : 0;
+                if (showMonthly && monthly >= 2) values.push(monthly);
+                if (showWorkCount && workCount >= 2 && !values.includes(workCount)) values.push(workCount);
             }
-            const qty = Number(workQty || 1);
-            if (qty > 1) values.push(qty);
             const safeName = String(name).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
             const text = `${safeName}${values.map(value => ` (${value})`).join('')}`;
             return `<span class="work-card-tag-value">${text}</span>`;
@@ -380,7 +377,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
                 : ['customer','address','manager'].includes(key) ? 'customer'
                 : ['images','modified'].includes(key) ? 'other' : 'work';
             const zoneStart = !seenCardZones.has(zone); seenCardZones.add(zone);
-            return `<div class="work-card-subwidget title-position-${titlePosition} widget-font-${fontSize} widget-align-h-${alignH} widget-align-v-${alignV} widget-border-none widget-box-plain widget-shadow-none${setting.emphasis ? ' is-emphasis' : ''}${setting.underline ? ' is-underlined' : ''}${setting.italic ? ' is-italic' : ''}${setting.hidden ? ' is-widget-hidden' : ''}${zoneStart ? ' is-zone-start' : ''}" data-card-zone="${zone}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="object:${key}" data-card-section-label="${label}" style="${freeWidgetStyle(setting, defaultCols)}">${title}${inner}</div>`;
+            return `<div class="work-card-subwidget title-position-${titlePosition} widget-font-${fontSize} widget-align-h-${alignH} widget-align-v-${alignV} widget-border-none widget-box-plain widget-shadow-none${setting.statusMode ? ' is-status-mode' : ''}${setting.emphasis ? ' is-emphasis' : ''}${setting.underline ? ' is-underlined' : ''}${setting.italic ? ' is-italic' : ''}${setting.hidden ? ' is-widget-hidden' : ''}${zoneStart ? ' is-zone-start' : ''}" data-card-zone="${zone}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="object:${key}" data-card-section-label="${label}" style="${freeWidgetStyle(setting, defaultCols)}">${title}${inner}</div>`;
         };
         const sortCardObjects = items => {
             const order = window.getWorkCardSectionOrder(items.map(html => html.match(/data-card-section-key="([^"]+)"/)?.[1]).filter(Boolean));
@@ -478,7 +475,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
                     const borderStyle = ['default','none','bold'].includes(setting.borderStyle) ? setting.borderStyle : 'none';
                     const boxStyle = ['plain','square','rounded'].includes(setting.boxStyle) ? setting.boxStyle : 'plain';
                     const shadowStyle = ['none','soft','strong'].includes(setting.shadowStyle) ? setting.shadowStyle : 'none';
-                    return `<div class="work-card-widget widget-font-${fontSize} widget-align-h-${alignH} widget-align-v-${alignV} widget-border-none widget-box-plain widget-shadow-none${isContainer ? ' is-container-widget' : ''}${setting.emphasis ? ' is-emphasis' : ''}${setting.underline ? ' is-underlined' : ''}${setting.italic ? ' is-italic' : ''}${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="${section.key}" data-card-section-label="${section.label || section.key}" style="${isContainer ? '' : freeWidgetStyle(setting, 4)}">${section.html}</div>`;
+                    return `<div class="work-card-widget widget-font-${fontSize} widget-align-h-${alignH} widget-align-v-${alignV} widget-border-none widget-box-plain widget-shadow-none${isContainer ? ' is-container-widget' : ''}${setting.statusMode ? ' is-status-mode' : ''}${setting.emphasis ? ' is-emphasis' : ''}${setting.underline ? ' is-underlined' : ''}${setting.italic ? ' is-italic' : ''}${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="${section.key}" data-card-section-label="${section.label || section.key}" style="${isContainer ? '' : freeWidgetStyle(setting, 4)}">${section.html}</div>`;
                 }).join('')}</div>
             </div>
         `;
