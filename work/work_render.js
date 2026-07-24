@@ -319,7 +319,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
             const workCount = Number(workQty || 1);
             if (workCount >= 2 && !values.includes(workCount)) values.push(workCount);
             const safeName = String(name).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-            const text = `${safeName}${values.map(value => ` (${value})`).join('')}`;
+            const text = `${safeName}${values.map(value => `(${value})`).join('')}`;
             return `<span class="work-card-tag-value">${text}</span>`;
         };
         const formatWorkQtyNames = (names, groupId) => (names || []).map(name => {

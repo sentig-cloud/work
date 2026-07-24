@@ -823,7 +823,7 @@ window.downloadViewerImage = async () => {
         const meaningfulName = value => {
             const name = String(value || "").trim();
             const base = name.replace(/\.[a-zA-Z0-9]{2,5}$/i, "");
-            return name && !/^image$/i.test(base) && !/^\d{1,6}$/.test(base) ? name : "";
+            return name && !/^image$/i.test(base) ? name : "";
         };
         const pad = value => String(value || 0).padStart(2, "0");
         const timestampFromImage = String(image.id || "").match(/(\d{13})/);
@@ -990,40 +990,18 @@ window.convertHeicIfNeeded = async function (file) {
 
 window.safeProcessImage = async function (file, callback) {
     try {
+        const lowerName = String(file?.name || "").toLowerCase();
+        const mimeType = String(file?.type || "").toLowerCase();
+        const isHeic = mimeType === "image/heic" ||
+            mimeType === "image/heif" ||
+            lowerName.endsWith(".heic") ||
+            lowerName.endsWith(".heif");
         const preparedFile = await window.convertHeicIfNeeded(file);
         const dataUrl = await window.readImageAsDataUrl(preparedFile);
 
-        const image = new Image();
-
-        image.onload = () => {
-            const canvas = document.createElement("canvas");
-            const maxWidth = 1200;
-            const maxHeight = 1200;
-
-            let width = image.width;
-            let height = image.height;
-
-            if (width > maxWidth || height > maxHeight) {
-                const ratio = Math.min(maxWidth / width, maxHeight / height);
-                width = Math.round(width * ratio);
-                height = Math.round(height * ratio);
-            }
-
-            canvas.width = width;
-            canvas.height = height;
-
-            const context = canvas.getContext("2d");
-            context.drawImage(image, 0, 0, width, height);
-
-            callback(canvas.toDataURL("image/jpeg", 0.75));
-        };
-
-        image.onerror = () => {
-            alert("이미지 파일을 읽을 수 없습니다.");
-            callback(null);
-        };
-
-        image.src = dataUrl;
+        // Preserve the exact uploaded bytes instead of resizing/re-encoding them.
+        // HEIC/HEIF remains converted because browsers cannot reliably display it.
+        callback(dataUrl, { originalPreserved: !isHeic });
     } catch (e) {
         console.error("사진 처리 실패:", e);
         alert(e.message || "사진 처리 실패");
@@ -1048,12 +1026,13 @@ window.handleGeneralFiles = (input) => {
     }
 
     files.forEach((file) => {
-        window.safeProcessImage(file, (dataUrl) => {
+        window.safeProcessImage(file, (dataUrl, imageMeta = {}) => {
             if (dataUrl) {
                 window.tempImgs.push({
                     id: `img_${Date.now()}_${Math.random()}`,
                     src: dataUrl,
                     originalName: file.name || "",
+                    originalPreserved: imageMeta.originalPreserved !== false,
                     updatedAt: new Date().toISOString()
                 });
             }
@@ -1101,12 +1080,13 @@ window.handleWorkFiles = (input) => {
     }
 
     files.forEach((file) => {
-        window.safeProcessImage(file, (dataUrl) => {
+        window.safeProcessImage(file, (dataUrl, imageMeta = {}) => {
             if (dataUrl) {
                 window.workImgs.push({
                     id: `w_${Date.now()}_${Math.random()}`,
                     src: dataUrl,
                     originalName: file.name || "",
+                    originalPreserved: imageMeta.originalPreserved !== false,
                     updatedAt: new Date().toISOString()
                 });
             }
@@ -1147,12 +1127,13 @@ window.addFilesToEdit = (input) => {
     let completed = 0;
 
     files.forEach((file) => {
-        window.safeProcessImage(file, (dataUrl) => {
+        window.safeProcessImage(file, (dataUrl, imageMeta = {}) => {
             if (dataUrl) {
                 log.imgs.push({
                     id: `e_${Date.now()}_${Math.random()}`,
                     src: dataUrl,
                     originalName: file.name || "",
+                    originalPreserved: imageMeta.originalPreserved !== false,
                     updatedAt: new Date().toISOString()
                 });
 
