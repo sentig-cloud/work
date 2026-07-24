@@ -292,7 +292,12 @@ window.getLogCardHtml = (l, indexStr = '') => {
             const safeName = String(name).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
             const text = `${safeName}${values.map(value => ` (${value})`).join('')}`;
             const color = /^#[0-9a-f]{6}$/i.test(tag?.cardColor || '') ? tag.cardColor : '';
-            return `<span class="work-card-tag-value"${color ? ` style="--tag-card-color:${color}"` : ''}>${text}</span>`;
+            let textColor = '#111111';
+            if (color) {
+                const rgb = [1,3,5].map(index => parseInt(color.slice(index, index + 2), 16));
+                textColor = ((rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000) < 145 ? '#ffffff' : '#111111';
+            }
+            return `<span class="work-card-tag-value"${color ? ` style="--tag-card-color:${color};--tag-card-text:${textColor}"` : ''}>${text}</span>`;
         };
         const formatWorkQtyNames = (names, groupId) => (names || []).map(name => {
             const qty = Number(l.tagQuantities?.[groupId]?.[name] || 1);
