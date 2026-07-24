@@ -1703,6 +1703,8 @@
         const monthlyBtn = document.getElementById("tagMonthlyBtn");
         const countBtn = document.getElementById("tagCountSuffixBtn");
         const cardDisplayBtn = document.getElementById("tagCardDisplayBtn");
+        const cardColorBtn = document.getElementById("tagCardColorBtn");
+        const cardColorInput = document.getElementById("tagCardColorInput");
         const dupBtn = document.getElementById("tagDuplicateBtn");
         const groupId = window.typeToGroupId(window.editingTagType);
         const editingTag = getTagArray(window.editingTagType)?.[window.editingTagIndex];
@@ -1719,8 +1721,15 @@
         paintToggle(monthlyBtn, window.groupIncludesMonthly(groupId), '월별', true, '이 그룹을 월별 집계에 포함');
         paintToggle(countBtn, window.groupShowsCount(groupId), '갯수', true,
             '선택태그상자에서 태그 뒤에 직접 설정된 갯수를 표시');
-        paintToggle(cardDisplayBtn, !!editingTag?.cardCountVisible, '카드에 표시', true,
+        paintToggle(cardDisplayBtn, !!editingTag?.cardCountVisible, '카드', true,
             '이 항목의 집계 숫자를 작업일지 카드에 (갯수) 형식으로 표시');
+        if (cardColorBtn && cardColorInput) {
+            const savedColor = /^#[0-9a-f]{6}$/i.test(editingTag?.cardColor || '') ? editingTag.cardColor : '#334155';
+            cardColorInput.value = savedColor;
+            cardColorBtn.style.setProperty('--tag-edit-color', savedColor);
+            cardColorBtn.classList.toggle('has-card-color', !!editingTag?.cardColor);
+            cardColorBtn.title = '작업일지 카드에서 이 항목의 글자색 변경';
+        }
         if (dupBtn) {
             const toggleable = canToggleSelectionMode(groupId);
             const g = window.getGroupById(groupId);
@@ -1799,6 +1808,17 @@
         const tag = getTagArray(window.editingTagType)?.[window.editingTagIndex];
         if (!tag) return;
         tag.cardCountVisible = !tag.cardCountVisible;
+        window.refreshTagEditControls();
+        window.markDirty?.("master", "groups", "upsert");
+        if (window.saveLocal) window.saveLocal("group-settings");
+        window.renderChangedTagType(window.editingTagType);
+        window.renderMain?.();
+    };
+
+    window.setTagCardColor = color => {
+        const tag = getTagArray(window.editingTagType)?.[window.editingTagIndex];
+        if (!tag || !/^#[0-9a-f]{6}$/i.test(color || '')) return;
+        tag.cardColor = color;
         window.refreshTagEditControls();
         window.markDirty?.("master", "groups", "upsert");
         if (window.saveLocal) window.saveLocal("group-settings");

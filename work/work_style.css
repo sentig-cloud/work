@@ -920,6 +920,9 @@ input, textarea, [contenteditable="true"] {
 .work-undo-btn:disabled { color: #999; opacity: 0.65; }
 
 .tag-edit-name-row, .tag-edit-control-row { display: flex; align-items: center; gap: 6px; }
+.tag-edit-options-row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; }
+.tag-edit-options-row .tag-toggle-btn { width:100%; min-width:0; padding:0 3px; }
+.tag-edit-options-row #tagCardColorBtn.has-card-color::before { content:''; display:inline-block; width:9px; height:9px; margin-right:3px; vertical-align:-1px; background:var(--tag-edit-color); border:1px solid #111; }
 #tagEditModal .modal-box { border:3px solid #7c3aed !important; box-shadow:0 0 0 4px #f59e0b,0 10px 24px rgba(15,23,42,.55); }
 .tag-edit-name-row { margin-bottom: 8px; }
 .tag-edit-name-row .m-input { flex: 1; min-width: 0; }
@@ -1115,3 +1118,5 @@ input, textarea, [contenteditable="true"] {
 .log-card.card-work.status-completed { background:var(--w-gray) !important; border:2px solid !important; border-color:var(--w-white) var(--w-black) var(--w-black) var(--w-white) !important; }
 .log-card.card-work.status-completed .log-content,
 .log-card.card-work.status-completed .card-content-zone div { opacity:1 !important; }
+.work-card-subwidget .work-info-line .work-card-tag-value[style*="--tag-card-color"],
+.work-card-subwidget .work-status-sticker .work-card-tag-value[style*="--tag-card-color"] { color:var(--tag-card-color) !important; }
