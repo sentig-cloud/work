@@ -1594,6 +1594,10 @@
         if (groupId === 'taskTypes' && !(window.activeTaskTypes || []).includes(tag.name)) window.activeTaskTypes.push(tag.name);
         else if (groupId === 'coworkers' && !(window.selectedCoworkers || []).includes(tag.name)) window.selectedCoworkers.push(tag.name);
         else if (groupId === 'statuses') window.activeStatus = tag.name;
+        else if (groupId === 'equipments') {
+            window.activeEquips = window.activeEquips || {};
+            if (Number(window.activeEquips[tag.name] || 0) < 1) window.activeEquips[tag.name] = 1;
+        }
         else if (!['equipments','memoTags'].includes(groupId)) {
             window.activeCustomGroupSelections[groupId] = window.activeCustomGroupSelections[groupId] || [];
             if (!window.activeCustomGroupSelections[groupId].includes(tag.name)) window.activeCustomGroupSelections[groupId].push(tag.name);
@@ -1609,7 +1613,10 @@
         }
         window.editingWorkQuantity = { type, index, groupId, name:tag.name };
         document.getElementById('workQtyTitle').textContent = tag.name;
-        document.getElementById('workQtyInput').value = Number(window.activeWorkTagQuantities[groupId][tag.name] || 1);
+        const currentQty = groupId === 'equipments'
+            ? Math.max(Number(window.activeEquips?.[tag.name] || 0), Number(window.activeWorkTagQuantities[groupId][tag.name] || 0), 1)
+            : Number(window.activeWorkTagQuantities[groupId][tag.name] || 1);
+        document.getElementById('workQtyInput').value = currentQty;
         modal.style.display = 'flex';
     };
     window.changeWorkTagQuantity = delta => {
@@ -1623,6 +1630,11 @@
             const qty = Math.max(0, Number(input.value || 0));
             const store = window.activeWorkTagQuantities[edit.groupId];
             if (qty <= 1) delete store[edit.name]; else store[edit.name] = qty;
+            if (edit.groupId === 'equipments') {
+                window.activeEquips = window.activeEquips || {};
+                if (qty > 0) window.activeEquips[edit.name] = qty;
+                else delete window.activeEquips[edit.name];
+            }
             if (qty === 0) {
                 if (edit.groupId === 'taskTypes') window.activeTaskTypes = (window.activeTaskTypes || []).filter(name => name !== edit.name);
                 else if (edit.groupId === 'coworkers') window.selectedCoworkers = (window.selectedCoworkers || []).filter(name => name !== edit.name);
@@ -2740,6 +2752,22 @@
         const activePreset = localStorage.getItem(ACTIVE_PRESET_KEY);
         overlay.querySelector(`[data-preset="${activePreset}"]`)?.classList.add('is-active');
 
+        const storeSelectedItem = () => {
+            if (!selected || !selected.isConnected) return;
+            const item = selected;
+            const key = item.dataset.key;
+            const label = item.dataset.label || knownLabels[key] || key;
+            settings[key] = { ...(settings[key] || {}), hidden:true };
+            addToTray(key, label);
+            item.remove();
+            selected = null;
+            settingsUnlocked = false;
+            overlay.classList.remove('is-object-settings');
+            overlay.querySelector('[data-free-action="settings"]')?.classList.remove('is-active');
+            objectPopup.classList.remove('is-open');
+            commitWidgetSettings(settings);
+        };
+
         const finish = () => {
             clearInterval(edgeScrollTimer); edgeScrollTimer = null;
             const items = [...canvas.children];
@@ -2777,6 +2805,10 @@
                 restoreTrayItem(restore);
                 return;
             }
+            if (event.target.closest('.card-free-store-button')) {
+                storeSelectedItem();
+                return;
+            }
             const item = event.target.closest('.card-free-item');
             if (item) select(item);
             const action = event.target.closest('[data-free-action]')?.dataset.freeAction;
@@ -2794,10 +2826,7 @@
                 settingsUnlocked = false; overlay.classList.remove('is-object-settings'); selected.classList.remove('is-settings-open');
                 overlay.querySelector('[data-free-action="settings"]')?.classList.remove('is-active'); objectPopup.classList.remove('is-open'); return;
             }
-            if (action === 'hide') {
-                settings[selected.dataset.key] = { ...(settings[selected.dataset.key] || {}), hidden:true };
-                commitWidgetSettings(settings); addToTray(selected.dataset.key, selected.dataset.label); selected.remove(); select(null); return;
-            }
+            if (action === 'hide') { storeSelectedItem(); return; }
             if (action === 'axis') { sizeAxis = sizeAxis === 'w' ? 'h' : 'w'; event.target.textContent = sizeAxis === 'w' ? '가로' : '세로'; return; }
             if (['title','title-marker','title-position','emphasis','underline','italic','font','align-h','align-v','box','border','shadow','status','content-box','auto-color','auto-all','reset-style'].includes(action) && !settingsUnlocked) return;
             if (action === 'auto-color') {

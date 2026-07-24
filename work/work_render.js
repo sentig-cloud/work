@@ -298,14 +298,16 @@ window.getLogCardHtml = (l, indexStr = '') => {
             if (!log || log.cat !== 'work' || Number(log.y) !== Number(l.y) || Number(log.m) !== Number(l.m)) return sum;
             if (window.isLogGroupExcluded?.(log, groupId)) return sum;
             const value = window.getGroupValueFromLog?.(log, groupId);
-            if (groupId === 'equipments') return sum + Math.max(0, Number(value?.[name] || 0));
-            if (Array.isArray(value)) return sum + (value.includes(name) ? 1 : 0);
-            return sum + (value === name ? 1 : 0);
+            const savedQty = Math.max(0, Number(log.tagQuantities?.[groupId]?.[name] || 0));
+            if (groupId === 'equipments') return sum + Math.max(0, Number(value?.[name] || 0), savedQty);
+            if (Array.isArray(value)) return sum + (value.includes(name) ? Math.max(1, savedQty) : 0);
+            return sum + (value === name ? Math.max(1, savedQty) : 0);
         }, 0);
 
         const formatCardTagValue = (groupId, name, workQty = 1) => {
             const group = window.getGroupById?.(groupId);
-            const tag = group?.tags?.find(item => item.name === name);
+            const tag = group?.tags?.find(item => item.name === name)
+                || group?.tags?.find(item => String(item.name || '').trim() === String(name || '').trim());
             const values = [];
             if (tag?.cardCountVisible) {
                 const showMonthly = window.groupShowsNumber?.(groupId)
@@ -407,8 +409,15 @@ window.getLogCardHtml = (l, indexStr = '') => {
         if (l.note || keepsEmptyObject('note')) workDetails.push(makeCardObject('note','특이사항',`<div class="work-info-line note">${l.note ? '<i class="fa-solid fa-triangle-exclamation"></i>' : ''}<span>${l.note || ''}</span></div>`));
         if (l.customerName || keepsEmptyObject('customer')) customerDetails.push(makeCardObject('customer','고객명',`<div class="work-info-line customer">${l.customerName ? '<i class="fa-solid fa-user"></i>' : ''}<span>${l.customerName || ''}</span></div>`,2));
         if (l.address || keepsEmptyObject('address')) customerDetails.push(makeCardObject('address','주소',`<div class="work-info-line address">${l.address ? '<i class="fa-solid fa-map-marker-alt"></i>' : ''}<span>${l.address || ''}</span></div>`));
-        const eqStr = Object.entries(l.equips || {}).filter(e => Number(e[1]) > 0)
-            .map(e => formatCardTagValue('equipments', e[0], Number(e[1]) || 1)).join(', ');
+        const equipmentNames = new Set([
+            ...Object.keys(l.equips || {}),
+            ...Object.keys(l.tagQuantities?.equipments || {})
+        ]);
+        const eqStr = [...equipmentNames].map(name => [
+            name,
+            Math.max(Number(l.equips?.[name] || 0), Number(l.tagQuantities?.equipments?.[name] || 0))
+        ]).filter(([, qty]) => qty > 0)
+            .map(([name, qty]) => formatCardTagValue('equipments', name, qty)).join(', ');
         if (eqStr || keepsEmptyObject('equipment')) customerDetails.push(makeCardObject('equipment','장비',`<div class="work-info-line equipment" style="${excludedCardStyle('equipments')}">${eqStr ? '<i class="fa-solid fa-box"></i>' : ''}<span>${eqStr}</span></div>`,2));
 
         // 시작/종료/총시간 (특수 그룹 — 태그 목록이 아니라 log.startTime/endTime/totalMin에 직접 저장)
