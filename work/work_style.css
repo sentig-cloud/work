@@ -535,6 +535,32 @@ html, body {
     .card-layout-editor-layer { padding:5px; }
     .card-free-canvas { min-height:350px; }
     .card-free-object-popup { grid-template-columns:1fr; }
+    #searchLayer .search-filter-grid {
+        max-height:34dvh;
+        overflow-x:hidden;
+        overflow-y:auto;
+        overscroll-behavior:contain;
+        align-content:start;
+        padding:1px 2px 3px;
+        border:2px inset #fff;
+        background:#b8b8b8;
+    }
+    #searchLayer .search-fixed-filter {
+        order:-1;
+        display:block !important;
+        visibility:visible !important;
+        min-height:32px;
+        position:sticky;
+        top:0;
+        z-index:5;
+        background:var(--w-gray);
+    }
+    #searchLayer .search-fixed-filter > select {
+        display:block !important;
+        visibility:visible !important;
+        min-height:32px;
+        font-size:.8rem !important;
+    }
 }
 
 /* 카드 꾸미기 초기값: 삭제 버튼을 제외한 모든 객체는 동일한 무서식 글꼴로 시작한다. */
