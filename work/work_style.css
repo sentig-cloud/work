@@ -1164,3 +1164,10 @@ input, textarea, [contenteditable="true"] {
 .log-card.card-work .card-content-zone *:not(.is-underlined) {
     text-decoration:none; font-style:normal; opacity:1; filter:none;
 }
+
+/* 보관함 객체는 상태/정렬/제목 서식보다 항상 우선해 실제 카드에서도 숨긴다. */
+.log-card.card-work .work-card-subwidget.is-widget-hidden,
+.log-card.card-work .work-card-widget.is-widget-hidden,
+.card-free-canvas .card-free-item.is-widget-hidden {
+    display:none !important;
+}

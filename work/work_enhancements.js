@@ -2766,6 +2766,7 @@
             overlay.querySelector('[data-free-action="settings"]')?.classList.remove('is-active');
             objectPopup.classList.remove('is-open');
             commitWidgetSettings(settings);
+            window.updateUI?.();
         };
 
         const finish = () => {
