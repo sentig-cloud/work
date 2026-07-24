@@ -305,16 +305,16 @@ window.getLogCardHtml = (l, indexStr = '') => {
         }).join(', ');
         seqHtml = '';
         taskNoHtml = '';
-        const dutyBadge = l.isDuty ? `<span class="work-alert-badge">당직</span>` : '';
-        const otBadge = Number(l.otCount) > 0 ? `<span class="work-alert-badge">OT${Number(l.otCount) > 1 ? ` ${Number(l.otCount)}` : ''}</span>` : '';
+        const dutyBadge = l.isDuty ? `<span class="work-alert-text">당직</span>` : '';
+        const otBadge = Number(l.otCount) > 0 ? `<span class="work-alert-text">OT${Number(l.otCount) > 1 ? ` ${Number(l.otCount)}` : ''}</span>` : '';
         const statusStickerClass = ({
             '완료': 'sticker-completed', '취소': 'sticker-canceled', '보류': 'sticker-pending',
             '일정변경': 'sticker-rescheduled', '불필요': 'sticker-unnecessary',
             '공사': 'sticker-construction', '이관': 'sticker-transfer'
         })[l.status] || 'sticker-default';
         const statusBadge = l.status
-            ? `<span class="work-status-sticker ${statusStickerClass}" style="${excludedCardStyle('statuses')}">${formatCardTagValue('statuses', l.status)}</span>`
-            : `<span class="work-status-sticker is-empty">상태 없음</span>`;
+            ? `<span class="work-status-text">${formatCardTagValue('statuses', l.status)}</span>`
+            : `<span class="work-status-text is-empty">상태 없음</span>`;
         const inlineTaskNo = l.taskNo
             ? `<button type="button" class="task-no-btn work-task-no" onclick="event.stopPropagation(); window.toggleLogOx('${l.id}')">${l.taskNo}</button>`
             : `<button type="button" class="task-no-btn work-task-no" onclick="event.stopPropagation(); window.toggleLogOx('${l.id}')">O/X</button>`;
@@ -363,7 +363,9 @@ window.getLogCardHtml = (l, indexStr = '') => {
                 : ['customer','address','manager'].includes(key) ? 'customer'
                 : ['images','modified'].includes(key) ? 'other' : 'work';
             const zoneStart = !seenCardZones.has(zone); seenCardZones.add(zone);
-            return `<div class="work-card-subwidget title-position-${titlePosition} widget-font-${fontSize} widget-align-h-${alignH} widget-align-v-${alignV} widget-border-none widget-box-plain widget-shadow-none${setting.emphasis ? ' is-emphasis' : ''}${setting.underline ? ' is-underlined' : ''}${setting.italic ? ' is-italic' : ''}${setting.hidden ? ' is-widget-hidden' : ''}${zoneStart ? ' is-zone-start' : ''}" data-card-zone="${zone}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="object:${key}" data-card-section-label="${label}" style="${freeWidgetStyle(setting, defaultCols)}">${title}${inner}</div>`;
+            const isPlainStatus = key === 'status';
+            const renderSetting = isPlainStatus ? { ...setting, color:'' } : setting;
+            return `<div class="work-card-subwidget title-position-${titlePosition} widget-font-${fontSize} widget-align-h-${alignH} widget-align-v-${alignV} widget-border-none widget-box-plain widget-shadow-none${!isPlainStatus && setting.emphasis ? ' is-emphasis' : ''}${!isPlainStatus && setting.underline ? ' is-underlined' : ''}${!isPlainStatus && setting.italic ? ' is-italic' : ''}${setting.hidden ? ' is-widget-hidden' : ''}${zoneStart ? ' is-zone-start' : ''}" data-card-zone="${zone}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="object:${key}" data-card-section-label="${label}" style="${freeWidgetStyle(renderSetting, defaultCols)}">${title}${inner}</div>`;
         };
         const sortCardObjects = items => {
             const order = window.getWorkCardSectionOrder(items.map(html => html.match(/data-card-section-key="([^"]+)"/)?.[1]).filter(Boolean));
