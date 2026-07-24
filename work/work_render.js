@@ -352,7 +352,10 @@ window.getLogCardHtml = (l, indexStr = '') => {
             const borderStyle = ['default','none','bold'].includes(setting.borderStyle) ? setting.borderStyle : 'none';
             const boxStyle = ['plain','square','rounded'].includes(setting.boxStyle) ? setting.boxStyle : 'plain';
             const shadowStyle = ['none','soft','strong'].includes(setting.shadowStyle) ? setting.shadowStyle : 'none';
-            return `<div class="work-card-subwidget title-position-${titlePosition} widget-font-${fontSize} widget-align-h-${alignH} widget-align-v-${alignV} widget-border-${borderStyle} widget-box-${boxStyle} widget-shadow-${shadowStyle}${setting.emphasis ? ' is-emphasis' : ''}${setting.underline ? ' is-underlined' : ''}${setting.italic ? ' is-italic' : ''}${setting.statusMode ? ' is-status-mode' : ''}${setting.contentBox ? ' has-content-box' : ''}${setting.hidden ? ' is-widget-hidden' : ''}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="object:${key}" data-card-section-label="${label}" style="${freeWidgetStyle(setting, defaultCols)}">${title}${inner}</div>`;
+            const zone = ['number','date','time','status','taskNo','alerts','delete','duration'].includes(key) ? 'basic'
+                : ['customer','address','manager'].includes(key) ? 'customer'
+                : ['images','modified'].includes(key) ? 'other' : 'work';
+            return `<div class="work-card-subwidget title-position-${titlePosition} widget-font-${fontSize} widget-align-h-${alignH} widget-align-v-${alignV} widget-border-${borderStyle} widget-box-${boxStyle} widget-shadow-${shadowStyle}${setting.emphasis ? ' is-emphasis' : ''}${setting.underline ? ' is-underlined' : ''}${setting.italic ? ' is-italic' : ''}${setting.statusMode ? ' is-status-mode' : ''}${setting.contentBox ? ' has-content-box' : ''}${setting.hidden ? ' is-widget-hidden' : ''}" data-card-zone="${zone}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="object:${key}" data-card-section-label="${label}" style="${freeWidgetStyle(setting, defaultCols)}">${title}${inner}</div>`;
         };
         const sortCardObjects = items => {
             const order = window.getWorkCardSectionOrder(items.map(html => html.match(/data-card-section-key="([^"]+)"/)?.[1]).filter(Boolean));
@@ -405,7 +408,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
                 customDetails.push({
                     key: `custom:${g.id}`,
                     label: g.title || '선택태그',
-                    html: `<aside class="work-custom-panel work-card-section title-position-${customTitlePosition}" style="--custom-accent:${palette[0]};--custom-bg:${palette[1]};" data-card-section-key="custom:${g.id}" data-card-section-label="${safeGroupTitle}">${customTitleVisible && customTitlePosition === 'top' ? `<b class="work-card-object-title">${customTitleMarker}${safeGroupTitle}</b>` : ''}<div class="work-info-line custom" style="${excludedCardStyle(g.id)}"><i class="fa-solid fa-tag"></i><span>${customTitleVisible && customTitlePosition === 'inline' ? `<b>${customTitleMarker}${safeGroupTitle}</b><span class="work-custom-title-separator"> : </span>` : ''}${valStr}</span></div></aside>`
+                    html: `<aside class="work-custom-panel work-card-section title-position-${customTitlePosition}" data-card-zone="work" style="--custom-accent:${palette[0]};--custom-bg:${palette[1]};" data-card-section-key="custom:${g.id}" data-card-section-label="${safeGroupTitle}">${customTitleVisible && customTitlePosition === 'top' ? `<b class="work-card-object-title">${customTitleMarker}${safeGroupTitle}</b>` : ''}<div class="work-info-line custom" style="${excludedCardStyle(g.id)}"><i class="fa-solid fa-tag"></i><span>${customTitleVisible && customTitlePosition === 'inline' ? `<b>${customTitleMarker}${safeGroupTitle}</b><span class="work-custom-title-separator"> : </span>` : ''}${valStr}</span></div></aside>`
                 });
             }
         });

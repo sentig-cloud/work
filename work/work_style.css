@@ -217,11 +217,11 @@ html, body {
 .log-card:active { background: rgba(0,0,0,0.05); }
 
 .status-completed { background: rgba(230, 244, 234, 0.9) !important; border: 2px solid #10b981 !important; }
-.status-completed .log-content, .status-completed .card-content-zone div { opacity: 0.8; }
+.status-completed .log-content, .status-completed .card-content-zone div { opacity: 1; }
 .status-canceled { background: #fef2f2 !important; border: 2px solid #ef4444 !important; }
-.status-canceled .log-content { text-decoration: line-through double #ef4444; color: #999; }
+.status-canceled .work-content-line { text-decoration: line-through solid #ef4444; color: #6b7280; }
 .status-pending { background: #fff7ed !important; border: 2px solid #f97316 !important; }
-.status-pending .log-content { text-decoration: line-through solid #ef4444; color: #999; }
+.status-pending .log-content { text-decoration: none; color: inherit; }
 .status-rescheduled { background: #faf5ff !important; border: 2px solid #a855f7 !important; }
 .status-unnecessary { background: #f4f4f5 !important; border: 2px solid #000000 !important; }
 .status-construction { background: #fefce8 !important; border: 2px solid #eab308 !important; }
@@ -299,7 +299,6 @@ html, body {
 .work-main-panel,.work-customer-panel { display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:3px; align-content:start; }
 .work-card-subwidget { min-width:0; padding:2px 3px; border:0; background:transparent; box-shadow:none; box-sizing:border-box; container-type:inline-size; }
 .work-card-subwidget:not([data-card-section-key="object:delete"]),.work-card-subwidget:not([data-card-section-key="object:delete"]) :not(i):not(.fa-solid):not(.fa-regular) { font-family:inherit; font-size:var(--widget-font-size,.76rem); font-weight:400; font-style:normal; color:inherit; }
-.work-card-subwidget:not([data-card-section-key="object:delete"]) .task-no-btn,.work-card-subwidget:not([data-card-section-key="object:delete"]) .work-status-sticker,.work-card-subwidget:not([data-card-section-key="object:delete"]) .work-alert-badge { min-width:0; min-height:0; padding:0; background:transparent; color:inherit; border:0; border-radius:0; box-shadow:none; }
 .work-card-widget:not(.is-container-widget):not(.has-content-box) > .work-card-section { background:transparent; border-color:transparent; box-shadow:none; }
 .work-card-subwidget[style*="--widget-text-color"],.work-card-widget[style*="--widget-text-color"] > .work-card-section { color:var(--widget-text-color) !important; }
 .work-card-subwidget[style*="--widget-text-color"] *,.work-card-widget[style*="--widget-text-color"] > .work-card-section * { color:var(--widget-text-color) !important; }
@@ -519,9 +518,7 @@ html, body {
     font-family:inherit !important; font-size:.76rem !important; font-weight:400 !important; font-style:normal; color:inherit;
 }
 .work-card-subwidget.widget-border-none:not(.has-content-box):not([data-card-section-key="object:delete"]) > *,
-.work-card-subwidget.widget-border-none:not(.has-content-box):not([data-card-section-key="object:delete"]) .task-no-btn,
-.work-card-subwidget.widget-border-none:not(.has-content-box):not([data-card-section-key="object:delete"]) .work-status-sticker,
-.work-card-subwidget.widget-border-none:not(.has-content-box):not([data-card-section-key="object:delete"]) .work-alert-badge {
+.work-card-subwidget.widget-border-none:not(.has-content-box):not([data-card-section-key="object:delete"]) .task-no-btn {
     background:transparent !important; border:0 !important; border-radius:0 !important; box-shadow:none !important;
 }
 
@@ -1104,9 +1101,7 @@ input, textarea, [contenteditable="true"] {
 .card-free-item[data-align-v="top"] .card-free-preview > .work-card-subwidget:not(.title-position-inline) > :not(.work-card-object-title) { height:auto !important; margin-top:0; margin-bottom:auto; }
 .card-free-item[data-align-v="middle"] .card-free-preview > .work-card-subwidget:not(.title-position-inline) > :not(.work-card-object-title) { height:auto !important; margin-top:auto; margin-bottom:auto; }
 .card-free-item[data-align-v="bottom"] .card-free-preview > .work-card-subwidget:not(.title-position-inline) > :not(.work-card-object-title) { height:auto !important; margin-top:auto; margin-bottom:0; }
-.work-card-subwidget:not([data-card-section-key="object:delete"]) .work-status-sticker,
-.work-card-subwidget:not([data-card-section-key="object:delete"]) .task-no-btn,
-.work-card-subwidget:not([data-card-section-key="object:delete"]) .work-alert-badge { background:transparent !important; border:0 !important; box-shadow:none !important; color:inherit !important; }
+.work-card-subwidget:not([data-card-section-key="object:delete"]) .task-no-btn { background:transparent !important; border:0 !important; box-shadow:none !important; color:inherit !important; }
 .work-card-subwidget:not(.has-content-box):not([data-card-section-key="object:delete"]) .work-info-line,
 .work-card-widget:not(.is-container-widget):not(.has-content-box) .work-info-line { padding:0 !important; background:transparent !important; border:0 !important; border-radius:0 !important; box-shadow:none !important; color:inherit !important; }
 .work-card-subwidget:not([data-card-section-key="object:delete"]) .work-info-line span,
@@ -1114,9 +1109,23 @@ input, textarea, [contenteditable="true"] {
 .work-card-subwidget,.work-card-subwidget * { font-size:var(--widget-fit-font,var(--widget-font-size,.78rem)) !important; }
 .work-card-subwidget.is-emphasis,.work-card-subwidget.is-emphasis * { font-weight:900 !important; }
 
-/* 작업일지 카드의 완료 상태는 값만 남기고 카드 전체 전용 서식은 사용하지 않는다. */
-.log-card.card-work.status-completed { background:var(--w-gray) !important; border:2px solid !important; border-color:var(--w-white) var(--w-black) var(--w-black) var(--w-white) !important; }
-.log-card.card-work.status-completed .log-content,
-.log-card.card-work.status-completed .card-content-zone div { opacity:1 !important; }
 .work-card-subwidget .work-info-line .work-card-tag-value[style*="--tag-card-color"],
 .work-card-subwidget .work-status-sticker .work-card-tag-value[style*="--tag-card-color"] { color:var(--tag-card-color) !important; }
+
+/* 자유 배치를 유지하면서 같은 정보 구역은 같은 면으로 보이게 한다. */
+.work-card-subwidget[data-card-zone],
+.work-card-widget:not(.is-container-widget) > .work-card-section[data-card-zone] { border:0 !important; border-radius:2px; box-shadow:none !important; }
+.work-card-subwidget[data-card-zone="basic"],
+.work-card-widget:not(.is-container-widget) > .work-card-section[data-card-zone="basic"] { background:rgba(243,244,246,.96) !important; }
+.work-card-subwidget[data-card-zone="work"],
+.work-card-widget:not(.is-container-widget) > .work-card-section[data-card-zone="work"] { background:rgba(255,255,255,.97) !important; }
+.work-card-subwidget[data-card-zone="customer"],
+.work-card-widget:not(.is-container-widget) > .work-card-section[data-card-zone="customer"] { background:rgba(243,244,246,.96) !important; }
+.work-card-subwidget[data-card-zone="other"],
+.work-card-widget:not(.is-container-widget) > .work-card-section[data-card-zone="other"] { background:rgba(255,255,255,.94) !important; }
+.work-card-subwidget[style*="--widget-bg-color"] { background:var(--widget-bg-color) !important; }
+.work-card-subwidget.is-status-mode { background:var(--widget-bg-color,#334155) !important; }
+.work-card-subwidget[data-card-section-key="object:note"] { background:#fff7d6 !important; border-left:3px solid #d97706 !important; }
+.work-card-subwidget[data-card-section-key="object:modified"] { color:#64748b; opacity:.88; }
+.log-card.card-work.status-canceled .work-card-subwidget[data-card-section-key="object:content"] .work-content-line,
+.log-card.card-work.status-canceled .work-card-subwidget[data-card-section-key="object:content"] .work-content-line * { text-decoration:line-through solid #ef4444 !important; }
