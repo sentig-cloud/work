@@ -51,7 +51,7 @@
 
     const tagButton = (type, tag, index, active) => `
         <button type="button" class="w95-btn layout-tag-button ${active ? "active-btn" : ""}"
-            data-tag-type="${type}" data-tag-name="${esc(tag.name)}"
+            data-tag-type="${type}" data-tag-index="${index}" data-tag-name="${esc(tag.name)}"
             onmousedown="window.startPress(event,'${type}',${index})"
             onmouseup="window.endPress(event,'${type}',${index})"
             onmouseleave="window.cancelPress()"
@@ -1458,7 +1458,8 @@
         const type = button.dataset.tagType || typeMap[groupId] || groupId;
         const area = button.parentElement;
         const buttons = [...(area?.querySelectorAll(':scope > .layout-tag-button') || [])];
-        return { type, index:buttons.indexOf(button) };
+        const taggedIndex = Number(button.dataset.tagIndex);
+        return { type, index:Number.isInteger(taggedIndex) && taggedIndex >= 0 ? taggedIndex : buttons.indexOf(button) };
     };
     document.addEventListener('pointerdown', event => {
         if (!window.isWorkLayoutMode) return;
@@ -1473,6 +1474,7 @@
             if (!layoutTagPressButton || !window.isWorkLayoutMode) return;
             const target = getLayoutTagTarget(layoutTagPressButton);
             if (target.type && target.index >= 0) {
+                window.isLongPress = true;
                 window.openTagEditBox?.(target.type, target.index);
                 navigator.vibrate?.(35);
             }
@@ -1683,10 +1685,13 @@
         window.editingTagType = type;
         window.editingTagIndex = index;
         window.tempTagQty = Number(tag.count || 0);
-        document.getElementById("tagEditInput").value = tag.name;
-        document.getElementById("tagEditModal").style.display = "flex";
+        const input = document.getElementById("tagEditInput");
+        const modal = document.getElementById("tagEditModal");
+        if (!input || !modal) return;
+        input.value = tag.name;
+        modal.style.display = "flex";
         window.refreshTagEditControls();
-        setTimeout(() => document.getElementById("tagEditInput").select(), 80);
+        setTimeout(() => input.select(), 80);
     };
 
     // 상태는 앱 전체(카드/내보내기/검색/대시보드)가 "값 하나"라는 전제로 만들어져 있어서

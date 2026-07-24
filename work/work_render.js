@@ -281,14 +281,18 @@ window.getLogCardHtml = (l, indexStr = '') => {
             const tag = group?.tags?.find(item => item.name === name);
             const values = [];
             if (tag?.cardCountVisible) {
-                const monthly = window.groupShowsNumber?.(groupId) && window.isTagNumberEnabled?.(tag) !== false
-                    ? Number(window.getGroupTagMonthlyCount?.(groupId, name) || 0) : 0;
-                const savedCount = window.groupShowsCount?.(groupId) ? Number(tag.count || 0) : 0;
-                if (monthly > 0) values.push(monthly);
-                if (savedCount > 0 && !values.includes(savedCount)) values.push(savedCount);
+                const showMonthly = window.groupShowsNumber?.(groupId)
+                    && window.groupIncludesMonthly?.(groupId)
+                    && window.isTagNumberEnabled?.(tag) !== false;
+                const showSavedCount = window.groupShowsCount?.(groupId);
+                const monthly = showMonthly ? Number(window.getGroupTagMonthlyCount?.(groupId, name) || 0) : 0;
+                const savedCount = showSavedCount ? Number(tag.count || 0) : 0;
+                if (showMonthly && showSavedCount) values.push(`월 ${monthly} · ${savedCount}`);
+                else if (showMonthly) values.push(monthly);
+                else if (showSavedCount) values.push(savedCount);
             }
             const qty = Number(workQty || 1);
-            if (qty > 1 && !values.includes(qty)) values.push(qty);
+            if (qty > 1) values.push(qty);
             const safeName = String(name).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
             const text = `${safeName}${values.map(value => ` (${value})`).join('')}`;
             const color = /^#[0-9a-f]{6}$/i.test(tag?.cardColor || '') ? tag.cardColor : '';
@@ -699,6 +703,7 @@ window.renderCustomGroup = (groupId) => {
         const baseCount = Number(t.count) || 0;
         const countSuffix = (showCount && baseCount > 0) ? ` (${baseCount})` : '';
         return `<button type="button" class="w95-btn layout-tag-button ${activeCls}"
+            data-tag-type="${groupId}" data-tag-index="${idx}" data-tag-name="${safeName}"
             onmousedown="window.startPress(event,'${groupId}',${idx})"
             onmouseup="window.endPress(event,'${groupId}',${idx})"
             onmouseleave="window.cancelPress()"

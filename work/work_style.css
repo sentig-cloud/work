@@ -1108,7 +1108,10 @@ input, textarea, [contenteditable="true"] {
 }
 .work-card-subwidget .work-info-line .work-card-tag-value { color:#111 !important; }
 .work-card-subwidget .work-card-tag-value[style*="--tag-card-color"] {
-    background:transparent !important; color:var(--tag-card-color,#374151) !important;
+    background:color-mix(in srgb,var(--tag-card-color,#64748b) 16%,#fff) !important;
+    color:var(--tag-card-color,#374151) !important;
+    border-left:3px solid var(--tag-card-color,#64748b) !important;
+    padding:1px 3px;
 }
 
 /* 작업일지 입력 칸처럼 각 객체를 나누고, 경계에만 약한 흑백 버튼 효과를 준다. */
