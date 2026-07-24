@@ -276,6 +276,25 @@ window.getLogCardHtml = (l, indexStr = '') => {
     if (isCommuteDetailCard || isCommuteCard || isMemoOrPhoto) taskNoHtml = '';
 
     if (l.cat === 'work') {
+        const getSelectedCardColor = () => {
+            const candidates = [];
+            const addNames = (groupId, names) => {
+                (Array.isArray(names) ? names : [names]).filter(Boolean).forEach(name => candidates.push([groupId, name]));
+            };
+            addNames('taskTypes', String(l.taskType || '').split(', ').filter(Boolean));
+            addNames('equipments', Object.entries(l.equips || {}).filter(([, count]) => Number(count) > 0).map(([name]) => name));
+            addNames('coworkers', l.coworkers || []);
+            Object.entries(l.customGroups || {}).forEach(([groupId, names]) => addNames(groupId, names));
+            addNames('statuses', l.status);
+            for (const [groupId, name] of candidates) {
+                const tag = window.getGroupById?.(groupId)?.tags?.find(item => item.name === name);
+                if (/^#[0-9a-f]{6}$/i.test(tag?.cardColor || '')) return tag.cardColor;
+            }
+            return '';
+        };
+        const selectedCardColor = getSelectedCardColor();
+        if (selectedCardColor) cardStyle += `--work-card-color:${selectedCardColor};`;
+
         const formatCardTagValue = (groupId, name, workQty = 1) => {
             const group = window.getGroupById?.(groupId);
             const tag = group?.tags?.find(item => item.name === name);
@@ -295,13 +314,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
             if (qty > 1) values.push(qty);
             const safeName = String(name).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
             const text = `${safeName}${values.map(value => ` (${value})`).join('')}`;
-            const color = /^#[0-9a-f]{6}$/i.test(tag?.cardColor || '') ? tag.cardColor : '';
-            let textColor = '#111111';
-            if (color) {
-                const rgb = [1,3,5].map(index => parseInt(color.slice(index, index + 2), 16));
-                textColor = ((rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000) < 145 ? '#ffffff' : '#111111';
-            }
-            return `<span class="work-card-tag-value"${color ? ` style="--tag-card-color:${color};--tag-card-text:${textColor}"` : ''}>${text}</span>`;
+            return `<span class="work-card-tag-value">${text}</span>`;
         };
         const formatWorkQtyNames = (names, groupId) => (names || []).map(name => {
             const qty = Number(l.tagQuantities?.[groupId]?.[name] || 1);
@@ -367,9 +380,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
                 : ['customer','address','manager'].includes(key) ? 'customer'
                 : ['images','modified'].includes(key) ? 'other' : 'work';
             const zoneStart = !seenCardZones.has(zone); seenCardZones.add(zone);
-            const isPlainStatus = key === 'status';
-            const renderSetting = isPlainStatus ? { ...setting, color:'' } : setting;
-            return `<div class="work-card-subwidget title-position-${titlePosition} widget-font-${fontSize} widget-align-h-${alignH} widget-align-v-${alignV} widget-border-none widget-box-plain widget-shadow-none${!isPlainStatus && setting.emphasis ? ' is-emphasis' : ''}${!isPlainStatus && setting.underline ? ' is-underlined' : ''}${!isPlainStatus && setting.italic ? ' is-italic' : ''}${setting.hidden ? ' is-widget-hidden' : ''}${zoneStart ? ' is-zone-start' : ''}" data-card-zone="${zone}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="object:${key}" data-card-section-label="${label}" style="${freeWidgetStyle(renderSetting, defaultCols)}">${title}${inner}</div>`;
+            return `<div class="work-card-subwidget title-position-${titlePosition} widget-font-${fontSize} widget-align-h-${alignH} widget-align-v-${alignV} widget-border-none widget-box-plain widget-shadow-none${setting.emphasis ? ' is-emphasis' : ''}${setting.underline ? ' is-underlined' : ''}${setting.italic ? ' is-italic' : ''}${setting.hidden ? ' is-widget-hidden' : ''}${zoneStart ? ' is-zone-start' : ''}" data-card-zone="${zone}" data-widget-w="${layout.w}" data-widget-h="${layout.h}" data-card-section-key="object:${key}" data-card-section-label="${label}" style="${freeWidgetStyle(setting, defaultCols)}">${title}${inner}</div>`;
         };
         const sortCardObjects = items => {
             const order = window.getWorkCardSectionOrder(items.map(html => html.match(/data-card-section-key="([^"]+)"/)?.[1]).filter(Boolean));

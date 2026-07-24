@@ -347,8 +347,8 @@ html, body {
 .work-card-modified { padding:3px 1px !important; text-align:right; font-size:.72rem; }
 .work-card-images { padding:0 !important; }
 .work-card-subwidget.is-widget-hidden { display:none; }
-.work-card-subwidget.is-emphasis,.work-card-widget.is-emphasis > .work-card-section { border-width:2px; border-left-width:5px; box-shadow:inset 0 0 0 1px var(--widget-accent,#f59e0b); font-weight:950; }
-.work-card-subwidget.is-emphasis .work-info-line,.work-card-widget.is-emphasis .work-info-line { font-weight:950; }
+.work-card-subwidget.is-emphasis,.work-card-widget.is-emphasis > .work-card-section { font-weight:900; }
+.work-card-subwidget.is-emphasis *,.work-card-widget.is-emphasis > .work-card-section * { font-weight:900 !important; }
 .widget-font-tiny { --widget-font-size:.56rem; }
 .widget-font-small { --widget-font-size:.66rem; }
 .widget-font-normal { --widget-font-size:.78rem; }
@@ -430,7 +430,9 @@ html, body {
 .card-free-item[style*="--widget-text-color"] .card-free-preview,.card-free-item[style*="--widget-text-color"] .card-free-preview * { color:var(--widget-text-color) !important; }
 .card-free-item.is-selected { outline:4px solid #f59e0b; outline-offset:1px; box-shadow:0 0 0 3px rgba(124,58,237,.42),0 4px 12px rgba(15,23,42,.38); z-index:3; }
 .card-free-item.is-settings-open { outline-color:#7c3aed; }
-.card-free-item.is-emphasis { font-weight:950; box-shadow:inset 0 0 0 2px var(--widget-accent,#f59e0b); }
+.card-free-item.is-emphasis,
+.card-free-item.is-emphasis .card-free-preview,
+.card-free-item.is-emphasis .card-free-preview * { font-weight:900 !important; }
 .card-free-item.is-status-mode .card-free-preview { display:flex; align-items:center; justify-content:center; overflow:hidden; }
 .card-free-item[data-font-size="small"] .card-free-preview { font-size:.64rem; }
 .card-free-item[data-font-size="large"] .card-free-preview { font-size:.92rem; }
@@ -1107,16 +1109,9 @@ input, textarea, [contenteditable="true"] {
     border-radius:0; line-height:inherit; box-shadow:none !important;
 }
 .work-card-subwidget .work-info-line .work-card-tag-value { color:#111 !important; }
-.work-card-subwidget .work-card-tag-value[style*="--tag-card-color"] {
-    background:color-mix(in srgb,var(--tag-card-color,#64748b) 16%,#fff) !important;
-    color:var(--tag-card-color,#374151) !important;
-    border-left:3px solid var(--tag-card-color,#64748b) !important;
-    padding:1px 3px;
-}
-
 /* 작업일지 입력 칸처럼 각 객체를 나누고, 경계에만 약한 흑백 버튼 효과를 준다. */
 .log-card.card-work,.log-card.card-work .card-content-zone,.log-card.card-work .work-card-columns {
-    background:#c7c9cc !important; background-color:#c7c9cc !important; background-image:none !important;
+    background:var(--work-card-color,#c7c9cc) !important; background-color:var(--work-card-color,#c7c9cc) !important; background-image:none !important;
     opacity:1 !important; filter:none !important;
 }
 .log-card.card-work { border:2px solid !important; border-color:#73767a #f8fafc #f8fafc #73767a !important; }

@@ -1733,7 +1733,7 @@
             cardColorInput.value = savedColor;
             cardColorBtn.style.setProperty('--tag-edit-color', savedColor);
             cardColorBtn.classList.toggle('has-card-color', !!editingTag?.cardColor);
-            cardColorBtn.title = '작업일지 카드에서 이 항목의 글자색 변경';
+            cardColorBtn.title = '이 항목이 선택된 작업 카드의 기본 배경색 변경';
         }
         if (dupBtn) {
             const toggleable = canToggleSelectionMode(groupId);
@@ -2398,7 +2398,7 @@
             <div class="card-free-canvas" aria-label="12칸 카드 배치 영역"></div>
             <div class="card-free-object-popup w95-out" role="group" aria-label="선택 객체 표시 설정">
                 <div class="card-free-setting-group"><b>표시</b><button type="button" class="w95-btn" data-free-action="title">제목</button><button type="button" class="w95-btn" data-free-action="title-marker">제목 점</button><button type="button" class="w95-btn" data-free-action="title-position">제목: 상단</button></div>
-                <div class="card-free-setting-group"><b>글자</b><button type="button" class="w95-btn" data-free-action="font">글자 중</button><button type="button" class="w95-btn" data-free-action="emphasis">강조</button><button type="button" class="w95-btn" data-free-action="underline">밑줄</button><button type="button" class="w95-btn" data-free-action="italic">기울임</button><label class="card-free-color-label">색<input type="color" class="card-free-color" value="#111827" title="글자 색상"></label></div>
+                <div class="card-free-setting-group"><b>글자</b><button type="button" class="w95-btn" data-free-action="font">글자 중</button><button type="button" class="w95-btn" data-free-action="emphasis">굵게</button><button type="button" class="w95-btn" data-free-action="underline">밑줄</button><button type="button" class="w95-btn" data-free-action="italic">기울임</button><label class="card-free-color-label">색<input type="color" class="card-free-color" value="#111827" title="글자 색상"></label></div>
                 <div class="card-free-setting-group"><b>칸 기준 정렬</b><button type="button" class="w95-btn" data-free-action="align-h">칸 가로: 없음</button><button type="button" class="w95-btn" data-free-action="align-v">칸 세로: 없음</button></div>
                 <div class="card-free-setting-group card-free-box-settings"><b>상자</b><button type="button" class="w95-btn" data-free-action="content-box">내용 상자</button><label class="card-free-color-label">상자색<input type="color" class="card-free-content-bg-color" value="#e2e8f0" title="내용 상자 색상"></label><button type="button" class="w95-btn" data-free-action="box">외곽: 기본</button><button type="button" class="w95-btn" data-free-action="border">테두리: 없음</button><button type="button" class="w95-btn" data-free-action="shadow">음영: 없음</button><label class="card-free-color-label">배경<input type="color" class="card-free-bg-color" value="#ffffff" title="배경 색상"></label><label class="card-free-color-label">선<input type="color" class="card-free-border-color" value="#334155" title="테두리 색상"></label></div>
                 <div class="card-free-setting-group card-free-auto-group"><b>자동 설정</b><button type="button" class="w95-btn" data-free-action="auto-color">선택 색상 자동</button><button type="button" class="w95-btn" data-free-action="auto-all">전체 자동 설정</button></div>
