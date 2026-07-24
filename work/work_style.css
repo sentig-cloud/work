@@ -1106,14 +1106,14 @@ input, textarea, [contenteditable="true"] {
 
 /* 작업일지 입력 칸처럼 각 객체를 나누고, 경계에만 약한 흑백 버튼 효과를 준다. */
 .log-card.card-work,.log-card.card-work .card-content-zone,.log-card.card-work .work-card-columns {
-    background:#fff !important; background-color:#fff !important; background-image:none !important;
+    background:#d4d0c8 !important; background-color:#d4d0c8 !important; background-image:none !important;
     opacity:1 !important; filter:none !important;
 }
 .log-card.card-work { border:2px solid !important; border-color:#fff #4b5563 #4b5563 #fff !important; }
 .log-card.card-work .work-card-columns { gap:2px; }
 .work-card-subwidget[data-card-zone],
 .work-card-widget:not(.is-container-widget) > .work-card-section[data-card-zone] {
-    background:#f3f4f6 !important; background-image:none !important;
+    background:#fff !important; background-color:#fff !important; background-image:none !important;
     border:1px solid !important; border-color:#fff #9ca3af #9ca3af #fff !important; border-radius:0;
     box-shadow:none !important; padding:4px 6px; opacity:1 !important; filter:none !important; overflow:hidden;
 }
