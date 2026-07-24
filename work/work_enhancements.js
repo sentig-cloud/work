@@ -949,6 +949,76 @@
     window.isSearchEditMode = false;
     window.isSearchOrderMode = false;
     window.selectedSearchGroupIds = new Set();
+    const ensureSearchPicker = () => {
+        let picker = document.getElementById('searchWin95Picker');
+        if (picker) return picker;
+        picker = document.createElement('div');
+        picker.id = 'searchWin95Picker';
+        picker.className = 'search-win95-picker';
+        picker.innerHTML = `<div class="search-win95-picker-window w95-window" role="dialog" aria-modal="true">
+            <div class="w95-titlebar"><span id="searchPickerTitle">선택</span>
+                <button type="button" class="w95-btn search-picker-close" aria-label="닫기">X</button></div>
+            <div id="searchPickerOptions" class="search-picker-options"></div>
+        </div>`;
+        picker.addEventListener('pointerdown', event => {
+            if (event.target === picker || event.target.closest('.search-picker-close')) window.closeSearchPicker();
+        });
+        document.getElementById('searchLayer')?.appendChild(picker);
+        return picker;
+    };
+    window.closeSearchPicker = () => {
+        document.getElementById('searchWin95Picker')?.classList.remove('is-open');
+    };
+    window.refreshSearchPickerTriggers = () => {
+        document.querySelectorAll('#searchLayer select.search-picker-native').forEach(select => {
+            const trigger = select.nextElementSibling;
+            if (!trigger?.classList.contains('search-picker-trigger')) return;
+            trigger.textContent = select.options[select.selectedIndex]?.textContent || '선택';
+            trigger.classList.toggle('has-selection', !!select.value);
+        });
+    };
+    window.openSearchPicker = selectId => {
+        if (window.isSearchEditMode) return;
+        const select = document.getElementById(selectId);
+        if (!select) return;
+        const picker = ensureSearchPicker();
+        const title = select.options[0]?.textContent?.replace(/[\[\]]/g, '').trim() || '선택';
+        document.getElementById('searchPickerTitle').textContent = title;
+        const optionsArea = document.getElementById('searchPickerOptions');
+        optionsArea.innerHTML = '';
+        [...select.options].forEach(option => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = `w95-btn search-picker-option${option.value === select.value ? ' is-selected' : ''}`;
+            button.textContent = option.textContent;
+            button.addEventListener('click', () => {
+                select.value = option.value;
+                window.handleSelectChange?.(select);
+                window.refreshSearchPickerTriggers();
+                window.closeSearchPicker();
+            });
+            optionsArea.appendChild(button);
+        });
+        picker.classList.add('is-open');
+    };
+    window.enhanceSearchSelects = () => {
+        document.querySelectorAll('#searchLayer select').forEach(select => {
+            if (select.classList.contains('search-picker-native')) return;
+            select.classList.add('search-picker-native');
+            select.tabIndex = -1;
+            const trigger = document.createElement('button');
+            trigger.type = 'button';
+            trigger.className = 'w95-btn search-picker-trigger';
+            trigger.dataset.selectId = select.id;
+            trigger.addEventListener('click', event => {
+                event.preventDefault();
+                event.stopPropagation();
+                window.openSearchPicker(select.id);
+            });
+            select.insertAdjacentElement('afterend', trigger);
+        });
+        window.refreshSearchPickerTriggers();
+    };
     window.renderDynamicSearchFilters = (targetMonth = null) => {
         const grid = document.getElementById('searchFilterGrid');
         if (!grid) return;
@@ -979,7 +1049,7 @@
                 </select></div>`;
         }).join('') + `<div class="search-filter-cell search-fixed-filter">
             <select id="searchOX" class="m-input w95-in" onchange="window.handleSelectChange(this)">
-                <option value="">[ O/X ]</option><option value="O">O 표시</option><option value="X">X 표시</option>
+                <option value="">[ O/X 전체 ]</option><option value="O">O 표시</option><option value="X">X 표시</option><option value="none">표시 안 됨</option>
             </select></div><div class="search-filter-cell search-fixed-filter">
             <select id="searchOT" class="m-input w95-in" onchange="window.handleSelectChange(this)">
                 <option value="">[ OT ]</option><option value="yes">OT 있음</option><option value="no">OT 없음</option>
@@ -988,6 +1058,7 @@
                 <option value="">[ 당직 ]</option><option value="yes">당직 있음</option><option value="no">당직 없음</option>
             </select></div>`;
         Object.entries(fixedValues).forEach(([id, value]) => { const el = document.getElementById(id); if (el) el.value = value; });
+        window.enhanceSearchSelects();
     };
     window.updateSearchFilters = (targetMonth = null) => window.renderDynamicSearchFilters(targetMonth);
 
@@ -1103,6 +1174,7 @@
 
     const closeSearchBase = window.closeSearch;
     window.closeSearch = () => {
+        window.closeSearchPicker();
         if (window.isSearchEditMode) window.setSearchEditMode(false);
         closeSearchBase?.();
     };
@@ -1110,6 +1182,7 @@
     window.removeFilter = selectId => {
         const el = document.getElementById(selectId); if (el) el.value = '';
         if (selectId === 'searchMonth') window.updateSearchFilters(null);
+        window.refreshSearchPickerTriggers();
         window.doSearch();
     };
     const flattenSearchValues = value => {
@@ -1155,7 +1228,7 @@
         const chips = [];
         if (monthValue) chips.push(`<button class="w95-btn" onclick="window.removeFilter('searchMonth')">${monthValue}월 ×</button>`);
         selections.forEach(s => chips.push(`<button class="w95-btn" onclick="window.removeFilter('${s.id}')">${esc(s.value)} ×</button>`));
-        if (ox) chips.push(`<button class="w95-btn" onclick="window.removeFilter('searchOX')">${ox} ×</button>`);
+        if (ox) chips.push(`<button class="w95-btn" onclick="window.removeFilter('searchOX')">${ox === 'none' ? 'O/X 표시 안 됨' : `${ox} 표시`} ×</button>`);
         if (ot) chips.push(`<button class="w95-btn" onclick="window.removeFilter('searchOT')">OT ${ot === 'yes' ? '있음' : '없음'} ×</button>`);
         if (duty) chips.push(`<button class="w95-btn" onclick="window.removeFilter('searchDuty')">당직 ${duty === 'yes' ? '있음' : '없음'} ×</button>`);
         filtersArea.innerHTML = chips.join('');
@@ -1166,7 +1239,9 @@
             const keywordText = buildLogKeywordText(log);
             return (!keyword || keywordText.includes(keyword)) &&
                 (!monthValue || Number(log.m) === Number(monthValue)) &&
-                (!ox || log.personalCheck === ox) &&
+                (!ox || (ox === 'none'
+                    ? log.personalCheck !== 'O' && log.personalCheck !== 'X'
+                    : log.personalCheck === ox)) &&
                 (!ot || (Number(log.otCount || 0) > 0) === (ot === 'yes')) &&
                 (!duty || !!(log.isDuty || log.isDutyLog || log.cat === 'duty') === (duty === 'yes')) &&
                 selections.every(s => groupHasSearchValue(log, s.groupId, s.value));
