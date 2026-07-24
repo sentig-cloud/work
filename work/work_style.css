@@ -1110,21 +1110,20 @@ input, textarea, [contenteditable="true"] {
     opacity:1 !important; filter:none !important;
 }
 .log-card.card-work { border:2px solid !important; border-color:#fff #4b5563 #4b5563 #fff !important; }
+.log-card.card-work .work-card-columns { gap:2px; }
 .work-card-subwidget[data-card-zone],
 .work-card-widget:not(.is-container-widget) > .work-card-section[data-card-zone] {
-    background:linear-gradient(#fff,#fff) padding-box,
-               linear-gradient(135deg,#fff 0%,#f3f4f6 28%,#9ca3af 72%,#111 100%) border-box !important;
-    border:1px solid transparent !important; border-radius:2px;
-    box-shadow:inset 1px 1px 0 rgba(255,255,255,.95),inset -1px -1px 0 rgba(0,0,0,.08) !important;
-    padding:4px 6px; opacity:1 !important; filter:none !important; overflow:hidden;
+    background:#f3f4f6 !important; background-image:none !important;
+    border:1px solid !important; border-color:#fff #9ca3af #9ca3af #fff !important; border-radius:0;
+    box-shadow:none !important; padding:4px 6px; opacity:1 !important; filter:none !important; overflow:hidden;
 }
 .work-card-subwidget.is-zone-start::before { content:none !important; display:none !important; }
 .work-card-subwidget[data-card-section-key="object:modified"] { color:#6b7280; opacity:1; }
 .log-card.card-work .work-status-sticker,.log-card.card-work .work-alert-badge {
-    background:linear-gradient(180deg,#6b7280,#374151) !important; color:#fff !important;
-    border-color:#f9fafb #1f2937 #1f2937 #f9fafb !important; box-shadow:none !important; opacity:1 !important;
+    background:#d1d5db !important; background-image:none !important; color:#111 !important;
+    border-color:#fff #6b7280 #6b7280 #fff !important; box-shadow:none !important; opacity:1 !important;
 }
-.log-card.card-work .work-status-sticker .work-card-tag-value { color:#fff !important; }
+.log-card.card-work .work-status-sticker .work-card-tag-value { color:#111 !important; }
 .log-card.card-work .log-content,.log-card.card-work .card-content-zone,
 .log-card.card-work .card-content-zone *:not(.is-underlined) {
     text-decoration:none; font-style:normal; opacity:1; filter:none;
