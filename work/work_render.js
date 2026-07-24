@@ -295,10 +295,10 @@ window.getLogCardHtml = (l, indexStr = '') => {
         const selectedCardColor = getSelectedCardColor();
         if (selectedCardColor) cardStyle += `--work-card-color:${selectedCardColor};`;
         const getCardMonthCount = (groupId, name) => (window.logs || []).reduce((sum, log) => {
-            if (!log || log.cat !== 'work' || log.y !== l.y || log.m !== l.m) return sum;
+            if (!log || log.cat !== 'work' || Number(log.y) !== Number(l.y) || Number(log.m) !== Number(l.m)) return sum;
             if (window.isLogGroupExcluded?.(log, groupId)) return sum;
             const value = window.getGroupValueFromLog?.(log, groupId);
-            if (groupId === 'equipments') return sum + (Number(value?.[name] || 0) > 0 ? 1 : 0);
+            if (groupId === 'equipments') return sum + Math.max(0, Number(value?.[name] || 0));
             if (Array.isArray(value)) return sum + (value.includes(name) ? 1 : 0);
             return sum + (value === name ? 1 : 0);
         }, 0);
@@ -465,7 +465,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
 
         const cardSections = [
             { key: 'work', html: `<section class="work-main-panel work-card-section" data-card-section-key="work" data-card-section-label="작업정보">${sortCardObjects(workDetails).join('')}</section>` },
-            { key: 'customer', html: `<aside class="work-customer-panel work-card-section" data-card-section-key="customer" data-card-section-label="고객정보">${customerDetails.length ? sortCardObjects(customerDetails).join('') : '<div class="work-info-empty">등록 정보 없음</div>'}</aside>` },
+            { key: 'customer', html: `<aside class="work-customer-panel work-card-section" data-card-section-key="customer" data-card-section-label="고객정보">${customerDetails.length ? sortCardObjects(customerDetails).join('') : ''}</aside>` },
             ...customDetails
         ];
         const orderedCardSections = window.getWorkCardSectionOrder(cardSections.map(section => section.key))

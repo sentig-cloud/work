@@ -344,6 +344,14 @@ html, body {
 .work-card-status-only { display:flex; align-items:center; height:100%; }
 .work-card-status-only .work-status-sticker { width:100%; box-sizing:border-box; text-align:center; }
 .work-card-delete-object.btn-del { position:static; display:flex; align-items:center; justify-content:center; width:34px; height:30px; min-height:30px; margin:auto; color:#b91c1c; font-weight:950; }
+.work-card-subwidget[data-card-section-key="object:delete"] {
+    display:flex !important; align-items:center !important; justify-content:center !important;
+    padding:0 !important;
+}
+.work-card-subwidget[data-card-section-key="object:delete"] .work-card-delete-object {
+    position:static !important; inset:auto !important; align-self:center; justify-self:center;
+    margin:auto !important; flex:0 0 34px;
+}
 .work-card-modified { padding:3px 1px !important; text-align:right; font-size:.72rem; }
 .work-card-images { padding:0 !important; }
 .work-card-subwidget.is-widget-hidden { display:none; }
