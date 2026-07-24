@@ -469,7 +469,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
 
         const cardSections = [
             { key: 'work', html: `<section class="work-main-panel work-card-section" data-card-section-key="work" data-card-section-label="작업정보">${sortCardObjects(workDetails).join('')}</section>` },
-            { key: 'customer', html: `<aside class="work-customer-panel work-card-section" data-card-section-key="customer" data-card-section-label="고객정보">${customerDetails.length ? sortCardObjects(customerDetails).join('') : ''}</aside>` },
+            ...(customerDetails.length ? [{ key: 'customer', html: `<aside class="work-customer-panel work-card-section" data-card-section-key="customer" data-card-section-label="고객정보">${sortCardObjects(customerDetails).join('')}</aside>` }] : []),
             ...customDetails
         ];
         const orderedCardSections = window.getWorkCardSectionOrder(cardSections.map(section => section.key))
