@@ -212,9 +212,10 @@ window.getWorkCardWidgetSettings = () => {
 };
 
 window.getLogCardHtml = (l, indexStr = '') => {
-    const excludedCardStyle = (groupId) => window.isLogGroupExcluded?.(l, groupId)
-        ? 'color:#dc2626 !important; text-decoration:line-through; text-decoration-color:#dc2626; text-decoration-thickness:2px;'
-        : '';
+    const isExcludedCardGroup = (groupId) => !!window.isLogGroupExcluded?.(l, groupId);
+    const excludedCardValue = (groupId, normalHtml, extraClass = '') => isExcludedCardGroup(groupId)
+        ? `<div class="work-info-line work-card-excluded-value ${extraClass}"><span>-</span></div>`
+        : normalHtml;
     let statusClass = '';
     if (l.status === '완료') statusClass = 'status-completed';
     else if (l.status === '취소') statusClass = 'status-canceled';
@@ -404,7 +405,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
         workDetails.push(makeCardObject('taskNo','타스크번호',inlineTaskNo,2));
         if (dutyBadge || otBadge || keepsEmptyObject('alerts')) workDetails.push(makeCardObject('alerts','OT·당직',`<div class="work-card-alerts">${dutyBadge}${otBadge}</div>`,2));
         workDetails.push(makeCardObject('delete','삭제',`<button type="button" class="btn-del work-card-delete-object w95-btn" onclick="event.stopPropagation(); window.deleteEntry('${l.id}')">X</button>`,1));
-        workDetails.push(makeCardObject('taskType','작업유형',`<div class="work-info-line task-type" style="${excludedCardStyle('taskTypes')}"><i class="fa-solid fa-screwdriver-wrench"></i><span>${formatWorkQtyNames(String(l.taskType || '기본').split(', '), 'taskTypes')}</span></div>`,2));
+        workDetails.push(makeCardObject('taskType','작업유형',excludedCardValue('taskTypes', `<div class="work-info-line task-type"><i class="fa-solid fa-screwdriver-wrench"></i><span>${formatWorkQtyNames(String(l.taskType || '기본').split(', '), 'taskTypes')}</span></div>`, 'task-type'),2));
         workDetails.push(makeCardObject('content','작업내용',`<div class="work-info-line work-content-line"><i class="fa-solid fa-clipboard"></i><span>${l.content || '내용 없음'}</span></div>`));
         if (l.note || keepsEmptyObject('note')) workDetails.push(makeCardObject('note','특이사항',`<div class="work-info-line note">${l.note ? '<i class="fa-solid fa-triangle-exclamation"></i>' : ''}<span>${l.note || ''}</span></div>`));
         if (l.customerName || keepsEmptyObject('customer')) customerDetails.push(makeCardObject('customer','고객명',`<div class="work-info-line customer">${l.customerName ? '<i class="fa-solid fa-user"></i>' : ''}<span>${l.customerName || ''}</span></div>`,2));
@@ -418,7 +419,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
             Math.max(Number(l.equips?.[name] || 0), Number(l.tagQuantities?.equipments?.[name] || 0))
         ]).filter(([, qty]) => qty > 0)
             .map(([name, qty]) => formatCardTagValue('equipments', name, qty)).join(', ');
-        if (eqStr || keepsEmptyObject('equipment')) customerDetails.push(makeCardObject('equipment','장비',`<div class="work-info-line equipment" style="${excludedCardStyle('equipments')}">${eqStr ? '<i class="fa-solid fa-box"></i>' : ''}<span>${eqStr}</span></div>`,2));
+        if (eqStr || keepsEmptyObject('equipment')) customerDetails.push(makeCardObject('equipment','장비',excludedCardValue('equipments', `<div class="work-info-line equipment">${eqStr ? '<i class="fa-solid fa-box"></i>' : ''}<span>${eqStr}</span></div>`, 'equipment'),2));
 
         // 시작/종료/총시간 (특수 그룹 — 태그 목록이 아니라 log.startTime/endTime/totalMin에 직접 저장)
         if (l.startTime || l.endTime || keepsEmptyObject('duration')) {
@@ -450,14 +451,14 @@ window.getLogCardHtml = (l, indexStr = '') => {
                 customDetails.push({
                     key: `custom:${g.id}`,
                     label: g.title || '선택태그',
-                    html: `<aside class="work-custom-panel work-card-section title-position-${customTitlePosition}" data-card-zone="work" style="--custom-accent:${palette[0]};--custom-bg:${palette[1]};" data-card-section-key="custom:${g.id}" data-card-section-label="${safeGroupTitle}">${customTitleVisible && customTitlePosition === 'top' ? `<b class="work-card-object-title">${customTitleMarker}${safeGroupTitle}</b>` : ''}<div class="work-info-line custom" style="${excludedCardStyle(g.id)}">${valStr ? '<i class="fa-solid fa-tag"></i>' : ''}<span>${customTitleVisible && customTitlePosition === 'inline' ? `<b>${customTitleMarker}${safeGroupTitle}</b><span class="work-custom-title-separator"> : </span>` : ''}${valStr}</span></div></aside>`
+                    html: `<aside class="work-custom-panel work-card-section title-position-${customTitlePosition}" data-card-zone="work" style="--custom-accent:${palette[0]};--custom-bg:${palette[1]};" data-card-section-key="custom:${g.id}" data-card-section-label="${safeGroupTitle}">${isExcludedCardGroup(g.id) ? '' : (customTitleVisible && customTitlePosition === 'top' ? `<b class="work-card-object-title">${customTitleMarker}${safeGroupTitle}</b>` : '')}${excludedCardValue(g.id, `<div class="work-info-line custom">${valStr ? '<i class="fa-solid fa-tag"></i>' : ''}<span>${customTitleVisible && customTitlePosition === 'inline' ? `<b>${customTitleMarker}${safeGroupTitle}</b><span class="work-custom-title-separator"> : </span>` : ''}${valStr}</span></div>`, 'custom')}</aside>`
                 });
             }
         });
 
         if ((l.coworkers && l.coworkers.length > 0) || keepsEmptyObject('manager')) {
             const managerText = formatWorkQtyNames(l.coworkers || [], 'coworkers');
-            workDetails.push(makeCardObject('manager','매니저',`<div class="work-info-line manager" style="${excludedCardStyle('coworkers')}">${managerText ? '<i class="fa-solid fa-user-group"></i>' : ''}<span>${managerText}</span></div>`,3));
+            workDetails.push(makeCardObject('manager','매니저',excludedCardValue('coworkers', `<div class="work-info-line manager">${managerText ? '<i class="fa-solid fa-user-group"></i>' : ''}<span>${managerText}</span></div>`, 'manager'),3));
         }
         workDetails.push(makeCardObject('modified','수정시간',`<div class="log-time work-card-modified">${l.m}/${l.d}(${dayStr}) ${l.time || ''}</div>`,3));
         if ((l.imgs && l.imgs.length > 0) || keepsEmptyObject('images')) {

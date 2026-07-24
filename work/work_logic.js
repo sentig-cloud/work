@@ -999,9 +999,35 @@ window.safeProcessImage = async function (file, callback) {
         const preparedFile = await window.convertHeicIfNeeded(file);
         const dataUrl = await window.readImageAsDataUrl(preparedFile);
 
-        // Preserve the exact uploaded bytes instead of resizing/re-encoding them.
-        // HEIC/HEIF remains converted because browsers cannot reliably display it.
-        callback(dataUrl, { originalPreserved: !isHeic });
+        const preparedType = String(preparedFile?.type || "").toLowerCase();
+        const storedOriginalName = isHeic
+            ? String(preparedFile?.name || file?.name || "image.jpg")
+            : String(file?.name || preparedFile?.name || "");
+        if (preparedType !== "image/jpeg") {
+            callback(dataUrl, { originalPreserved: !isHeic, originalName: storedOriginalName });
+            return;
+        }
+
+        const image = new Image();
+        image.onload = () => {
+            const maxWidth = 2560;
+            const maxHeight = 2560;
+            const ratio = Math.min(1, maxWidth / image.width, maxHeight / image.height);
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.max(1, Math.round(image.width * ratio));
+            canvas.height = Math.max(1, Math.round(image.height * ratio));
+            const context = canvas.getContext("2d");
+            context.drawImage(image, 0, 0, canvas.width, canvas.height);
+            callback(canvas.toDataURL("image/jpeg", 0.94), {
+                originalPreserved: false,
+                originalName: storedOriginalName
+            });
+        };
+        image.onerror = () => callback(dataUrl, {
+            originalPreserved: !isHeic,
+            originalName: storedOriginalName
+        });
+        image.src = dataUrl;
     } catch (e) {
         console.error("사진 처리 실패:", e);
         alert(e.message || "사진 처리 실패");
@@ -1031,7 +1057,7 @@ window.handleGeneralFiles = (input) => {
                 window.tempImgs.push({
                     id: `img_${Date.now()}_${Math.random()}`,
                     src: dataUrl,
-                    originalName: file.name || "",
+                    originalName: imageMeta.originalName || file.name || "",
                     originalPreserved: imageMeta.originalPreserved !== false,
                     updatedAt: new Date().toISOString()
                 });
@@ -1085,7 +1111,7 @@ window.handleWorkFiles = (input) => {
                 window.workImgs.push({
                     id: `w_${Date.now()}_${Math.random()}`,
                     src: dataUrl,
-                    originalName: file.name || "",
+                    originalName: imageMeta.originalName || file.name || "",
                     originalPreserved: imageMeta.originalPreserved !== false,
                     updatedAt: new Date().toISOString()
                 });
@@ -1132,7 +1158,7 @@ window.addFilesToEdit = (input) => {
                 log.imgs.push({
                     id: `e_${Date.now()}_${Math.random()}`,
                     src: dataUrl,
-                    originalName: file.name || "",
+                    originalName: imageMeta.originalName || file.name || "",
                     originalPreserved: imageMeta.originalPreserved !== false,
                     updatedAt: new Date().toISOString()
                 });
