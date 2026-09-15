@@ -169,6 +169,7 @@
                         <label class="tt-settings-check"><input type="radio" name="ttDefaultView" id="ttOptViewMonth" value="month"> 월간 달력</label>
                         <label class="tt-settings-check"><input type="radio" name="ttDefaultView" id="ttOptViewTimetable" value="timetable"> 주간 시간표</label>
                     </div>
+                    <div class="tt-settings-group-title">시인성</div>
                     <div class="tt-settings-section">
                         <div class="tt-settings-label">표시 크기(시간/줄/글씨)</div>
                         <label class="tt-settings-check"><input type="radio" name="ttScale" id="ttOptScaleSmall" value="small"> 작게</label>
@@ -179,6 +180,11 @@
                         <div class="tt-settings-label">긴 이름 표시</div>
                         <label class="tt-settings-check"><input type="radio" name="ttLongName" id="ttOptLongNameWrap" value="wrap"> 줄바꿈(칸 높이 늘어남)</label>
                         <label class="tt-settings-check"><input type="radio" name="ttLongName" id="ttOptLongNameEllipsis" value="ellipsis"> 말줄임(한 줄, ...)</label>
+                    </div>
+                    <div class="tt-settings-section">
+                        <div class="tt-settings-label">격자 무늬(칸 구분)</div>
+                        <label class="tt-settings-check"><input type="radio" name="ttGridPattern" id="ttOptGridPatternNone" value="none"> 없음</label>
+                        <label class="tt-settings-check"><input type="radio" name="ttGridPattern" id="ttOptGridPatternChecker" value="checker"> 바둑판 무늬</label>
                     </div>
                 </div>
                 <div class="modal-footer" style="padding:6px; background:var(--w-gray);">
@@ -200,6 +206,7 @@
         document.getElementById(s.defaultView === 'timetable' ? 'ttOptViewTimetable' : 'ttOptViewMonth').checked = true;
         document.getElementById(`ttOptScale${s.scale.charAt(0).toUpperCase()}${s.scale.slice(1)}`).checked = true;
         document.getElementById(s.longNameMode === 'ellipsis' ? 'ttOptLongNameEllipsis' : 'ttOptLongNameWrap').checked = true;
+        document.getElementById(s.gridPattern === 'checker' ? 'ttOptGridPatternChecker' : 'ttOptGridPatternNone').checked = true;
         document.getElementById('ttSettingsModal').style.display = 'flex';
     }
     function closeSettingsModal() {
@@ -210,6 +217,7 @@
         const scaleEl = document.querySelector('input[name="ttScale"]:checked');
         const viewEl = document.querySelector('input[name="ttDefaultView"]:checked');
         const longNameEl = document.querySelector('input[name="ttLongName"]:checked');
+        const gridPatternEl = document.querySelector('input[name="ttGridPattern"]:checked');
         WT.saveSettings({
             categories: {
                 work: document.getElementById('ttOptCatWork').checked,
@@ -218,7 +226,8 @@
             },
             defaultView: viewEl ? viewEl.value : 'month',
             scale: scaleEl ? scaleEl.value : 'medium',
-            longNameMode: longNameEl ? longNameEl.value : 'wrap'
+            longNameMode: longNameEl ? longNameEl.value : 'wrap',
+            gridPattern: gridPatternEl ? gridPatternEl.value : 'none'
         });
         closeSettingsModal();
         if (active) { applyScaleClass(); renderWeek(); }
@@ -319,11 +328,13 @@
         }
 
         // 정시 행 × 요일 칸 — 각 칸 안에 그 시간대 일정을 시간순으로 세로로 쌓는다.
-        const rowsHtml = hours.map(hour => {
+        const checker = settings.gridPattern === 'checker';
+        const rowsHtml = hours.map((hour, rowIdx) => {
             const cellsHtml = days.map((d, dayIdx) => {
                 const blocks = WT.buildDayBlocks(window.logs || [], d, settings).filter(b => b.hour === hour);
                 const chipsHtml = blocks.map(renderChipHtml).join('');
-                return `<div class="tt-hour-cell" data-day-idx="${dayIdx}" data-hour="${hour}">${chipsHtml}</div>`;
+                const tileClass = checker && (rowIdx + dayIdx) % 2 === 1 ? ' is-tile-dark' : '';
+                return `<div class="tt-hour-cell${tileClass}" data-day-idx="${dayIdx}" data-hour="${hour}">${chipsHtml}</div>`;
             }).join('');
             return `<div class="tt-hour-row" data-hour="${hour}">
                 <div class="tt-hour-label">${String(hour).padStart(2, '0')}:00</div>

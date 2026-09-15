@@ -9,7 +9,8 @@ window.WorkTimetable = (() => {
         categories: { work: true, commute: true, memo: false },
         defaultView: 'month', // 'month' | 'timetable'
         scale: 'medium', // 'small' | 'medium' | 'large' — 시간표 글씨/줄 크기
-        longNameMode: 'wrap' // 'wrap'(칸 높이를 늘려 줄바꿈) | 'ellipsis'(한 줄로 말줄임)
+        longNameMode: 'wrap', // 'wrap'(칸 높이를 늘려 줄바꿈) | 'ellipsis'(한 줄로 말줄임)
+        gridPattern: 'none' // 'none' | 'checker' — 시인성: 바둑판(타일) 무늬 배경
     };
 
     function getSettings() {
@@ -17,11 +18,13 @@ window.WorkTimetable = (() => {
         try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); } catch (_) { saved = {}; }
         const scale = ['small', 'medium', 'large'].includes(saved.scale) ? saved.scale : DEFAULT_SETTINGS.scale;
         const longNameMode = ['wrap', 'ellipsis'].includes(saved.longNameMode) ? saved.longNameMode : DEFAULT_SETTINGS.longNameMode;
+        const gridPattern = ['none', 'checker'].includes(saved.gridPattern) ? saved.gridPattern : DEFAULT_SETTINGS.gridPattern;
         return {
             categories: { ...DEFAULT_SETTINGS.categories, ...(saved.categories || {}) },
             defaultView: saved.defaultView === 'timetable' ? 'timetable' : 'month',
             scale,
-            longNameMode
+            longNameMode,
+            gridPattern
         };
     }
 
