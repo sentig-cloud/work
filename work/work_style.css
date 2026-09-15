@@ -1307,9 +1307,12 @@ input, textarea, [contenteditable="true"] {
 .tt-day-header .tt-day-date { font-weight:bold; }
 
 .tt-scroll { flex:1; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; padding-bottom:120px; }
-.tt-body { display:flex; flex-direction:column; }
+/* min-height:100%로 스크롤 영역만큼은 항상 채우고, 그 안의 행들이 flex-grow로 남는
+   공간을 나눠 가져서(표시 크기를 "작게"로 줄여도) 화면 아래 빈 부분이 생기지 않게 한다.
+   칸이 그 높이보다 많아 넘치면 flex-grow가 나눠줄 여유 공간이 없으니 자연히 스크롤된다. */
+.tt-body { display:flex; flex-direction:column; min-height:100%; }
 
-.tt-hour-row { display:flex; border-bottom:1px solid #d1d5db; }
+.tt-hour-row { display:flex; flex-grow:1; flex-shrink:0; border-bottom:1px solid #d1d5db; }
 .tt-hour-row:last-child { border-bottom:none; }
 .tt-hour-label {
     width:38px; flex-shrink:0; padding:4px 4px 0 0; text-align:right;
@@ -1319,6 +1322,8 @@ input, textarea, [contenteditable="true"] {
     flex:1; min-width:0; min-height:32px; display:flex; flex-direction:column; gap:2px;
     padding:3px; border-left:1px solid #d1d5db;
 }
+/* 설정 > 격자 무늬: 바둑판(타일) 배경 — 칸 경계를 더 잘 구분되게 한다 */
+.tt-hour-cell.is-tile-dark { background:rgba(15,23,42,0.06); }
 
 .tt-chip {
     display:flex; align-items:center; gap:4px; box-sizing:border-box; width:100%; min-width:0; border-radius:3px; padding:2px 5px;
@@ -1392,6 +1397,10 @@ input, textarea, [contenteditable="true"] {
 .tt-settings-section { display:flex; flex-direction:column; gap:4px; }
 .tt-settings-label { font-size:0.8rem; font-weight:bold; color:var(--w-blue); margin-bottom:2px; }
 .tt-settings-check { display:flex; align-items:center; gap:6px; font-size:0.85rem; }
+.tt-settings-group-title {
+    font-size:0.78rem; font-weight:900; color:var(--w-black); text-transform:uppercase;
+    letter-spacing:0.05em; border-top:1px solid var(--w-dark-gray); padding-top:8px; margin-top:2px;
+}
 
 /* ─── 사진 먼저 담고 나중에 넣기 (work_photo_insert.js) ─── */
 .pi-pending-strip { background:var(--w-gray); border-bottom:2px solid var(--w-black); padding:8px; flex-shrink:0; }

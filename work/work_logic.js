@@ -802,6 +802,25 @@ window.downloadViewerImage = async () => {
     if (downloadButton) downloadButton.disabled = true;
 
     try {
+        // 인라인(data:) 사진은 blob/download 속성을 일부 안드로이드 브라우저가 무시해서
+        // 임의의 이름(예: "4832")으로 저장되는 문제가 있다. R2로 먼저 옮겨두면
+        // 아래 /api/download/파일명 직접 경로(서버가 Content-Disposition을 붙여줌)를
+        // 탈 수 있어 파일명이 확실히 적용된다. 이후 다운로드부터는 계속 이 경로를 탄다.
+        if (window.isInlineImageSrc?.(image.src) && window.uploadToStorage) {
+            try {
+                const uploadedUrl = await window.uploadToStorage(image.src, image.originalName || "");
+                image.src = uploadedUrl;
+                image.updatedAt = new Date().toISOString();
+                const owningLogForMigration = (window.logs || []).find(log => (log.imgs || []).some(item => item === image));
+                if (owningLogForMigration) {
+                    owningLogForMigration.updatedAt = new Date().toISOString();
+                    window.saveToLocalStore("logs", owningLogForMigration);
+                }
+            } catch (uploadError) {
+                console.warn("다운로드 전 R2 이전 실패, 인라인 상태로 계속 진행:", uploadError);
+            }
+        }
+
         const response = await fetch(image.src);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
