@@ -1,5 +1,5 @@
 // work_timetable.js
-// 주간 시간표 뷰 — 순수 데이터 로직(시간 계산, 주 범위, 겹침 분할).
+// 주간 시간표 뷰 — 순수 데이터 로직(시간 계산, 주 범위, 시간대별 묶음).
 // window.logs를 그대로 읽기만 하고, 새 컬렉션/스키마는 만들지 않는다.
 
 window.WorkTimetable = (() => {
@@ -8,17 +8,17 @@ window.WorkTimetable = (() => {
     const DEFAULT_SETTINGS = {
         categories: { work: true, commute: true, memo: false },
         defaultView: 'month', // 'month' | 'timetable'
-        gridUnit: 30 // 15 | 30 | 60 (분)
+        scale: 'medium' // 'small' | 'medium' | 'large' — 시간표 글씨/줄 크기
     };
 
     function getSettings() {
         let saved = {};
         try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); } catch (_) { saved = {}; }
-        const gridUnit = [15, 30, 60].includes(Number(saved.gridUnit)) ? Number(saved.gridUnit) : DEFAULT_SETTINGS.gridUnit;
+        const scale = ['small', 'medium', 'large'].includes(saved.scale) ? saved.scale : DEFAULT_SETTINGS.scale;
         return {
             categories: { ...DEFAULT_SETTINGS.categories, ...(saved.categories || {}) },
             defaultView: saved.defaultView === 'timetable' ? 'timetable' : 'month',
-            gridUnit
+            scale
         };
     }
 
@@ -41,10 +41,6 @@ window.WorkTimetable = (() => {
         const clamped = Math.max(0, Math.min(24 * 60 - 1, Math.round(min)));
         const h = Math.floor(clamped / 60), m = clamped % 60;
         return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-    }
-
-    function snapToGrid(min, gridUnit) {
-        return Math.round(min / gridUnit) * gridUnit;
     }
 
     // 해당 날짜가 속한 주(월~일)의 월요일 00:00을 반환
@@ -87,40 +83,20 @@ window.WorkTimetable = (() => {
         return '(내용없음)';
     }
 
-    // 로그 1건 -> {startMin, endMin, isRange} 또는 null(시간 정보 없어 제외)
-    function timeRangeOf(log, gridUnit) {
+    // 로그 1건의 대표 시각(분) — work는 시작시간(없으면 작업시간), 그 외는 time/workTime
+    function startMinOf(log) {
         if (log.cat === 'work') {
             const s = toMin(log.startTime);
-            const e = toMin(log.endTime);
-            if (s !== null && e !== null && e > s) return { startMin: s, endMin: e, isRange: true };
-            const point = s !== null ? s : toMin(log.workTime || log.time);
-            if (point === null) return null;
-            return { startMin: point, endMin: Math.min(24 * 60, point + gridUnit), isRange: false };
+            if (s !== null) return s;
+            return toMin(log.workTime || log.time);
         }
-        const point = toMin(log.time) !== null ? toMin(log.time) : toMin(log.workTime);
-        if (point === null) return null;
-        return { startMin: point, endMin: Math.min(24 * 60, point + gridUnit), isRange: false };
+        const t = toMin(log.time);
+        return t !== null ? t : toMin(log.workTime);
     }
 
-    // 겹치는 블록끼리 lane(가로 분할 슬롯)을 배정하는 고전적 interval partitioning
-    function assignLanes(blocks) {
-        const sorted = [...blocks].sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
-        const active = []; // {endMin, lane}
-        sorted.forEach(block => {
-            for (let i = active.length - 1; i >= 0; i--) {
-                if (active[i].endMin <= block.startMin) active.splice(i, 1);
-            }
-            const usedLanes = new Set(active.map(a => a.lane));
-            let lane = 0;
-            while (usedLanes.has(lane)) lane++;
-            block.lane = lane;
-            active.push({ endMin: block.endMin, lane });
-        });
-        sorted.forEach(block => {
-            const overlapping = sorted.filter(o => o.startMin < block.endMin && o.endMin > block.startMin);
-            block.laneCount = overlapping.reduce((max, o) => Math.max(max, o.lane + 1), 1);
-        });
-        return sorted;
+    // 정시 단위로만 구분한다 — 15시 59분도 15시 칸으로 판단(분 단위는 표시만 유지).
+    function hourOf(startMin) {
+        return Math.floor(startMin / 60);
     }
 
     function buildDayBlocks(logs, date, settings) {
@@ -129,30 +105,30 @@ window.WorkTimetable = (() => {
         dayLogs.forEach(log => {
             const groupCat = groupCatOf(log);
             if (!settings.categories[groupCat]) return;
-            const range = timeRangeOf(log, settings.gridUnit);
-            if (!range) return;
+            const startMin = startMinOf(log);
+            if (startMin === null || startMin === undefined || Number.isNaN(startMin)) return;
             blocks.push({
                 logId: log.id,
                 cat: log.cat,
                 groupCat,
                 label: labelOf(log),
                 completed: log.status === '완료',
+                canceled: log.status === '취소',
                 taskNo: log.taskNo || '',
                 address: log.address || '',
                 memo: log.memo || '',
-                startMin: range.startMin,
-                endMin: range.endMin,
-                isRange: range.isRange
+                startMin,
+                hour: hourOf(startMin)
             });
         });
-        return assignLanes(blocks);
+        return blocks.sort((a, b) => a.startMin - b.startMin);
     }
 
     return {
         DEFAULT_SETTINGS, DAY_LABELS,
         getSettings, saveSettings,
-        toMin, toHHMM, snapToGrid,
+        toMin, toHHMM,
         mondayOf, weekDays, logsForDay,
-        groupCatOf, labelOf, timeRangeOf, assignLanes, buildDayBlocks
+        groupCatOf, labelOf, startMinOf, hourOf, buildDayBlocks
     };
 })();

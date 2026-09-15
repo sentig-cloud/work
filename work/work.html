@@ -7,7 +7,7 @@
     <title>Work Master Local Pro</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-<link rel="stylesheet" href="work_style.css?v=20260915-2">
+<link rel="stylesheet" href="work_style.css?v=20260915-3">
 </head>
 <body>
 
@@ -21,6 +21,7 @@
             <button type="button" class="w95-btn icon-btn" onclick="window.goToWeeklyTimetable()" title="주간 시간표"><i class="fa-solid fa-table-cells"></i></button>
         </div>
         <div class="toolbar-group header-right-tools">
+            <button type="button" class="w95-btn icon-btn" onclick="window.openPhotoInsert()" title="사진 먼저 담아서 넣기"><i class="fa-solid fa-images" style="color:#7c3aed;"></i></button>
             <button type="button" class="w95-btn icon-btn" onclick="window.triggerImport()" title="백업 복원"><i class="fa-solid fa-file-import" style="color:#dc2626;"></i></button>
             <button type="button" class="w95-btn icon-btn" onclick="if(window.WorkExportUI) window.WorkExportUI.open(); else alert('내보내기 모듈이 로드되지 않았습니다.');" title="엑셀 내보내기"><i class="fa-solid fa-file-excel" style="color:#10b981;"></i></button>
         </div>
@@ -466,8 +467,9 @@
 <script src="work_ui.js?v=20260722-1"></script>
 <script src="work_modal.js?v=20260722-4"></script>
 <script src="work_logic.js?v=20260724-47"></script>
-<script src="work_timetable.js?v=20260915-1"></script>
-<script src="work_timetable_ui.js?v=20260915-1"></script>
+<script src="work_timetable.js?v=20260915-3"></script>
+<script src="work_timetable_ui.js?v=20260915-3"></script>
+<script src="work_photo_insert.js?v=20260915-1"></script>
 <script src="work_enhancements.js?v=20260724-47"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>

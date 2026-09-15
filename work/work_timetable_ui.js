@@ -2,15 +2,17 @@
 // 주간 시간표 뷰 — 렌더링/드래그/팝오버/설정 패널.
 // window.logs / window.saveToLocalStore / window.openWorkModal / window.openEditModal 등
 // 기존 파이프라인을 그대로 재사용하고, 새 렌더러만 추가한다.
+//
+// 표시 모델: 정시(hour) 단위 행 × 요일 열의 표. 각 칸 안에 그 시간대(예: 15:00~15:59)
+// 일정들을 시간순으로 세로로 쌓는다(겹침 레인 없음). 칸 높이는 CSS flex가 내용물에 맞춰
+// 자동으로 늘어나므로 별도 픽셀 계산이 필요 없다.
 
 (() => {
     const WT = window.WorkTimetable;
     const DRAG_THRESHOLD = 6; // 이 이하 이동은 탭(클릭)으로 취급
     const UNDO_MS = 3000;
-    const BASE_START_MIN = 9 * 60;  // 기본 표시 범위: 09:00
-    const BASE_END_MIN = 18 * 60;   // 기본 표시 범위: 18:00
-    const MIN_PPM = 0.6;            // 분당 최소 px (이보다 좁아지면 스크롤 발생)
-    const FOOTER_SAFE_PAD = 120;    // .tt-scroll의 padding-bottom과 맞춘 값(.footer-nav 오버레이 회피)
+    const BASE_MIN_HOUR = 9;  // 기본 표시 범위 시작: 09시
+    const BASE_MAX_HOUR = 18; // 기본 표시 범위 끝: 18시
 
     let active = false;
     let userToggled = false;
@@ -18,8 +20,6 @@
     let dragCtx = null;
     let lastUndo = null;
     let undoTimer = null;
-    // 마지막으로 렌더링한 주의 시간 범위/스케일 — 드래그 계산과 클릭(겹침 판정)이 재사용한다.
-    let currentRange = { rangeStart: BASE_START_MIN, rangeEnd: BASE_END_MIN, ppm: MIN_PPM };
 
     function escapeHtml(str) {
         return String(str == null ? '' : str).replace(/[&<>"']/g, ch => ({
@@ -66,18 +66,20 @@
         return 'var(--w-black)';
     }
 
-    // 09:00~18:00을 기본으로 하되, 그 범위를 벗어나는 일정이 있으면 정시 단위로 넓힌다.
-    function computeWeekRange(days, settings) {
-        let rangeStart = BASE_START_MIN, rangeEnd = BASE_END_MIN;
+    // 09~18시를 기본으로 하되, 그 범위를 벗어나는 일정이 있으면 정시 단위로 넓힌다.
+    function computeHourRange(days, settings) {
+        let minHour = BASE_MIN_HOUR, maxHour = BASE_MAX_HOUR;
         days.forEach(d => {
             WT.buildDayBlocks(window.logs || [], d, settings).forEach(b => {
-                if (b.startMin < rangeStart) rangeStart = b.startMin;
-                if (b.endMin > rangeEnd) rangeEnd = b.endMin;
+                if (b.hour < minHour) minHour = b.hour;
+                if (b.hour > maxHour) maxHour = b.hour;
             });
         });
-        rangeStart = Math.max(0, Math.floor(rangeStart / 60) * 60);
-        rangeEnd = Math.min(24 * 60, Math.ceil(rangeEnd / 60) * 60);
-        return { rangeStart, rangeEnd };
+        minHour = Math.max(0, minHour);
+        maxHour = Math.min(23, maxHour);
+        const hours = [];
+        for (let h = minHour; h <= maxHour; h++) hours.push(h);
+        return hours;
     }
 
     // ─── DOM 준비 (최초 1회) ───
@@ -136,7 +138,7 @@
         document.addEventListener('pointerdown', e => {
             const popEl = document.getElementById('ttPopover');
             if (!popEl || popEl.style.display === 'none') return;
-            if (popEl.contains(e.target) || e.target.closest('.tt-block')) return;
+            if (popEl.contains(e.target) || e.target.closest('.tt-chip')) return;
             hidePopover();
         });
     }
@@ -163,10 +165,10 @@
                         <label class="tt-settings-check"><input type="radio" name="ttDefaultView" id="ttOptViewTimetable" value="timetable"> 주간 시간표</label>
                     </div>
                     <div class="tt-settings-section">
-                        <div class="tt-settings-label">그리드 단위</div>
-                        <label class="tt-settings-check"><input type="radio" name="ttGridUnit" id="ttOptGrid15" value="15"> 15분</label>
-                        <label class="tt-settings-check"><input type="radio" name="ttGridUnit" id="ttOptGrid30" value="30"> 30분</label>
-                        <label class="tt-settings-check"><input type="radio" name="ttGridUnit" id="ttOptGrid60" value="60"> 60분</label>
+                        <div class="tt-settings-label">표시 크기(시간/줄/글씨)</div>
+                        <label class="tt-settings-check"><input type="radio" name="ttScale" id="ttOptScaleSmall" value="small"> 작게</label>
+                        <label class="tt-settings-check"><input type="radio" name="ttScale" id="ttOptScaleMedium" value="medium"> 보통</label>
+                        <label class="tt-settings-check"><input type="radio" name="ttScale" id="ttOptScaleLarge" value="large"> 크게</label>
                     </div>
                 </div>
                 <div class="modal-footer" style="padding:6px; background:var(--w-gray);">
@@ -186,7 +188,7 @@
         document.getElementById('ttOptCatCommute').checked = !!s.categories.commute;
         document.getElementById('ttOptCatMemo').checked = !!s.categories.memo;
         document.getElementById(s.defaultView === 'timetable' ? 'ttOptViewTimetable' : 'ttOptViewMonth').checked = true;
-        document.getElementById(`ttOptGrid${s.gridUnit}`).checked = true;
+        document.getElementById(`ttOptScale${s.scale.charAt(0).toUpperCase()}${s.scale.slice(1)}`).checked = true;
         document.getElementById('ttSettingsModal').style.display = 'flex';
     }
     function closeSettingsModal() {
@@ -194,7 +196,7 @@
         if (modal) modal.style.display = 'none';
     }
     function saveSettingsFromModal() {
-        const gridUnitEl = document.querySelector('input[name="ttGridUnit"]:checked');
+        const scaleEl = document.querySelector('input[name="ttScale"]:checked');
         const viewEl = document.querySelector('input[name="ttDefaultView"]:checked');
         WT.saveSettings({
             categories: {
@@ -203,7 +205,7 @@
                 memo: document.getElementById('ttOptCatMemo').checked
             },
             defaultView: viewEl ? viewEl.value : 'month',
-            gridUnit: gridUnitEl ? Number(gridUnitEl.value) : 30
+            scale: scaleEl ? scaleEl.value : 'medium'
         });
         closeSettingsModal();
         if (active) renderWeek();
@@ -217,6 +219,14 @@
         return WT.mondayOf(new Date(y, m - 1, d));
     }
 
+    function applyScaleClass() {
+        const area = document.getElementById('timetableArea');
+        if (!area) return;
+        const scale = WT.getSettings().scale;
+        area.classList.remove('tt-scale-small', 'tt-scale-medium', 'tt-scale-large');
+        area.classList.add(`tt-scale-${scale}`);
+    }
+
     function activate() {
         ensureAreaDom();
         ensurePopoverDom();
@@ -225,6 +235,7 @@
         document.getElementById('popContentArea')?.classList.add('timetable-mode');
         const toggleBtn = document.getElementById('timetableToggleBtn');
         if (toggleBtn) toggleBtn.classList.add('active-btn');
+        applyScaleClass();
         renderWeek();
     }
 
@@ -265,26 +276,17 @@
     function renderWeek() {
         if (!active) return;
         ensureAreaDom();
+        applyScaleClass();
         const settings = WT.getSettings();
         const days = WT.weekDays(currentMonday);
         const today = new Date();
-
-        const { rangeStart, rangeEnd } = computeWeekRange(days, settings);
-        const totalRange = rangeEnd - rangeStart;
-
-        // .tt-scroll 자체 높이는 컨텐츠와 무관하게 flex 레이아웃으로 정해지므로,
-        // 본문을 새로 그리기 전에 먼저 측정해서 "한 화면에 맞는" 배율을 계산한다.
-        const scrollEl = document.getElementById('ttScroll');
-        const availableHeight = Math.max(200, (scrollEl?.clientHeight || 500) - FOOTER_SAFE_PAD);
-        const ppm = Math.max(MIN_PPM, availableHeight / totalRange);
-        const dayHeight = totalRange * ppm;
-        currentRange = { rangeStart, rangeEnd, ppm, settings };
+        const hours = computeHourRange(days, settings);
 
         const label = `${days[0].getFullYear()}.${String(days[0].getMonth() + 1).padStart(2, '0')}.${String(days[0].getDate()).padStart(2, '0')} ~ ${String(days[6].getMonth() + 1).padStart(2, '0')}.${String(days[6].getDate()).padStart(2, '0')}`;
         const weekLabelEl = document.getElementById('ttWeekLabel');
         if (weekLabelEl) weekLabelEl.textContent = label;
 
-        // 헤더 (요일/날짜 색상은 공휴일·주말 기준, 탭하면 그 날짜로 이동)
+        // 헤더 (요일/날짜 색상은 공휴일·주말 기준, 탭하면 그 월의 달력 해당 날짜로 이동)
         const headerRow = document.getElementById('ttHeaderRow');
         if (headerRow) {
             headerRow.innerHTML = `<div class="tt-time-col-header"></div>` + days.map((d, i) => {
@@ -301,29 +303,26 @@
             });
         }
 
-        // 시간 라벨 / 정시 구분선 (표시 범위 안에서만)
-        let timeLabelsHtml = '';
-        let hourLinesHtml = '';
-        for (let m = rangeStart; m <= rangeEnd; m += 60) {
-            timeLabelsHtml += `<div class="tt-time-label" style="top:${(m - rangeStart) * ppm}px;">${String(Math.floor(m / 60)).padStart(2, '0')}:00</div>`;
-            if (m > rangeStart && m < rangeEnd) hourLinesHtml += `<div class="tt-hour-line" style="top:${(m - rangeStart) * ppm}px;"></div>`;
-        }
-
-        // 요일 컬럼
-        const dayColsHtml = days.map((d, dayIdx) => {
-            const blocks = WT.buildDayBlocks(window.logs || [], d, settings);
-            const blocksHtml = blocks.map(b => renderBlockHtml(b, ppm, rangeStart)).join('');
-            return `<div class="tt-day-col" data-day-idx="${dayIdx}" style="height:${dayHeight}px;">${hourLinesHtml}${blocksHtml}</div>`;
+        // 정시 행 × 요일 칸 — 각 칸 안에 그 시간대 일정을 시간순으로 세로로 쌓는다.
+        const rowsHtml = hours.map(hour => {
+            const cellsHtml = days.map((d, dayIdx) => {
+                const blocks = WT.buildDayBlocks(window.logs || [], d, settings).filter(b => b.hour === hour);
+                const chipsHtml = blocks.map(renderChipHtml).join('');
+                return `<div class="tt-hour-cell" data-day-idx="${dayIdx}" data-hour="${hour}">${chipsHtml}</div>`;
+            }).join('');
+            return `<div class="tt-hour-row" data-hour="${hour}">
+                <div class="tt-hour-label">${String(hour).padStart(2, '0')}:00</div>
+                ${cellsHtml}
+            </div>`;
         }).join('');
 
         const body = document.getElementById('ttBody');
-        if (body) {
-            body.style.height = `${dayHeight}px`;
-            body.innerHTML = `<div class="tt-time-col" style="height:${dayHeight}px;">${timeLabelsHtml}</div>${dayColsHtml}`;
-        }
+        if (body) body.innerHTML = rowsHtml;
 
-        // 09:00이 기본으로 화면 맨 위에 오도록 — 그보다 이른 일정이 있어 범위가 늘어난 만큼만 스크롤이 생긴다.
-        if (scrollEl) scrollEl.scrollTop = Math.max(0, (BASE_START_MIN - rangeStart) * ppm);
+        // 09시가 기본으로 화면 맨 위에 오도록 — 그보다 이른 일정이 있어 범위가 늘어난 만큼만 스크롤이 생긴다.
+        const scrollEl = document.getElementById('ttScroll');
+        const baseRow = body ? body.querySelector(`.tt-hour-row[data-hour="${BASE_MIN_HOUR}"]`) : null;
+        if (scrollEl) scrollEl.scrollTop = baseRow ? baseRow.offsetTop : 0;
     }
 
     function onDayHeaderClick(date) {
@@ -333,65 +332,46 @@
         const monthLabelEl = document.getElementById('monthLabel');
         if (monthLabelEl) monthLabelEl.innerText = `${window.curMonth}월`;
         if (window.renderCal) window.renderCal(window.currentYear, window.curMonth - 1);
-        renderWeek();
+        deactivate(); // 시간표를 끄고 월간 달력 + 해당 날짜 목록으로 전환한다.
     }
 
-    function renderBlockHtml(b, ppm, rangeStart) {
-        const top = (b.startMin - rangeStart) * ppm;
-        const height = Math.max(16, (b.endMin - b.startMin) * ppm);
-        const width = 100 / b.laneCount;
-        const left = b.lane * width;
-        const classes = ['tt-block', `cat-${b.cat}`, `group-${b.groupCat}`];
+    function renderChipHtml(b) {
+        const classes = ['tt-chip', `cat-${b.cat}`, `group-${b.groupCat}`];
         if (b.completed) classes.push('is-completed');
-        return `<div class="${classes.join(' ')}" data-log-id="${escapeHtml(b.logId)}" data-is-range="${b.isRange ? '1' : '0'}"
-            style="top:${top}px; height:${height}px; left:${left}%; width:calc(${width}% - 2px);">
-            <div class="tt-block-label">${escapeHtml(b.label)}</div>
-            ${b.isRange ? '<div class="tt-resize-handle"></div>' : ''}
+        if (b.canceled) classes.push('is-canceled');
+        return `<div class="${classes.join(' ')}" data-log-id="${escapeHtml(b.logId)}">
+            <span class="tt-chip-time">${WT.toHHMM(b.startMin)}</span>
+            <span class="tt-chip-label">${escapeHtml(b.label)}</span>
         </div>`;
     }
 
-    // ─── 드래그(이동) / 리사이즈 ───
+    // ─── 드래그(이동) ───
     function onBodyPointerDown(e) {
-        const handle = e.target.closest('.tt-resize-handle');
-        const blockEl = e.target.closest('.tt-block');
-        if (!blockEl) return;
+        const chipEl = e.target.closest('.tt-chip');
+        if (!chipEl) return;
 
-        const logId = blockEl.dataset.logId;
+        const logId = chipEl.dataset.logId;
         const log = (window.logs || []).find(l => String(l.id) === String(logId));
         if (!log) return;
 
-        const settings = currentRange.settings || WT.getSettings();
-        const ppm = currentRange.ppm;
-        // 짧은 블록은 화면 표시상 최소 높이로 늘려 그리므로, DOM 크기가 아니라
-        // 로그의 실제 시간값에서 시작/종료(분)를 다시 계산해야 정확하다.
-        const range = WT.timeRangeOf(log, settings.gridUnit);
-        if (!range) return;
-        const startMin = range.startMin;
-        const endMin = range.endMin;
-        const dayColEl = blockEl.closest('.tt-day-col');
-        const dayIdx = dayColEl ? Number(dayColEl.dataset.dayIdx) : 0;
+        const cellEl = chipEl.closest('.tt-hour-cell');
+        const origDayIdx = cellEl ? Number(cellEl.dataset.dayIdx) : 0;
+        const origHour = cellEl ? Number(cellEl.dataset.hour) : 0;
 
         dragCtx = {
-            mode: handle ? 'resize' : 'move',
             logId,
             cat: log.cat,
             groupCat: WT.groupCatOf(log),
-            isRange: range.isRange,
-            origStartMin: startMin,
-            origEndMin: endMin,
-            origDayIdx: dayIdx,
+            origDayIdx,
+            origHour,
             startClientX: e.clientX,
             startClientY: e.clientY,
             moved: 0,
-            settings,
-            ppm,
-            rangeStart: currentRange.rangeStart,
-            rangeEnd: currentRange.rangeEnd,
-            blockEl
+            chipEl
         };
 
-        blockEl.classList.add('is-dragging');
-        try { blockEl.setPointerCapture(e.pointerId); } catch (_) { /* noop */ }
+        chipEl.classList.add('is-dragging');
+        try { chipEl.setPointerCapture(e.pointerId); } catch (_) { /* noop */ }
 
         window.addEventListener('pointermove', onBodyPointerMove);
         window.addEventListener('pointerup', onBodyPointerUp, { once: true });
@@ -416,42 +396,21 @@
         const deltaY = e.clientY - dragCtx.startClientY;
         dragCtx.moved = Math.max(dragCtx.moved, Math.abs(deltaX), Math.abs(deltaY));
 
-        const deltaMinRaw = deltaY / dragCtx.ppm;
-        const deltaMinSnapped = WT.snapToGrid(deltaMinRaw, dragCtx.settings.gridUnit);
-
-        let newStartMin = dragCtx.origStartMin;
-        let newEndMin = dragCtx.origEndMin;
-        let dayIdx = dragCtx.origDayIdx;
-
-        if (dragCtx.mode === 'resize') {
-            newEndMin = Math.max(dragCtx.origStartMin + dragCtx.settings.gridUnit, Math.min(dragCtx.rangeEnd, dragCtx.origEndMin + deltaMinSnapped));
-        } else {
-            const duration = dragCtx.origEndMin - dragCtx.origStartMin;
-            newStartMin = Math.max(dragCtx.rangeStart, Math.min(dragCtx.rangeEnd - duration, dragCtx.origStartMin + deltaMinSnapped));
-            newEndMin = newStartMin + duration;
-
-            const under = document.elementFromPoint(e.clientX, e.clientY);
-            const dayColEl = under ? under.closest('.tt-day-col') : null;
-            if (dayColEl) dayIdx = Number(dayColEl.dataset.dayIdx);
-        }
-
-        dragCtx.previewStartMin = newStartMin;
-        dragCtx.previewEndMin = newEndMin;
+        const under = document.elementFromPoint(e.clientX, e.clientY);
+        const cellEl = under ? under.closest('.tt-hour-cell') : null;
+        let dayIdx = dragCtx.origDayIdx, hour = dragCtx.origHour;
+        if (cellEl) { dayIdx = Number(cellEl.dataset.dayIdx); hour = Number(cellEl.dataset.hour); }
         dragCtx.previewDayIdx = dayIdx;
+        dragCtx.previewHour = hour;
 
         const days = WT.weekDays(currentMonday);
         const targetDate = days[dayIdx];
-        const dayLabel = `${WT.DAY_LABELS[dayIdx]}(${targetDate.getDate()}일)`;
-        const timeLabel = dragCtx.mode === 'resize'
-            ? `~ ${WT.toHHMM(newEndMin)}`
-            : `${dayLabel} ${WT.toHHMM(newStartMin)} ~ ${WT.toHHMM(newEndMin)}`;
-
         const ind = document.getElementById('ttDragIndicator');
-        if (ind) {
+        if (ind && targetDate) {
             ind.style.display = 'block';
             ind.style.left = `${e.clientX + 14}px`;
             ind.style.top = `${e.clientY + 14}px`;
-            ind.textContent = timeLabel;
+            ind.textContent = `${WT.DAY_LABELS[dayIdx]}(${targetDate.getDate()}일) ${String(hour).padStart(2, '0')}:00`;
         }
     }
 
@@ -465,48 +424,51 @@
         if (!ctx) return;
 
         if (ctx.moved < DRAG_THRESHOLD) {
-            onBlockTap(ctx.logId, ctx.blockEl, ctx.origDayIdx);
+            showPopoverForLog(ctx.logId, ctx.chipEl);
             return;
         }
 
-        if (ctx.previewStartMin == null) return;
+        if (ctx.previewDayIdx == null) return;
+        const dayChanged = ctx.previewDayIdx !== ctx.origDayIdx;
+        const hourChanged = ctx.previewHour !== ctx.origHour;
+        if (!dayChanged && !hourChanged) return;
 
-        if (ctx.mode === 'resize') {
-            commitChange(ctx.logId, buildResizePatch(ctx), null, ctx.cat);
-        } else {
-            const days = WT.weekDays(currentMonday);
-            const targetDate = days[ctx.previewDayIdx];
-            const dayChanged = ctx.previewDayIdx !== ctx.origDayIdx;
-            commitChange(ctx.logId, buildMovePatch(ctx), dayChanged ? targetDate : null, ctx.cat);
-        }
+        const days = WT.weekDays(currentMonday);
+        const targetDate = days[ctx.previewDayIdx];
+        commitMove(ctx, dayChanged ? targetDate : null);
     }
 
     function cleanupDrag() {
         window.removeEventListener('pointermove', onBodyPointerMove);
-        if (dragCtx && dragCtx.blockEl) dragCtx.blockEl.classList.remove('is-dragging');
+        if (dragCtx && dragCtx.chipEl) dragCtx.chipEl.classList.remove('is-dragging');
         const ind = document.getElementById('ttDragIndicator');
         if (ind) ind.style.display = 'none';
         dragCtx = null;
     }
 
-    function buildMovePatch(ctx) {
-        const newStart = ctx.previewStartMin, newEnd = ctx.previewEndMin;
-        if (ctx.groupCat === 'work' && ctx.isRange) {
-            return { startTime: WT.toHHMM(newStart), endTime: WT.toHHMM(newEnd) };
+    function buildMovePatch(ctx, log) {
+        const newStartMin = ctx.previewHour * 60; // 정시(:00)로 옮긴다 — 칸 단위 이동이므로 분은 버린다.
+        if (ctx.cat === 'work') {
+            const s = WT.toMin(log.startTime), e = WT.toMin(log.endTime);
+            if (s !== null && e !== null && e > s) {
+                const duration = e - s;
+                return {
+                    startTime: WT.toHHMM(newStartMin),
+                    endTime: WT.toHHMM(Math.min(24 * 60 - 1, newStartMin + duration)),
+                    workTime: WT.toHHMM(newStartMin)
+                };
+            }
+            return { workTime: WT.toHHMM(newStartMin) };
         }
-        if (ctx.cat === 'work') return { workTime: WT.toHHMM(newStart) };
-        if (ctx.cat === 'commute_in') { const t = WT.toHHMM(newStart); return { time: t, inTime: t }; }
-        if (ctx.cat === 'commute_out') { const t = WT.toHHMM(newStart); return { time: t, outTime: t }; }
-        return { time: WT.toHHMM(newStart) };
+        if (ctx.cat === 'commute_in') { const t = WT.toHHMM(newStartMin); return { time: t, inTime: t }; }
+        if (ctx.cat === 'commute_out') { const t = WT.toHHMM(newStartMin); return { time: t, outTime: t }; }
+        return { time: WT.toHHMM(newStartMin) };
     }
 
-    function buildResizePatch(ctx) {
-        return { endTime: WT.toHHMM(ctx.previewEndMin) };
-    }
-
-    function commitChange(logId, patch, targetDate, cat) {
-        const log = (window.logs || []).find(l => String(l.id) === String(logId));
+    function commitMove(ctx, targetDate) {
+        const log = (window.logs || []).find(l => String(l.id) === String(ctx.logId));
         if (!log) return;
+        const patch = buildMovePatch(ctx, log);
 
         const trackedFields = ['y', 'm', 'd', 'startTime', 'endTime', 'workTime', 'time', 'inTime', 'outTime'];
         const prevFields = {};
@@ -522,12 +484,12 @@
 
         window.saveToLocalStore('logs', updated);
 
-        if ((cat === 'commute_in' || cat === 'commute_out') && window.updateCommuteDetailByDate) {
+        if ((ctx.cat === 'commute_in' || ctx.cat === 'commute_out') && window.updateCommuteDetailByDate) {
             window.updateCommuteDetailByDate(updated.y, updated.m, updated.d);
             if (targetDate) window.updateCommuteDetailByDate(origY, origM, origD);
         }
 
-        lastUndo = { logId, prevFields };
+        lastUndo = { logId: ctx.logId, prevFields };
         showUndoToast();
     }
 
@@ -555,59 +517,7 @@
     }
 
     // ─── 팝오버(1단계 미리보기) ───
-    // 블록 탭 시: 같은 시간대에 겹치는 항목이 여럿이면 먼저 목록으로 보여주고,
-    // 단일 항목이면 바로 상세 미리보기(이름/Task No/주소)로 간다.
-    function onBlockTap(logId, blockEl, dayIdx) {
-        const settings = WT.getSettings();
-        const days = WT.weekDays(currentMonday);
-        const date = days[dayIdx];
-        if (!date) { showPopoverForLog(logId, blockEl); return; }
-        const dayBlocks = WT.buildDayBlocks(window.logs || [], date, settings);
-        const tapped = dayBlocks.find(b => b.logId === logId);
-        if (!tapped) { showPopoverForLog(logId, blockEl); return; }
-        const group = dayBlocks.filter(b => b.startMin < tapped.endMin && b.endMin > tapped.startMin);
-        if (group.length > 1) showListPopover(group, blockEl);
-        else showPopoverForLog(logId, blockEl);
-    }
-
-    // 겹치는 시간대의 항목 목록 — 타이틀바는 이름 대신 시간 범위를 보여준다.
-    function showListPopover(group, blockEl) {
-        ensurePopoverDom();
-        const sorted = [...group].sort((a, b) => a.startMin - b.startMin);
-        const minStart = Math.min(...sorted.map(b => b.startMin));
-        const maxEnd = Math.max(...sorted.map(b => b.endMin));
-
-        const titleEl = document.getElementById('ttPopoverTitle');
-        titleEl.textContent = `${WT.toHHMM(minStart)} ~ ${WT.toHHMM(maxEnd)} (${sorted.length}건)`;
-        titleEl.classList.remove('tt-copyable');
-        titleEl.onclick = null;
-
-        const bodyEl = document.getElementById('ttPopoverBody');
-        bodyEl.innerHTML = '';
-        bodyEl.classList.add('tt-popover-list');
-        sorted.forEach(b => {
-            const row = document.createElement('div');
-            row.className = 'tt-popover-list-item';
-            const label = document.createElement('span');
-            label.className = 'tt-popover-list-label' + (b.completed ? ' is-completed' : '');
-            label.textContent = b.label;
-            const time = document.createElement('span');
-            time.className = 'tt-popover-list-time';
-            time.textContent = WT.toHHMM(b.startMin);
-            row.appendChild(label);
-            row.appendChild(time);
-            row.addEventListener('click', () => showPopoverForLog(b.logId, blockEl));
-            bodyEl.appendChild(row);
-        });
-
-        document.getElementById('ttPopoverDetailBtn').style.display = 'none';
-
-        const pop = document.getElementById('ttPopover');
-        pop.style.display = 'block';
-        positionPopover(pop, blockEl);
-    }
-
-    function showPopoverForLog(logId, blockEl) {
+    function showPopoverForLog(logId, anchorEl) {
         const log = (window.logs || []).find(l => String(l.id) === String(logId));
         if (!log) return;
         ensurePopoverDom();
@@ -621,7 +531,6 @@
         titleEl.onclick = () => copyToClipboard(title, titleEl);
 
         const bodyEl = document.getElementById('ttPopoverBody');
-        bodyEl.classList.remove('tt-popover-list');
         bodyEl.innerHTML = '';
 
         const addLine = (labelText, valueText, copyable) => {
@@ -655,7 +564,6 @@
         }
 
         const detailBtn = document.getElementById('ttPopoverDetailBtn');
-        detailBtn.style.display = '';
         detailBtn.onclick = () => {
             hidePopover();
             window.handleCardClick(log.id, log.cat);
@@ -663,7 +571,7 @@
 
         const pop = document.getElementById('ttPopover');
         pop.style.display = 'block';
-        positionPopover(pop, blockEl);
+        positionPopover(pop, anchorEl);
     }
 
     function positionPopover(pop, anchorEl) {
