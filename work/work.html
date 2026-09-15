@@ -6,7 +6,7 @@
     <title>Work Master Local Pro</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-<link rel="stylesheet" href="work_style.css?v=20260724-46">
+<link rel="stylesheet" href="work_style.css?v=20260915-1">
 </head>
 <body>
 
@@ -63,6 +63,7 @@
             <div style="display:flex; align-items:center;">
                 <button type="button" class="w95-btn icon-btn" onclick="if(!window.isSyncLongPress) window.closePop()" onmousedown="window.startSyncPress(event)" onmouseup="window.endSyncPress(event)" onmouseleave="window.cancelSyncPress()" ontouchstart="window.startSyncPress(event)" ontouchend="window.endSyncPress(event)" ontouchcancel="window.cancelSyncPress()" oncontextmenu="return false;" style="margin-right: 8px; touch-action: manipulation; user-select: none;" title="길게 누르면 강제 동기화"><i class="fa-solid fa-chevron-left"></i></button>
                 <div class="pop-title" id="monthLabel" onclick="window.closePop()">0월</div>
+                <button type="button" class="w95-btn icon-btn" id="timetableToggleBtn" onclick="window.toggleTimetableView()" title="주간 시간표 보기"><i class="fa-solid fa-table-cells"></i></button>
             </div>
             <div class="pop-nav-stats">
                 <span class="pop-month-summary">
@@ -463,6 +464,8 @@
 <script src="work_ui.js?v=20260722-1"></script>
 <script src="work_modal.js?v=20260722-4"></script>
 <script src="work_logic.js?v=20260724-47"></script>
+<script src="work_timetable.js?v=20260915-1"></script>
+<script src="work_timetable_ui.js?v=20260915-1"></script>
 <script src="work_enhancements.js?v=20260724-47"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
