@@ -9,15 +9,19 @@
 
 (() => {
     const WT = window.WorkTimetable;
-    const DRAG_THRESHOLD = 6; // 이 이하 이동은 탭(클릭)으로 취급
+    const MOVE_SLOP_PX = 10; // 롱프레스 완성 전에 이만큼 움직이면 스크롤 의도로 본다
+    const LONG_PRESS_MS = 420; // 이만큼 눌러야 드래그 이동이 시작된다(그 전엔 스크롤 우선)
     const UNDO_MS = 3000;
     const BASE_MIN_HOUR = 9;  // 기본 표시 범위 시작: 09시
     const BASE_MAX_HOUR = 18; // 기본 표시 범위 끝: 18시
+    const HOUR_STEP_PX = { small: 24, medium: 32, large: 44 }; // 표시 범위 밖으로 끌 때 시간당 픽셀(대략)
 
     let active = false;
     let userToggled = false;
     let currentMonday = null;
     let dragCtx = null;
+    let longPressTimer = null;
+    let suppressNextClick = false;
     let undoStack = [];
     let redoStack = [];
     let undoTimer = null;
@@ -121,6 +125,78 @@
 
         const body = document.getElementById('ttBody');
         body.addEventListener('pointerdown', onBodyPointerDown);
+        body.addEventListener('click', onBodyClick);
+    }
+
+    // 빈 칸(일정이 없는 시간대)을 탭하면 그 날짜·시간으로 바로 작업일지/출퇴근/메모를 시작할 수 있다.
+    function onBodyClick(e) {
+        if (suppressNextClick) { suppressNextClick = false; return; }
+        if (e.target.closest('.tt-chip')) return; // 칩 탭은 포인터 로직(onChipTap)이 이미 처리
+        const cellEl = e.target.closest('.tt-hour-cell');
+        if (!cellEl) return;
+        const dayIdx = Number(cellEl.dataset.dayIdx);
+        const hour = Number(cellEl.dataset.hour);
+        const days = WT.weekDays(currentMonday);
+        const date = days[dayIdx];
+        if (!date) return;
+        showQuickAddPopover(date, hour, cellEl);
+    }
+
+    function showQuickAddPopover(date, hour, anchorEl) {
+        ensurePopoverDom();
+        const timeDigits = `${String(hour).padStart(2, '0')}00`;
+        const dow = (date.getDay() + 6) % 7; // getDay: 0=일 → WT.DAY_LABELS는 월=0 시작
+
+        const titleEl = document.getElementById('ttPopoverTitle');
+        titleEl.textContent = `${WT.DAY_LABELS[dow]}(${date.getDate()}일) ${String(hour).padStart(2, '0')}:00`;
+        titleEl.classList.remove('tt-copyable');
+        titleEl.onclick = null;
+
+        const applyDateContext = () => {
+            window.currentYear = date.getFullYear();
+            window.curMonth = date.getMonth() + 1;
+            window.curDay = date.getDate();
+        };
+
+        const bodyEl = document.getElementById('ttPopoverBody');
+        bodyEl.innerHTML = '';
+        bodyEl.classList.add('tt-popover-list');
+
+        const addAction = (label, handler) => {
+            const row = document.createElement('div');
+            row.className = 'tt-popover-list-item';
+            const span = document.createElement('span');
+            span.className = 'tt-popover-list-label';
+            span.textContent = label;
+            row.appendChild(span);
+            row.addEventListener('click', () => { hidePopover(); applyDateContext(); handler(); });
+            bodyEl.appendChild(row);
+        };
+
+        addAction('작업일지 작성', () => {
+            window.openWorkModal();
+            const timeInput = document.getElementById('workTime');
+            if (timeInput) timeInput.value = timeDigits;
+        });
+        addAction('출근 기록', () => {
+            window.openCommuteModal('in');
+            const timeInput = document.getElementById('commuteTime');
+            if (timeInput) timeInput.value = timeDigits;
+        });
+        addAction('퇴근 기록', () => {
+            window.openCommuteModal('out');
+            const timeInput = document.getElementById('commuteTime');
+            if (timeInput) timeInput.value = timeDigits;
+        });
+        addAction('메모 입력', () => {
+            const memoInput = document.getElementById('memoIn');
+            if (memoInput) memoInput.focus();
+        });
+
+        document.getElementById('ttPopoverDetailBtn').style.display = 'none';
+        const pop = document.getElementById('ttPopover');
+        pop.style.display = 'block';
+        positionPopover(pop, anchorEl);
     }
 
     function ensurePopoverDom() {
@@ -371,6 +447,9 @@
     }
 
     // ─── 드래그(이동) ───
+    // 칩을 누르면 바로 드래그하지 않는다 — 롱프레스(LONG_PRESS_MS)를 완성해야 드래그가 시작되고,
+    // 그 전에 손가락이 MOVE_SLOP_PX 이상 움직이면 스크롤 의도로 보고 우리가 직접 스크롤을 대신 처리한다
+    // (칩에 touch-action:none이 걸려 있어 브라우저 기본 스크롤이 안 먹으므로).
     function onBodyPointerDown(e) {
         const chipEl = e.target.closest('.tt-chip');
         if (!chipEl) return;
@@ -385,6 +464,7 @@
         const originRect = chipEl.getBoundingClientRect();
 
         dragCtx = {
+            phase: 'pending', // 'pending' → 'dragging' | 'scrolling'
             logId,
             cat: log.cat,
             groupCat: WT.groupCatOf(log),
@@ -394,20 +474,30 @@
             originY: originRect.top + originRect.height / 2,
             startClientX: e.clientX,
             startClientY: e.clientY,
+            lastClientY: e.clientY,
+            scrollEl: document.getElementById('ttScroll'),
             moved: 0,
             chipEl
         };
 
-        chipEl.classList.add('is-dragging');
         try { chipEl.setPointerCapture(e.pointerId); } catch (_) { /* noop */ }
 
         window.addEventListener('pointermove', onBodyPointerMove);
         window.addEventListener('pointerup', onBodyPointerUp, { once: true });
         window.addEventListener('pointercancel', onBodyPointerCancel, { once: true });
 
+        clearTimeout(longPressTimer);
+        longPressTimer = setTimeout(activateDrag, LONG_PRESS_MS);
+        e.preventDefault();
+    }
+
+    function activateDrag() {
+        if (!dragCtx || dragCtx.phase !== 'pending') return;
+        dragCtx.phase = 'dragging';
+        dragCtx.chipEl.classList.add('is-dragging');
+        if (navigator.vibrate) { try { navigator.vibrate(15); } catch (_) { /* noop */ } }
         ensureDragIndicatorDom();
         ensureDragTrajectoryDom();
-        e.preventDefault();
     }
 
     function ensureDragIndicatorDom() {
@@ -441,33 +531,105 @@
         document.body.appendChild(svg);
     }
 
+    // 표시 중인 행 범위를 벗어나 위/아래로 끌면(예: 09시 위쪽, 18시 아래쪽) 실제 칸이 없어도
+    // 정시 단위로 계속 확장해서 시간을 고를 수 있게 한다. 요일은 첫 행의 칸 가로 폭을 기준으로 계산한다.
+    function resolveDragTarget(clientX, clientY) {
+        const body = document.getElementById('ttBody');
+        const rows = body ? Array.from(body.querySelectorAll('.tt-hour-row')) : [];
+        if (!rows.length) return { dayIdx: dragCtx.origDayIdx, hour: dragCtx.origHour };
+
+        const firstRow = rows[0], lastRow = rows[rows.length - 1];
+        const firstRect = firstRow.getBoundingClientRect();
+        const lastRect = lastRow.getBoundingClientRect();
+        const firstHour = Number(firstRow.dataset.hour);
+        const lastHour = Number(lastRow.dataset.hour);
+        const unit = HOUR_STEP_PX[WT.getSettings().scale] || 32;
+
+        let hour;
+        if (clientY < firstRect.top) {
+            hour = Math.max(0, firstHour - Math.ceil((firstRect.top - clientY) / unit));
+        } else if (clientY > lastRect.bottom) {
+            hour = Math.min(23, lastHour + Math.ceil((clientY - lastRect.bottom) / unit));
+        } else {
+            const row = rows.find(r => {
+                const rc = r.getBoundingClientRect();
+                return clientY >= rc.top && clientY < rc.bottom;
+            }) || lastRow;
+            hour = Number(row.dataset.hour);
+        }
+
+        const refCells = Array.from(firstRow.querySelectorAll('.tt-hour-cell'));
+        let dayIdx = dragCtx.origDayIdx;
+        if (refCells.length) {
+            const firstCellRect = refCells[0].getBoundingClientRect();
+            const lastCellRect = refCells[refCells.length - 1].getBoundingClientRect();
+            if (clientX < firstCellRect.left) dayIdx = 0;
+            else if (clientX >= lastCellRect.right) dayIdx = refCells.length - 1;
+            else {
+                const hit = refCells.find(cell => {
+                    const r = cell.getBoundingClientRect();
+                    return clientX >= r.left && clientX < r.right;
+                });
+                if (hit) dayIdx = Number(hit.dataset.dayIdx);
+            }
+        }
+
+        return { dayIdx, hour };
+    }
+
+    // "자석" 효과 — 지금 놓으면 들어갈 칸을 하이라이트한다. 범위 밖 시간이면 가장 가까운 가장자리 행을 비춘다.
+    function highlightDropTarget(dayIdx, hour) {
+        document.querySelectorAll('.tt-hour-cell.is-drag-target').forEach(el => el.classList.remove('is-drag-target'));
+        const body = document.getElementById('ttBody');
+        const rows = body ? Array.from(body.querySelectorAll('.tt-hour-row')) : [];
+        if (!rows.length) return;
+        const hours = rows.map(r => Number(r.dataset.hour));
+        const clampedHour = Math.min(Math.max(hour, hours[0]), hours[hours.length - 1]);
+        const row = rows.find(r => Number(r.dataset.hour) === clampedHour);
+        const cell = row ? row.querySelector(`.tt-hour-cell[data-day-idx="${dayIdx}"]`) : null;
+        if (cell) cell.classList.add('is-drag-target');
+    }
+
     function onBodyPointerMove(e) {
         if (!dragCtx) return;
         const deltaX = e.clientX - dragCtx.startClientX;
         const deltaY = e.clientY - dragCtx.startClientY;
         dragCtx.moved = Math.max(dragCtx.moved, Math.abs(deltaX), Math.abs(deltaY));
 
-        const under = document.elementFromPoint(e.clientX, e.clientY);
-        const cellEl = under ? under.closest('.tt-hour-cell') : null;
-        let dayIdx = dragCtx.origDayIdx, hour = dragCtx.origHour;
-        if (cellEl) { dayIdx = Number(cellEl.dataset.dayIdx); hour = Number(cellEl.dataset.hour); }
-        dragCtx.previewDayIdx = dayIdx;
-        dragCtx.previewHour = hour;
+        if (dragCtx.phase === 'pending') {
+            if (dragCtx.moved <= MOVE_SLOP_PX) return; // 아직 판단 대기(롱프레스 타이머가 결정)
+            // 롱프레스가 끝나기 전에 움직였다 — 스크롤 의도로 보고 여기서부터 우리가 대신 스크롤한다.
+            clearTimeout(longPressTimer);
+            dragCtx.phase = 'scrolling';
+        }
+
+        if (dragCtx.phase === 'scrolling') {
+            const dy = e.clientY - dragCtx.lastClientY;
+            if (dragCtx.scrollEl) dragCtx.scrollEl.scrollTop -= dy;
+            dragCtx.lastClientY = e.clientY;
+            return;
+        }
+
+        // phase === 'dragging'
+        const target = resolveDragTarget(e.clientX, e.clientY);
+        dragCtx.previewDayIdx = target.dayIdx;
+        dragCtx.previewHour = target.hour;
+        highlightDropTarget(target.dayIdx, target.hour);
 
         const days = WT.weekDays(currentMonday);
-        const targetDate = days[dayIdx];
+        const targetDate = days[target.dayIdx];
         const ind = document.getElementById('ttDragIndicator');
         if (ind && targetDate) {
             ind.style.display = 'block';
             ind.style.left = `${e.clientX + 14}px`;
             ind.style.top = `${e.clientY + 14}px`;
-            ind.textContent = `${WT.DAY_LABELS[dayIdx]}(${targetDate.getDate()}일) ${String(hour).padStart(2, '0')}:00`;
+            ind.textContent = `${WT.DAY_LABELS[target.dayIdx]}(${targetDate.getDate()}일) ${String(target.hour).padStart(2, '0')}:00`;
         }
 
         const svg = document.getElementById('ttDragTrajectory');
         const line = document.getElementById('ttDragTrajectoryLine');
         const dot = document.getElementById('ttDragTrajectoryOrigin');
-        if (svg && line && dragCtx.moved >= DRAG_THRESHOLD) {
+        if (svg && line) {
             svg.style.display = 'block';
             line.setAttribute('x1', dragCtx.originX);
             line.setAttribute('y1', dragCtx.originY);
@@ -485,11 +647,15 @@
         const ctx = dragCtx;
         cleanupDrag();
         if (!ctx) return;
+        // 칩 위에서 시작된 포인터 조작이 끝난 직후 뒤따라오는 네이티브 click(마우스 입력 등)이
+        // 그 자리의 빈 칸 빠른입력 메뉴를 오작동시키지 않도록 한 번 무시한다.
+        suppressNextClick = true;
 
-        if (ctx.moved < DRAG_THRESHOLD) {
+        if (ctx.phase === 'pending') {
             onChipTap(ctx.logId, ctx.chipEl);
             return;
         }
+        if (ctx.phase !== 'dragging') return; // 스크롤이었던 경우 — 이미 스크롤 처리됨, 커밋 없음
 
         if (ctx.previewDayIdx == null) return;
         const dayChanged = ctx.previewDayIdx !== ctx.origDayIdx;
@@ -502,12 +668,14 @@
     }
 
     function cleanupDrag() {
+        clearTimeout(longPressTimer);
         window.removeEventListener('pointermove', onBodyPointerMove);
         if (dragCtx && dragCtx.chipEl) dragCtx.chipEl.classList.remove('is-dragging');
         const ind = document.getElementById('ttDragIndicator');
         if (ind) ind.style.display = 'none';
         const svg = document.getElementById('ttDragTrajectory');
         if (svg) svg.style.display = 'none';
+        document.querySelectorAll('.tt-hour-cell.is-drag-target').forEach(el => el.classList.remove('is-drag-target'));
         dragCtx = null;
     }
 

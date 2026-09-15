@@ -841,10 +841,14 @@ window.downloadViewerImage = async () => {
         const owningLog = (window.logs || []).find(log => (log.imgs || []).some(item =>
             item === image || (item.id && image.id && String(item.id) === String(image.id)) || item.src === image.src
         ));
+        // 카메라 촬영 시 일부 기기/브라우저가 "image.jpg"가 아니라 "4832.jpg"처럼
+        // 아무 의미 없는 짧은 숫자만 파일명으로 주는 경우가 있다 — 그런 이름은
+        // 사진과 무관한 값이라 다운로드명으로 써도 도움이 안 되므로 날짜-시간 이름으로 대신한다.
         const meaningfulName = value => {
             const name = String(value || "").trim();
             const base = name.replace(/\.[a-zA-Z0-9]{2,5}$/i, "");
-            return name && !/^image$/i.test(base) ? name : "";
+            if (!name || /^image$/i.test(base) || /^\d+$/.test(base)) return "";
+            return name;
         };
         const pad = value => String(value || 0).padStart(2, "0");
         const timestampFromImage = String(image.id || "").match(/(\d{13})/);
