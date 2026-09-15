@@ -340,7 +340,6 @@
         if (b.completed) classes.push('is-completed');
         if (b.canceled) classes.push('is-canceled');
         return `<div class="${classes.join(' ')}" data-log-id="${escapeHtml(b.logId)}">
-            <span class="tt-chip-time">${WT.toHHMM(b.startMin)}</span>
             <span class="tt-chip-label">${escapeHtml(b.label)}</span>
         </div>`;
     }
