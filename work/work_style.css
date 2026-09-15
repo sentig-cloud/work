@@ -1324,6 +1324,8 @@ input, textarea, [contenteditable="true"] {
 }
 /* 설정 > 격자 무늬: 바둑판(타일) 배경 — 칸 경계를 더 잘 구분되게 한다 */
 .tt-hour-cell.is-tile-dark { background:rgba(15,23,42,0.06); }
+/* 드래그 중 "자석" 효과 — 지금 놓으면 들어갈 칸 */
+.tt-hour-cell.is-drag-target { background:#fde68a !important; box-shadow:inset 0 0 0 2px #d97706; }
 
 .tt-chip {
     display:flex; align-items:center; gap:4px; box-sizing:border-box; width:100%; min-width:0; border-radius:3px; padding:2px 5px;
@@ -1366,8 +1368,10 @@ input, textarea, [contenteditable="true"] {
 .tt-undo-toast {
     /* .footer-nav가 하단에 position:absolute로 떠 있으므로(z-index:1010), 그 위로 올라오게 배치한다. */
     position:absolute; left:50%; bottom:130px; transform:translateX(-50%); z-index:1020;
-    background:#111827; color:#fff; padding:6px 8px 6px 14px; border-radius:20px;
-    font-size:0.78rem; display:flex; gap:10px; align-items:center; box-shadow:0 2px 8px rgba(0,0,0,0.35);
+    background:var(--w-gray); color:var(--w-black); padding:4px 4px 4px 10px;
+    border:2px solid; border-color:var(--w-white) var(--w-black) var(--w-black) var(--w-white);
+    font-size:0.78rem; font-weight:bold; display:flex; gap:8px; align-items:center;
+    box-shadow:2px 2px 0 rgba(0,0,0,0.35);
 }
 .tt-undo-toast .w95-btn { height:26px; padding:0 10px; font-weight:bold; color:var(--w-blue); }
 
