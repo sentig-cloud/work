@@ -5,9 +5,12 @@
 
 (() => {
     const WT = window.WorkTimetable;
-    const ROW_PX = 22; // gridUnit 1칸의 높이(px)
     const DRAG_THRESHOLD = 6; // 이 이하 이동은 탭(클릭)으로 취급
     const UNDO_MS = 3000;
+    const BASE_START_MIN = 9 * 60;  // 기본 표시 범위: 09:00
+    const BASE_END_MIN = 18 * 60;   // 기본 표시 범위: 18:00
+    const MIN_PPM = 0.6;            // 분당 최소 px (이보다 좁아지면 스크롤 발생)
+    const FOOTER_SAFE_PAD = 120;    // .tt-scroll의 padding-bottom과 맞춘 값(.footer-nav 오버레이 회피)
 
     let active = false;
     let userToggled = false;
@@ -15,6 +18,8 @@
     let dragCtx = null;
     let lastUndo = null;
     let undoTimer = null;
+    // 마지막으로 렌더링한 주의 시간 범위/스케일 — 드래그 계산과 클릭(겹침 판정)이 재사용한다.
+    let currentRange = { rangeStart: BASE_START_MIN, rangeEnd: BASE_END_MIN, ppm: MIN_PPM };
 
     function escapeHtml(str) {
         return String(str == null ? '' : str).replace(/[&<>"']/g, ch => ({
@@ -24,7 +29,56 @@
 
     function daysInMonthOf(y, m) { return new Date(y, m, 0).getDate(); }
 
-    function pxPerMin(settings) { return ROW_PX / settings.gridUnit; }
+    function copyToClipboard(text, sourceEl) {
+        if (!text) return;
+        const flash = () => {
+            if (!sourceEl) return;
+            sourceEl.classList.add('tt-copied-flash');
+            setTimeout(() => sourceEl.classList.remove('tt-copied-flash'), 500);
+        };
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(flash).catch(() => fallbackCopy(text, flash));
+        } else {
+            fallbackCopy(text, flash);
+        }
+    }
+    function fallbackCopy(text, onDone) {
+        try {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            if (onDone) onDone();
+        } catch (_) { /* noop */ }
+    }
+
+    // 날짜(년/월/일 로컬)가 한국 공휴일/일요일이면 --sun, 토요일이면 --sat, 그 외는 기본 검정
+    function dayHeaderColor(date) {
+        const ds = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
+        const isHoliday = !!(window.holidays && window.holidays[ds]);
+        const dow = date.getDay();
+        if (isHoliday || dow === 0) return 'var(--sun)';
+        if (dow === 6) return 'var(--sat)';
+        return 'var(--w-black)';
+    }
+
+    // 09:00~18:00을 기본으로 하되, 그 범위를 벗어나는 일정이 있으면 정시 단위로 넓힌다.
+    function computeWeekRange(days, settings) {
+        let rangeStart = BASE_START_MIN, rangeEnd = BASE_END_MIN;
+        days.forEach(d => {
+            WT.buildDayBlocks(window.logs || [], d, settings).forEach(b => {
+                if (b.startMin < rangeStart) rangeStart = b.startMin;
+                if (b.endMin > rangeEnd) rangeEnd = b.endMin;
+            });
+        });
+        rangeStart = Math.max(0, Math.floor(rangeStart / 60) * 60);
+        rangeEnd = Math.min(24 * 60, Math.ceil(rangeEnd / 60) * 60);
+        return { rangeStart, rangeEnd };
+    }
 
     // ─── DOM 준비 (최초 1회) ───
     function ensureAreaDom() {
@@ -213,42 +267,52 @@
         ensureAreaDom();
         const settings = WT.getSettings();
         const days = WT.weekDays(currentMonday);
-        const ppm = pxPerMin(settings);
-        const dayHeight = 24 * 60 * ppm;
         const today = new Date();
+
+        const { rangeStart, rangeEnd } = computeWeekRange(days, settings);
+        const totalRange = rangeEnd - rangeStart;
+
+        // .tt-scroll 자체 높이는 컨텐츠와 무관하게 flex 레이아웃으로 정해지므로,
+        // 본문을 새로 그리기 전에 먼저 측정해서 "한 화면에 맞는" 배율을 계산한다.
+        const scrollEl = document.getElementById('ttScroll');
+        const availableHeight = Math.max(200, (scrollEl?.clientHeight || 500) - FOOTER_SAFE_PAD);
+        const ppm = Math.max(MIN_PPM, availableHeight / totalRange);
+        const dayHeight = totalRange * ppm;
+        currentRange = { rangeStart, rangeEnd, ppm, settings };
 
         const label = `${days[0].getFullYear()}.${String(days[0].getMonth() + 1).padStart(2, '0')}.${String(days[0].getDate()).padStart(2, '0')} ~ ${String(days[6].getMonth() + 1).padStart(2, '0')}.${String(days[6].getDate()).padStart(2, '0')}`;
         const weekLabelEl = document.getElementById('ttWeekLabel');
         if (weekLabelEl) weekLabelEl.textContent = label;
 
-        // 헤더
+        // 헤더 (요일/날짜 색상은 공휴일·주말 기준, 탭하면 그 날짜로 이동)
         const headerRow = document.getElementById('ttHeaderRow');
         if (headerRow) {
             headerRow.innerHTML = `<div class="tt-time-col-header"></div>` + days.map((d, i) => {
                 const isToday = d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
-                return `<div class="tt-day-header${isToday ? ' is-today' : ''}">
-                    <div class="tt-day-name">${WT.DAY_LABELS[i]}</div>
-                    <div class="tt-day-date">${d.getDate()}</div>
+                const isSelected = d.getFullYear() === window.currentYear && d.getMonth() + 1 === window.curMonth && d.getDate() === window.curDay;
+                const color = dayHeaderColor(d);
+                return `<div class="tt-day-header${isToday ? ' is-today' : ''}${isSelected ? ' is-selected' : ''}" data-day-idx="${i}">
+                    <div class="tt-day-name" style="color:${color};">${WT.DAY_LABELS[i]}</div>
+                    <div class="tt-day-date" style="color:${color};">${d.getDate()}</div>
                 </div>`;
             }).join('');
+            headerRow.querySelectorAll('.tt-day-header').forEach(el => {
+                el.addEventListener('click', () => onDayHeaderClick(days[Number(el.dataset.dayIdx)]));
+            });
         }
 
-        // 시간 라벨
+        // 시간 라벨 / 정시 구분선 (표시 범위 안에서만)
         let timeLabelsHtml = '';
-        for (let h = 0; h < 24; h++) {
-            timeLabelsHtml += `<div class="tt-time-label" style="top:${h * 60 * ppm}px;">${String(h).padStart(2, '0')}:00</div>`;
-        }
-
-        // 시간대 구분선(매 정시)
         let hourLinesHtml = '';
-        for (let h = 1; h < 24; h++) {
-            hourLinesHtml += `<div class="tt-hour-line" style="top:${h * 60 * ppm}px;"></div>`;
+        for (let m = rangeStart; m <= rangeEnd; m += 60) {
+            timeLabelsHtml += `<div class="tt-time-label" style="top:${(m - rangeStart) * ppm}px;">${String(Math.floor(m / 60)).padStart(2, '0')}:00</div>`;
+            if (m > rangeStart && m < rangeEnd) hourLinesHtml += `<div class="tt-hour-line" style="top:${(m - rangeStart) * ppm}px;"></div>`;
         }
 
         // 요일 컬럼
         const dayColsHtml = days.map((d, dayIdx) => {
             const blocks = WT.buildDayBlocks(window.logs || [], d, settings);
-            const blocksHtml = blocks.map(b => renderBlockHtml(b, ppm)).join('');
+            const blocksHtml = blocks.map(b => renderBlockHtml(b, ppm, rangeStart)).join('');
             return `<div class="tt-day-col" data-day-idx="${dayIdx}" style="height:${dayHeight}px;">${hourLinesHtml}${blocksHtml}</div>`;
         }).join('');
 
@@ -258,16 +322,22 @@
             body.innerHTML = `<div class="tt-time-col" style="height:${dayHeight}px;">${timeLabelsHtml}</div>${dayColsHtml}`;
         }
 
-        // 최초 진입 시에만 업무시간대(07:00)로 스크롤
-        const scrollEl = document.getElementById('ttScroll');
-        if (scrollEl && !scrollEl.dataset.scrolled) {
-            scrollEl.scrollTop = Math.max(0, 7 * 60 * ppm - 60);
-            scrollEl.dataset.scrolled = '1';
-        }
+        // 09:00이 기본으로 화면 맨 위에 오도록 — 그보다 이른 일정이 있어 범위가 늘어난 만큼만 스크롤이 생긴다.
+        if (scrollEl) scrollEl.scrollTop = Math.max(0, (BASE_START_MIN - rangeStart) * ppm);
     }
 
-    function renderBlockHtml(b, ppm) {
-        const top = b.startMin * ppm;
+    function onDayHeaderClick(date) {
+        window.currentYear = date.getFullYear();
+        window.curMonth = date.getMonth() + 1;
+        window.curDay = date.getDate();
+        const monthLabelEl = document.getElementById('monthLabel');
+        if (monthLabelEl) monthLabelEl.innerText = `${window.curMonth}월`;
+        if (window.renderCal) window.renderCal(window.currentYear, window.curMonth - 1);
+        renderWeek();
+    }
+
+    function renderBlockHtml(b, ppm, rangeStart) {
+        const top = (b.startMin - rangeStart) * ppm;
         const height = Math.max(16, (b.endMin - b.startMin) * ppm);
         const width = 100 / b.laneCount;
         const left = b.lane * width;
@@ -290,8 +360,8 @@
         const log = (window.logs || []).find(l => String(l.id) === String(logId));
         if (!log) return;
 
-        const settings = WT.getSettings();
-        const ppm = pxPerMin(settings);
+        const settings = currentRange.settings || WT.getSettings();
+        const ppm = currentRange.ppm;
         // 짧은 블록은 화면 표시상 최소 높이로 늘려 그리므로, DOM 크기가 아니라
         // 로그의 실제 시간값에서 시작/종료(분)를 다시 계산해야 정확하다.
         const range = WT.timeRangeOf(log, settings.gridUnit);
@@ -315,6 +385,8 @@
             moved: 0,
             settings,
             ppm,
+            rangeStart: currentRange.rangeStart,
+            rangeEnd: currentRange.rangeEnd,
             blockEl
         };
 
@@ -352,10 +424,10 @@
         let dayIdx = dragCtx.origDayIdx;
 
         if (dragCtx.mode === 'resize') {
-            newEndMin = Math.max(dragCtx.origStartMin + dragCtx.settings.gridUnit, Math.min(24 * 60, dragCtx.origEndMin + deltaMinSnapped));
+            newEndMin = Math.max(dragCtx.origStartMin + dragCtx.settings.gridUnit, Math.min(dragCtx.rangeEnd, dragCtx.origEndMin + deltaMinSnapped));
         } else {
             const duration = dragCtx.origEndMin - dragCtx.origStartMin;
-            newStartMin = Math.max(0, Math.min(24 * 60 - duration, dragCtx.origStartMin + deltaMinSnapped));
+            newStartMin = Math.max(dragCtx.rangeStart, Math.min(dragCtx.rangeEnd - duration, dragCtx.origStartMin + deltaMinSnapped));
             newEndMin = newStartMin + duration;
 
             const under = document.elementFromPoint(e.clientX, e.clientY);
@@ -393,7 +465,7 @@
         if (!ctx) return;
 
         if (ctx.moved < DRAG_THRESHOLD) {
-            showPopoverForLog(ctx.logId, ctx.blockEl);
+            onBlockTap(ctx.logId, ctx.blockEl, ctx.origDayIdx);
             return;
         }
 
@@ -483,6 +555,58 @@
     }
 
     // ─── 팝오버(1단계 미리보기) ───
+    // 블록 탭 시: 같은 시간대에 겹치는 항목이 여럿이면 먼저 목록으로 보여주고,
+    // 단일 항목이면 바로 상세 미리보기(이름/Task No/주소)로 간다.
+    function onBlockTap(logId, blockEl, dayIdx) {
+        const settings = WT.getSettings();
+        const days = WT.weekDays(currentMonday);
+        const date = days[dayIdx];
+        if (!date) { showPopoverForLog(logId, blockEl); return; }
+        const dayBlocks = WT.buildDayBlocks(window.logs || [], date, settings);
+        const tapped = dayBlocks.find(b => b.logId === logId);
+        if (!tapped) { showPopoverForLog(logId, blockEl); return; }
+        const group = dayBlocks.filter(b => b.startMin < tapped.endMin && b.endMin > tapped.startMin);
+        if (group.length > 1) showListPopover(group, blockEl);
+        else showPopoverForLog(logId, blockEl);
+    }
+
+    // 겹치는 시간대의 항목 목록 — 타이틀바는 이름 대신 시간 범위를 보여준다.
+    function showListPopover(group, blockEl) {
+        ensurePopoverDom();
+        const sorted = [...group].sort((a, b) => a.startMin - b.startMin);
+        const minStart = Math.min(...sorted.map(b => b.startMin));
+        const maxEnd = Math.max(...sorted.map(b => b.endMin));
+
+        const titleEl = document.getElementById('ttPopoverTitle');
+        titleEl.textContent = `${WT.toHHMM(minStart)} ~ ${WT.toHHMM(maxEnd)} (${sorted.length}건)`;
+        titleEl.classList.remove('tt-copyable');
+        titleEl.onclick = null;
+
+        const bodyEl = document.getElementById('ttPopoverBody');
+        bodyEl.innerHTML = '';
+        bodyEl.classList.add('tt-popover-list');
+        sorted.forEach(b => {
+            const row = document.createElement('div');
+            row.className = 'tt-popover-list-item';
+            const label = document.createElement('span');
+            label.className = 'tt-popover-list-label' + (b.completed ? ' is-completed' : '');
+            label.textContent = b.label;
+            const time = document.createElement('span');
+            time.className = 'tt-popover-list-time';
+            time.textContent = WT.toHHMM(b.startMin);
+            row.appendChild(label);
+            row.appendChild(time);
+            row.addEventListener('click', () => showPopoverForLog(b.logId, blockEl));
+            bodyEl.appendChild(row);
+        });
+
+        document.getElementById('ttPopoverDetailBtn').style.display = 'none';
+
+        const pop = document.getElementById('ttPopover');
+        pop.style.display = 'block';
+        positionPopover(pop, blockEl);
+    }
+
     function showPopoverForLog(logId, blockEl) {
         const log = (window.logs || []).find(l => String(l.id) === String(logId));
         if (!log) return;
@@ -490,25 +614,48 @@
 
         const groupCat = WT.groupCatOf(log);
         const title = WT.labelOf(log);
-        let bodyHtml = '';
+
+        const titleEl = document.getElementById('ttPopoverTitle');
+        titleEl.textContent = title;
+        titleEl.classList.add('tt-copyable');
+        titleEl.onclick = () => copyToClipboard(title, titleEl);
+
+        const bodyEl = document.getElementById('ttPopoverBody');
+        bodyEl.classList.remove('tt-popover-list');
+        bodyEl.innerHTML = '';
+
+        const addLine = (labelText, valueText, copyable) => {
+            const line = document.createElement('div');
+            line.className = 'tt-popover-line';
+            const b = document.createElement('b');
+            b.textContent = labelText;
+            const span = document.createElement('span');
+            span.textContent = valueText || '-';
+            if (copyable && valueText) {
+                span.classList.add('tt-copyable');
+                span.onclick = () => copyToClipboard(valueText, span);
+            }
+            line.appendChild(b);
+            line.appendChild(span);
+            bodyEl.appendChild(line);
+            return line;
+        };
 
         if (groupCat === 'work') {
-            bodyHtml = `
-                <div class="tt-popover-line"><b>Task No</b> ${escapeHtml(log.taskNo || '-')}</div>
-                <div class="tt-popover-line tt-popover-address" title="${escapeHtml(log.address || '')}"><b>주소</b> ${escapeHtml(log.address || '-')}</div>
-                ${log.status ? `<div class="tt-popover-line"><b>상태</b> ${escapeHtml(log.status)}</div>` : ''}
-            `;
+            addLine('Task No', log.taskNo, true);
+            const addrLine = addLine('주소', log.address, true);
+            addrLine.classList.add('tt-popover-address');
+            if (log.address) addrLine.title = log.address;
+            if (log.status) addLine('상태', log.status, false);
         } else if (groupCat === 'commute') {
-            bodyHtml = `<div class="tt-popover-line"><b>${log.cat === 'commute_in' ? '출근' : '퇴근'}</b> ${escapeHtml(log.time || '-')}</div>
-                ${log.commuteNote ? `<div class="tt-popover-line">${escapeHtml(log.commuteNote)}</div>` : ''}`;
+            addLine(log.cat === 'commute_in' ? '출근' : '퇴근', log.time, false);
+            if (log.commuteNote) addLine('메모', log.commuteNote, false);
         } else {
-            bodyHtml = `<div class="tt-popover-line">${escapeHtml(log.memo || '-')}</div>`;
+            addLine('메모', log.memo, false);
         }
 
-        document.getElementById('ttPopoverTitle').textContent = title;
-        document.getElementById('ttPopoverBody').innerHTML = bodyHtml;
-
         const detailBtn = document.getElementById('ttPopoverDetailBtn');
+        detailBtn.style.display = '';
         detailBtn.onclick = () => {
             hidePopover();
             window.handleCardClick(log.id, log.cat);
@@ -536,8 +683,19 @@
         if (pop) pop.style.display = 'none';
     }
 
+    // 메인 화면 아이콘 등, 팝업 밖에서 곧바로 오늘 기준 주간 시간표로 진입한다.
+    function goToWeeklyTimetable() {
+        userToggled = true;
+        const now = new Date();
+        window.currentYear = now.getFullYear();
+        window.curDay = now.getDate();
+        window.openPop(now.getMonth() + 1);
+        activate();
+    }
+
     // ─── 외부 훅 ───
     window.toggleTimetableView = toggleTimetableView;
+    window.goToWeeklyTimetable = goToWeeklyTimetable;
 
     window.WorkTimetableUI = {
         activate, deactivate, renderWeek, shiftWeek,
