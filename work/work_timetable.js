@@ -8,17 +8,20 @@ window.WorkTimetable = (() => {
     const DEFAULT_SETTINGS = {
         categories: { work: true, commute: true, memo: false },
         defaultView: 'month', // 'month' | 'timetable'
-        scale: 'medium' // 'small' | 'medium' | 'large' — 시간표 글씨/줄 크기
+        scale: 'medium', // 'small' | 'medium' | 'large' — 시간표 글씨/줄 크기
+        longNameMode: 'wrap' // 'wrap'(칸 높이를 늘려 줄바꿈) | 'ellipsis'(한 줄로 말줄임)
     };
 
     function getSettings() {
         let saved = {};
         try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); } catch (_) { saved = {}; }
         const scale = ['small', 'medium', 'large'].includes(saved.scale) ? saved.scale : DEFAULT_SETTINGS.scale;
+        const longNameMode = ['wrap', 'ellipsis'].includes(saved.longNameMode) ? saved.longNameMode : DEFAULT_SETTINGS.longNameMode;
         return {
             categories: { ...DEFAULT_SETTINGS.categories, ...(saved.categories || {}) },
             defaultView: saved.defaultView === 'timetable' ? 'timetable' : 'month',
-            scale
+            scale,
+            longNameMode
         };
     }
 

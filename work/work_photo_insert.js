@@ -184,9 +184,32 @@
         const count = pendingImgs.length;
         pendingImgs = [];
         close();
-        const message = `사진 ${count}장을 추가했습니다.`;
-        if (window.showWorkNavigationToast) window.showWorkNavigationToast(message);
-        else alert(message);
+        showInsertedToast(count, log);
+    }
+
+    // 일반 안내 토스트(showWorkNavigationToast)는 pointer-events:none인 공용 요소라
+    // 탭으로 이동시키는 용도로는 못 쓴다 — 전용 클릭 가능 토스트를 따로 둔다.
+    function ensureInsertedToastDom() {
+        if (document.getElementById('piInsertedToast')) return;
+        const toast = document.createElement('div');
+        toast.id = 'piInsertedToast';
+        toast.className = 'pi-inserted-toast';
+        toast.style.display = 'none';
+        document.body.appendChild(toast);
+    }
+
+    function showInsertedToast(count, log) {
+        ensureInsertedToastDom();
+        const toast = document.getElementById('piInsertedToast');
+        toast.textContent = `사진 ${count}장을 ${labelOf(log)}에 추가했습니다 · 이동`;
+        toast.style.display = 'block';
+        toast.onclick = () => {
+            clearTimeout(window.__piToastTimer);
+            toast.style.display = 'none';
+            window.handleCardClick(log.id, log.cat);
+        };
+        clearTimeout(window.__piToastTimer);
+        window.__piToastTimer = setTimeout(() => { toast.style.display = 'none'; }, 4000);
     }
 
     window.openPhotoInsert = openPicker;
