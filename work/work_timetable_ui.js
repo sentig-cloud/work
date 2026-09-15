@@ -18,7 +18,8 @@
     let userToggled = false;
     let currentMonday = null;
     let dragCtx = null;
-    let lastUndo = null;
+    let undoStack = [];
+    let redoStack = [];
     let undoTimer = null;
 
     function escapeHtml(str) {
@@ -96,7 +97,9 @@
                 <button type="button" class="w95-btn icon-btn" id="ttPrevWeekBtn" title="이전 주"><i class="fa-solid fa-chevron-left"></i></button>
                 <span id="ttWeekLabel" class="tt-week-label"></span>
                 <button type="button" class="w95-btn icon-btn" id="ttNextWeekBtn" title="다음 주"><i class="fa-solid fa-chevron-right"></i></button>
-                <button type="button" class="w95-btn icon-btn" id="ttSettingsBtn" style="margin-left:auto;" title="시간표 설정"><i class="fa-solid fa-gear"></i></button>
+                <button type="button" class="w95-btn icon-btn" id="ttUndoNavBtn" style="margin-left:auto;" title="되돌리기" disabled><i class="fa-solid fa-rotate-left"></i></button>
+                <button type="button" class="w95-btn icon-btn" id="ttRedoNavBtn" title="다시 실행" disabled><i class="fa-solid fa-rotate-right"></i></button>
+                <button type="button" class="w95-btn icon-btn" id="ttSettingsBtn" title="시간표 설정"><i class="fa-solid fa-gear"></i></button>
             </div>
             <div class="tt-header-row" id="ttHeaderRow"></div>
             <div class="tt-scroll" id="ttScroll">
@@ -112,7 +115,9 @@
         document.getElementById('ttPrevWeekBtn').addEventListener('click', () => shiftWeek(-1));
         document.getElementById('ttNextWeekBtn').addEventListener('click', () => shiftWeek(1));
         document.getElementById('ttSettingsBtn').addEventListener('click', openSettingsModal);
-        document.getElementById('ttUndoBtn').addEventListener('click', undoLastChange);
+        document.getElementById('ttUndoBtn').addEventListener('click', performUndo);
+        document.getElementById('ttUndoNavBtn').addEventListener('click', performUndo);
+        document.getElementById('ttRedoNavBtn').addEventListener('click', performRedo);
 
         const body = document.getElementById('ttBody');
         body.addEventListener('pointerdown', onBodyPointerDown);
@@ -236,6 +241,7 @@
         const toggleBtn = document.getElementById('timetableToggleBtn');
         if (toggleBtn) toggleBtn.classList.add('active-btn');
         applyScaleClass();
+        updateUndoRedoButtons();
         renderWeek();
     }
 
@@ -470,26 +476,52 @@
         const patch = buildMovePatch(ctx, log);
 
         const trackedFields = ['y', 'm', 'd', 'startTime', 'endTime', 'workTime', 'time', 'inTime', 'outTime'];
-        const prevFields = {};
-        trackedFields.forEach(f => { prevFields[f] = log[f]; });
+        const before = {};
+        trackedFields.forEach(f => { before[f] = log[f]; });
 
         const updated = { ...log, ...patch };
-        const origY = log.y, origM = log.m, origD = log.d;
         if (targetDate) {
             updated.y = targetDate.getFullYear();
             updated.m = targetDate.getMonth() + 1;
             updated.d = targetDate.getDate();
         }
+        const after = {};
+        trackedFields.forEach(f => { after[f] = updated[f]; });
 
+        applyLogFields(ctx.logId, after, before);
+
+        undoStack.push({ logId: ctx.logId, before, after });
+        redoStack = [];
+        updateUndoRedoButtons();
+        showUndoToast();
+    }
+
+    // fields를 로그에 반영해 저장하고, 출퇴근이면 관련 상세메모도 갱신한다.
+    // prevFields가 주어지면(되돌리기 등으로 날짜가 바뀔 수 있는 경우) 이전 날짜도 함께 갱신한다.
+    function applyLogFields(logId, fields, prevFieldsForCommuteRefresh) {
+        const log = (window.logs || []).find(l => String(l.id) === String(logId));
+        if (!log) return;
+        const cat = log.cat;
+        const origY = log.y, origM = log.m, origD = log.d;
+        const updated = { ...log, ...fields };
         window.saveToLocalStore('logs', updated);
 
-        if ((ctx.cat === 'commute_in' || ctx.cat === 'commute_out') && window.updateCommuteDetailByDate) {
+        if ((cat === 'commute_in' || cat === 'commute_out') && window.updateCommuteDetailByDate) {
             window.updateCommuteDetailByDate(updated.y, updated.m, updated.d);
-            if (targetDate) window.updateCommuteDetailByDate(origY, origM, origD);
+            const prevY = prevFieldsForCommuteRefresh?.y ?? origY;
+            const prevM = prevFieldsForCommuteRefresh?.m ?? origM;
+            const prevD = prevFieldsForCommuteRefresh?.d ?? origD;
+            if (prevY !== updated.y || prevM !== updated.m || prevD !== updated.d) {
+                window.updateCommuteDetailByDate(prevY, prevM, prevD);
+            }
         }
+    }
 
-        lastUndo = { logId: ctx.logId, prevFields };
-        showUndoToast();
+    function updateUndoRedoButtons() {
+        const undoBtn = document.getElementById('ttUndoNavBtn');
+        const redoBtn = document.getElementById('ttRedoNavBtn');
+        if (undoBtn) undoBtn.disabled = undoStack.length === 0;
+        if (redoBtn) redoBtn.disabled = redoStack.length === 0;
     }
 
     function showUndoToast() {
@@ -499,20 +531,26 @@
         if (!toast) return;
         if (text) text.textContent = '일정을 변경했습니다.';
         toast.style.display = 'flex';
-        undoTimer = setTimeout(() => { toast.style.display = 'none'; lastUndo = null; }, UNDO_MS);
+        undoTimer = setTimeout(() => { toast.style.display = 'none'; }, UNDO_MS);
     }
 
-    function undoLastChange() {
-        if (!lastUndo) return;
-        const log = (window.logs || []).find(l => String(l.id) === String(lastUndo.logId));
-        if (log) {
-            const restored = { ...log, ...lastUndo.prevFields };
-            window.saveToLocalStore('logs', restored);
-        }
+    function performUndo() {
+        if (undoStack.length === 0) return;
+        const entry = undoStack.pop();
+        applyLogFields(entry.logId, entry.before, entry.after);
+        redoStack.push(entry);
+        updateUndoRedoButtons();
         clearTimeout(undoTimer);
         const toast = document.getElementById('ttUndoToast');
         if (toast) toast.style.display = 'none';
-        lastUndo = null;
+    }
+
+    function performRedo() {
+        if (redoStack.length === 0) return;
+        const entry = redoStack.pop();
+        applyLogFields(entry.logId, entry.after, entry.before);
+        undoStack.push(entry);
+        updateUndoRedoButtons();
     }
 
     // ─── 팝오버(1단계 미리보기) ───
