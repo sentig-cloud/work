@@ -254,7 +254,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
     let oxWatermark = '';
     if (l.personalCheck === 'O' || l.personalCheck === 'X') {
         let markColor = l.personalCheck === 'O' ? '#10b981' : '#ef4444';
-        oxWatermark = `<div style="position: absolute; bottom: 12px; right: 20px; font-size: 5.5rem; color: ${markColor}; font-weight: 900; opacity: 0.15; pointer-events: none; user-select: none; z-index: 20; transform: rotate(-15deg);">${l.personalCheck}</div>`;
+        oxWatermark = `<div style="position: absolute; bottom: 12px; right: 20px; font-size: 5.5rem; color: ${markColor}; font-weight: 900; opacity: 0.4; -webkit-text-stroke: 1px ${markColor}; pointer-events: none; user-select: none; z-index: 20; transform: rotate(-15deg);">${l.personalCheck}</div>`;
     }
 
     const days = ['일', '월', '화', '수', '목', '금', '토'];
@@ -398,7 +398,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
             const order = window.getWorkCardSectionOrder(items.map(html => html.match(/data-card-section-key="([^"]+)"/)?.[1]).filter(Boolean));
             return [...items].sort((a,b) => order.indexOf(a.match(/data-card-section-key="([^"]+)"/)?.[1]) - order.indexOf(b.match(/data-card-section-key="([^"]+)"/)?.[1]));
         };
-        workDetails.push(makeCardObject('number','번호',`<div class="work-card-number">No.${indexStr || '-'}</div>`,2));
+        workDetails.push(makeCardObject('number','번호',`<div class="work-card-number" onclick="event.stopPropagation(); window.toggleLogOx('${l.id}')">No.${indexStr || '-'}</div>`,2));
         workDetails.push(makeCardObject('date','일자',`<div class="work-card-core-value work-card-core-date">${headerDateStr}</div>`,3));
         workDetails.push(makeCardObject('time','시간',`<div class="work-card-core-value work-card-core-time">${l.workTime || '00:00'}</div>`,2));
         workDetails.push(makeCardObject('status','상태',`<div class="work-card-status-only">${statusBadge}</div>`,2));
