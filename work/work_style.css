@@ -1286,3 +1286,67 @@ input, textarea, [contenteditable="true"] {
 .card-free-canvas .card-free-item.is-widget-hidden {
     display:none !important;
 }
+
+/* ─── 주간 시간표 뷰 (work_timetable.js / work_timetable_ui.js) ─── */
+#timetableArea { display:none; flex:1; flex-direction:column; overflow:hidden; background:var(--w-white); position:relative; }
+#popContentArea.timetable-mode #timetableArea { display:flex; }
+#popContentArea.timetable-mode .cal-table,
+#popContentArea.timetable-mode #logList { display:none; }
+
+.tt-nav { display:flex; align-items:center; gap:6px; background:var(--w-gray); border-bottom:2px solid var(--w-black); padding:4px 6px; flex-shrink:0; }
+.tt-week-label { font-weight:bold; font-size:0.85rem; color:var(--w-blue); }
+
+.tt-header-row { display:flex; border-bottom:2px solid var(--w-black); background:var(--w-gray); flex-shrink:0; }
+.tt-time-col-header { width:38px; flex-shrink:0; }
+.tt-day-header { flex:1; text-align:center; padding:3px 1px; border-left:1px solid var(--w-dark-gray); font-size:0.72rem; }
+.tt-day-header.is-today { background:#eff6ff; }
+.tt-day-header .tt-day-name { font-weight:bold; }
+.tt-day-header .tt-day-date { color:var(--w-blue); font-weight:bold; }
+
+.tt-scroll { flex:1; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; padding-bottom:120px; }
+.tt-body { display:flex; position:relative; }
+.tt-time-col { width:38px; flex-shrink:0; position:relative; border-right:1px solid var(--w-gray); }
+.tt-time-label { position:absolute; right:4px; transform:translateY(-50%); font-size:0.62rem; color:var(--w-dark-gray); white-space:nowrap; }
+.tt-day-col { flex:1; position:relative; border-left:1px solid #e5e7eb; }
+.tt-hour-line { position:absolute; left:0; right:0; border-top:1px solid #eef0f2; pointer-events:none; }
+
+.tt-block {
+    position:absolute; box-sizing:border-box; border-radius:3px; padding:2px 4px; overflow:hidden;
+    font-size:0.68rem; line-height:1.2; cursor:grab; touch-action:none; user-select:none;
+    box-shadow:0 1px 2px rgba(0,0,0,0.25);
+}
+.tt-block.is-dragging { opacity:0.75; z-index:80; box-shadow:0 4px 10px rgba(0,0,0,0.35); }
+.tt-block-label { pointer-events:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tt-block.is-completed .tt-block-label { text-decoration:line-through; }
+
+.tt-block.cat-work { background:#dbeafe; border:1px solid #3b82f6; color:#1e3a8a; }
+.tt-block.cat-commute_in { background:#dcfce7; border:1px solid #16a34a; color:#14532d; }
+.tt-block.cat-commute_out { background:#fce7f3; border:1px solid #db2777; color:#831843; }
+.tt-block.group-memo { background:#f3f4f6; border:1px solid #9ca3af; color:#374151; }
+
+.tt-resize-handle { position:absolute; left:0; right:0; bottom:0; height:7px; cursor:ns-resize; touch-action:none; }
+
+.tt-drag-indicator {
+    position:fixed; z-index:2900; background:#111827; color:#fff; padding:4px 8px; border-radius:4px;
+    font-size:0.75rem; font-weight:bold; pointer-events:none; white-space:nowrap;
+}
+
+.tt-undo-toast {
+    /* .footer-nav가 하단에 position:absolute로 떠 있으므로(z-index:1010), 그 위로 올라오게 배치한다. */
+    position:absolute; left:50%; bottom:130px; transform:translateX(-50%); z-index:1020;
+    background:#111827; color:#fff; padding:6px 8px 6px 14px; border-radius:20px;
+    font-size:0.78rem; display:flex; gap:10px; align-items:center; box-shadow:0 2px 8px rgba(0,0,0,0.35);
+}
+.tt-undo-toast .w95-btn { height:26px; padding:0 10px; font-weight:bold; color:var(--w-blue); }
+
+.tt-popover { position:fixed; z-index:2800; display:none; width:220px; box-shadow:2px 2px 8px rgba(0,0,0,0.4); }
+.tt-popover-titlebar span { font-size:0.85rem; }
+.tt-popover-body { padding:8px; background:var(--w-gray); font-size:0.78rem; display:flex; flex-direction:column; gap:4px; }
+.tt-popover-line b { color:var(--w-blue); margin-right:4px; }
+.tt-popover-address { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tt-popover-actions { display:flex; padding:4px 6px 6px; background:var(--w-gray); }
+
+.tt-settings-body { padding:10px; background:var(--w-gray); display:flex; flex-direction:column; gap:10px; }
+.tt-settings-section { display:flex; flex-direction:column; gap:4px; }
+.tt-settings-label { font-size:0.8rem; font-weight:bold; color:var(--w-blue); margin-bottom:2px; }
+.tt-settings-check { display:flex; align-items:center; gap:6px; font-size:0.85rem; }
