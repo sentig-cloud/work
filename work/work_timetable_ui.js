@@ -175,6 +175,11 @@
                         <label class="tt-settings-check"><input type="radio" name="ttScale" id="ttOptScaleMedium" value="medium"> 보통</label>
                         <label class="tt-settings-check"><input type="radio" name="ttScale" id="ttOptScaleLarge" value="large"> 크게</label>
                     </div>
+                    <div class="tt-settings-section">
+                        <div class="tt-settings-label">긴 이름 표시</div>
+                        <label class="tt-settings-check"><input type="radio" name="ttLongName" id="ttOptLongNameWrap" value="wrap"> 줄바꿈(칸 높이 늘어남)</label>
+                        <label class="tt-settings-check"><input type="radio" name="ttLongName" id="ttOptLongNameEllipsis" value="ellipsis"> 말줄임(한 줄, ...)</label>
+                    </div>
                 </div>
                 <div class="modal-footer" style="padding:6px; background:var(--w-gray);">
                     <button type="button" class="w95-btn" id="ttSettingsSaveBtn" style="width:100%; height:32px; font-weight:bold; color:var(--w-blue);">저장</button>
@@ -194,6 +199,7 @@
         document.getElementById('ttOptCatMemo').checked = !!s.categories.memo;
         document.getElementById(s.defaultView === 'timetable' ? 'ttOptViewTimetable' : 'ttOptViewMonth').checked = true;
         document.getElementById(`ttOptScale${s.scale.charAt(0).toUpperCase()}${s.scale.slice(1)}`).checked = true;
+        document.getElementById(s.longNameMode === 'ellipsis' ? 'ttOptLongNameEllipsis' : 'ttOptLongNameWrap').checked = true;
         document.getElementById('ttSettingsModal').style.display = 'flex';
     }
     function closeSettingsModal() {
@@ -203,6 +209,7 @@
     function saveSettingsFromModal() {
         const scaleEl = document.querySelector('input[name="ttScale"]:checked');
         const viewEl = document.querySelector('input[name="ttDefaultView"]:checked');
+        const longNameEl = document.querySelector('input[name="ttLongName"]:checked');
         WT.saveSettings({
             categories: {
                 work: document.getElementById('ttOptCatWork').checked,
@@ -210,10 +217,11 @@
                 memo: document.getElementById('ttOptCatMemo').checked
             },
             defaultView: viewEl ? viewEl.value : 'month',
-            scale: scaleEl ? scaleEl.value : 'medium'
+            scale: scaleEl ? scaleEl.value : 'medium',
+            longNameMode: longNameEl ? longNameEl.value : 'wrap'
         });
         closeSettingsModal();
-        if (active) renderWeek();
+        if (active) { applyScaleClass(); renderWeek(); }
     }
 
     // ─── 활성화/비활성화 ───
@@ -227,9 +235,10 @@
     function applyScaleClass() {
         const area = document.getElementById('timetableArea');
         if (!area) return;
-        const scale = WT.getSettings().scale;
+        const settings = WT.getSettings();
         area.classList.remove('tt-scale-small', 'tt-scale-medium', 'tt-scale-large');
-        area.classList.add(`tt-scale-${scale}`);
+        area.classList.add(`tt-scale-${settings.scale}`);
+        area.classList.toggle('tt-longname-ellipsis', settings.longNameMode === 'ellipsis');
     }
 
     function activate() {
@@ -362,6 +371,7 @@
         const cellEl = chipEl.closest('.tt-hour-cell');
         const origDayIdx = cellEl ? Number(cellEl.dataset.dayIdx) : 0;
         const origHour = cellEl ? Number(cellEl.dataset.hour) : 0;
+        const originRect = chipEl.getBoundingClientRect();
 
         dragCtx = {
             logId,
@@ -369,6 +379,8 @@
             groupCat: WT.groupCatOf(log),
             origDayIdx,
             origHour,
+            originX: originRect.left + originRect.width / 2,
+            originY: originRect.top + originRect.height / 2,
             startClientX: e.clientX,
             startClientY: e.clientY,
             moved: 0,
@@ -383,6 +395,7 @@
         window.addEventListener('pointercancel', onBodyPointerCancel, { once: true });
 
         ensureDragIndicatorDom();
+        ensureDragTrajectoryDom();
         e.preventDefault();
     }
 
@@ -393,6 +406,28 @@
         ind.className = 'tt-drag-indicator';
         ind.style.display = 'none';
         document.body.appendChild(ind);
+    }
+
+    // 드래그 중인 칩이 시작 지점에서 현재 포인터 위치까지 이동한 궤적을 선으로 보여준다.
+    function ensureDragTrajectoryDom() {
+        if (document.getElementById('ttDragTrajectory')) return;
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.id = 'ttDragTrajectory';
+        svg.setAttribute('width', '100%');
+        svg.setAttribute('height', '100%');
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.id = 'ttDragTrajectoryLine';
+        line.setAttribute('stroke', '#111827');
+        line.setAttribute('stroke-width', '2');
+        line.setAttribute('stroke-dasharray', '5 4');
+        line.setAttribute('stroke-linecap', 'round');
+        svg.appendChild(line);
+        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        dot.id = 'ttDragTrajectoryOrigin';
+        dot.setAttribute('r', '5');
+        dot.setAttribute('fill', '#111827');
+        svg.appendChild(dot);
+        document.body.appendChild(svg);
     }
 
     function onBodyPointerMove(e) {
@@ -417,6 +452,18 @@
             ind.style.top = `${e.clientY + 14}px`;
             ind.textContent = `${WT.DAY_LABELS[dayIdx]}(${targetDate.getDate()}일) ${String(hour).padStart(2, '0')}:00`;
         }
+
+        const svg = document.getElementById('ttDragTrajectory');
+        const line = document.getElementById('ttDragTrajectoryLine');
+        const dot = document.getElementById('ttDragTrajectoryOrigin');
+        if (svg && line && dragCtx.moved >= DRAG_THRESHOLD) {
+            svg.style.display = 'block';
+            line.setAttribute('x1', dragCtx.originX);
+            line.setAttribute('y1', dragCtx.originY);
+            line.setAttribute('x2', e.clientX);
+            line.setAttribute('y2', e.clientY);
+            if (dot) { dot.setAttribute('cx', dragCtx.originX); dot.setAttribute('cy', dragCtx.originY); }
+        }
     }
 
     function onBodyPointerCancel() {
@@ -429,7 +476,7 @@
         if (!ctx) return;
 
         if (ctx.moved < DRAG_THRESHOLD) {
-            showPopoverForLog(ctx.logId, ctx.chipEl);
+            onChipTap(ctx.logId, ctx.chipEl);
             return;
         }
 
@@ -448,6 +495,8 @@
         if (dragCtx && dragCtx.chipEl) dragCtx.chipEl.classList.remove('is-dragging');
         const ind = document.getElementById('ttDragIndicator');
         if (ind) ind.style.display = 'none';
+        const svg = document.getElementById('ttDragTrajectory');
+        if (svg) svg.style.display = 'none';
         dragCtx = null;
     }
 
@@ -554,6 +603,61 @@
     }
 
     // ─── 팝오버(1단계 미리보기) ───
+    // 같은 칸(같은 요일·시간대)에 2건 이상 있으면 작은 칩을 각각 정확히 누르기 어려우므로
+    // 먼저 목록 팝업으로 보여주고, 거기서 하나를 골라야 상세 미리보기로 들어간다.
+    function onChipTap(logId, chipEl) {
+        const cellEl = chipEl.closest('.tt-hour-cell');
+        const siblingChips = cellEl ? cellEl.querySelectorAll('.tt-chip') : null;
+        if (!cellEl || !siblingChips || siblingChips.length <= 1) {
+            showPopoverForLog(logId, chipEl);
+            return;
+        }
+        const dayIdx = Number(cellEl.dataset.dayIdx);
+        const hour = Number(cellEl.dataset.hour);
+        const days = WT.weekDays(currentMonday);
+        const date = days[dayIdx];
+        if (!date) { showPopoverForLog(logId, chipEl); return; }
+        const blocks = WT.buildDayBlocks(window.logs || [], date, WT.getSettings()).filter(b => b.hour === hour);
+        if (blocks.length <= 1) { showPopoverForLog(logId, chipEl); return; }
+        showListPopover(blocks, chipEl);
+    }
+
+    // 겹치는 시간대의 항목 목록 — 타이틀바는 이름 대신 시간대를 보여준다.
+    function showListPopover(blocks, anchorEl) {
+        ensurePopoverDom();
+        const sorted = [...blocks].sort((a, b) => a.startMin - b.startMin);
+        const hour = sorted[0].hour;
+
+        const titleEl = document.getElementById('ttPopoverTitle');
+        titleEl.textContent = `${String(hour).padStart(2, '0')}:00대 (${sorted.length}건)`;
+        titleEl.classList.remove('tt-copyable');
+        titleEl.onclick = null;
+
+        const bodyEl = document.getElementById('ttPopoverBody');
+        bodyEl.innerHTML = '';
+        bodyEl.classList.add('tt-popover-list');
+        sorted.forEach(b => {
+            const row = document.createElement('div');
+            row.className = 'tt-popover-list-item';
+            const label = document.createElement('span');
+            label.className = 'tt-popover-list-label' + (b.completed ? ' is-completed' : '') + (b.canceled ? ' is-canceled' : '');
+            label.textContent = b.label;
+            const time = document.createElement('span');
+            time.className = 'tt-popover-list-time';
+            time.textContent = WT.toHHMM(b.startMin);
+            row.appendChild(label);
+            row.appendChild(time);
+            row.addEventListener('click', () => showPopoverForLog(b.logId, anchorEl));
+            bodyEl.appendChild(row);
+        });
+
+        document.getElementById('ttPopoverDetailBtn').style.display = 'none';
+
+        const pop = document.getElementById('ttPopover');
+        pop.style.display = 'block';
+        positionPopover(pop, anchorEl);
+    }
+
     function showPopoverForLog(logId, anchorEl) {
         const log = (window.logs || []).find(l => String(l.id) === String(logId));
         if (!log) return;
@@ -568,6 +672,7 @@
         titleEl.onclick = () => copyToClipboard(title, titleEl);
 
         const bodyEl = document.getElementById('ttPopoverBody');
+        bodyEl.classList.remove('tt-popover-list');
         bodyEl.innerHTML = '';
 
         const addLine = (labelText, valueText, copyable) => {
@@ -601,6 +706,7 @@
         }
 
         const detailBtn = document.getElementById('ttPopoverDetailBtn');
+        detailBtn.style.display = '';
         detailBtn.onclick = () => {
             hidePopover();
             window.handleCardClick(log.id, log.cat);

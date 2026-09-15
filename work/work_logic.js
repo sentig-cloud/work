@@ -753,7 +753,9 @@ window.openImageViewer = (index, mode, refId = null) => {
 
     const deleteButton = document.getElementById("deleteImgBtn");
 
-    if (mode === "log" || mode === "tempCommute") {
+    // tempCommute(출퇴근 사진)는 그 모달 안에 별도 삭제 버튼(commuteImgDelBtn)이 있으니 여기서는 숨긴다.
+    // 그 외에는(저장된 로그의 사진 포함) 휴지통으로 보내는 삭제를 쓸 수 있게 둔다.
+    if (mode === "tempCommute") {
         deleteButton.style.display = "none";
     } else {
         deleteButton.style.display = "inline-flex";
@@ -842,9 +844,10 @@ window.downloadViewerImage = async () => {
             ? `${pad(validCreatedDate.getHours())}${pad(validCreatedDate.getMinutes())}${pad(validCreatedDate.getSeconds())}`
             : logTime || "000000";
         const inferredName = ymd ? `${ymd}-${hms}.${extension}` : `image.${extension}`;
-        // 다운로드 파일명은 촬영/등록 시각을 찾기 쉬운 고정 형식으로 통일한다.
-        // 원본명은 서버 메타데이터에 계속 보존하되 다운로드명에는 날짜-시간을 우선한다.
-        const rawOriginalName = inferredName || meaningfulName(image.originalName) || meaningfulName(headerName);
+        // 다운로드 파일명은 원래 올렸던 사진 파일명을 최우선으로 쓴다(로컬 originalName,
+        // 없으면 서버가 R2 메타데이터에서 돌려주는 X-Original-Name). 카메라 촬영본처럼
+        // 의미 있는 원본명이 없을 때만 날짜-시간 기반 이름으로 대신한다.
+        const rawOriginalName = meaningfulName(image.originalName) || meaningfulName(headerName) || inferredName;
         let defaultFileName = String(rawOriginalName)
             .normalize("NFC")
             .replace(/^.*[\\/]/, "")
@@ -910,6 +913,69 @@ window.downloadViewerImage = async () => {
         alert("사진 다운로드에 실패했습니다. 저장소의 다운로드 권한을 확인해주세요.");
     } finally {
         if (downloadButton) downloadButton.disabled = false;
+    }
+};
+
+// 사진 삭제는 완전히 지우지 않고 휴지통으로 보낸다(기존 로그 삭제와 같은 방식) — 복원 가능.
+window.deleteViewerImage = () => {
+    const images = window.currentViewerImages;
+    const idx = window.currentViewerIndex;
+
+    if (!images || idx < 0 || idx >= images.length) {
+        return;
+    }
+
+    if (!confirm("이 사진을 삭제하시겠습니까? 휴지통으로 이동합니다.")) {
+        return;
+    }
+
+    const image = images[idx];
+    const mode = window.currentViewerMode;
+    const refId = window.currentViewerRefId;
+    const owningLog = (mode === "log" || mode === "edit")
+        ? window.logs.find((item) => item.id === refId)
+        : null;
+
+    const now = new Date();
+    const trashEntry = {
+        id: `img_trash_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        y: owningLog ? owningLog.y : now.getFullYear(),
+        m: owningLog ? owningLog.m : now.getMonth() + 1,
+        d: owningLog ? owningLog.d : now.getDate(),
+        cat: "photo",
+        memo: owningLog
+            ? `[${owningLog.customerName || owningLog.taskType || "작업"}]에서 삭제된 사진`
+            : "삭제된 사진",
+        imgs: [image],
+        personalCheck: null,
+        updatedAt: now.toISOString()
+    };
+
+    if (!window.trash) {
+        window.trash = [];
+    }
+    window.trash.push(trashEntry);
+    window.saveToLocalStore("trash", trashEntry);
+
+    images.splice(idx, 1);
+
+    if (owningLog) {
+        owningLog.updatedAt = now.toISOString();
+        window.saveToLocalStore("logs", owningLog);
+    } else if (mode === "temp" && window.renderTempImgs) {
+        window.renderTempImgs();
+    } else if (mode === "work" && window.renderWorkPhotoGrid) {
+        window.renderWorkPhotoGrid();
+    }
+
+    if (mode === "edit" && window.renderEditPhotoGrid) {
+        window.renderEditPhotoGrid();
+    }
+
+    if (images.length === 0) {
+        window.closeImageViewer();
+    } else {
+        window.openImageViewer(Math.min(idx, images.length - 1), mode, refId);
     }
 };
 
