@@ -7,7 +7,7 @@
     <title>Work Master Local Pro</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-<link rel="stylesheet" href="work_style.css?v=20260917-2">
+<link rel="stylesheet" href="work_style.css?v=20260917-3">
 </head>
 <body>
 
@@ -322,6 +322,7 @@
                 <span id="geoRouteTitle">동선 관리</span>
                 <button type="button" class="w95-btn" style="padding:0 6px;" onclick="window.closeGeoRouteModal()">X</button>
             </div>
+            <div id="geoRouteMap"></div>
             <div class="modal-content-scroll" style="padding:10px;">
                 <div id="geoRouteList"></div>
             </div>
@@ -494,7 +495,8 @@
 <script src="work_timetable.js?v=20260916-3"></script>
 <script src="work_timetable_ui.js?v=20260917-2"></script>
 <script src="work_photo_insert.js?v=20260916-1"></script>
-<script src="work_georoute.js?v=20260917-1"></script>
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=95e50bf045aa4dda112398b1ca38d9c0&autoload=false"></script>
+<script src="work_georoute.js?v=20260917-3"></script>
 <script src="work_enhancements.js?v=20260916-1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>

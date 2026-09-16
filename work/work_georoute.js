@@ -1,8 +1,8 @@
 // work_georoute.js
 // 주간표 요일 헤더 / 월간 달력 날짜를 롱프레스하면, 그날 등록된 카드들의 주소를 모아
-// 좌표로 변환하고(카카오 지오코딩), 순서·거리를 보여주는 "동선 관리" 팝업을 연다.
-// 지도 SDK를 새로 붙이는 대신 이미 있는 텍스트 주소를 그대로 활용해서, 기존 지도 앱
-// 연결(T맵/네이버지도/카카오맵)로 좌표 기반 길찾기까지 바로 이어지게 한다.
+// 좌표로 변환하고(카카오 지오코딩), 순서·거리와 함께 미니 카카오맵에 번호 핀으로 찍어
+// 보여주는 "동선 관리" 팝업을 연다. 핀(또는 목록 항목)을 누르면 기존 지도 앱 연결
+// (T맵/네이버지도/카카오맵)로 좌표 기반 길찾기까지 바로 이어진다.
 
 function escapeHtml(str) {
     return String(str == null ? '' : str).replace(/[&<>"']/g, ch => ({
@@ -31,6 +31,81 @@ function geoCacheSet(address, result) {
 
 let geoRouteRequestId = 0;
 
+// ─── 카카오맵 SDK 지연 로딩 + 팝업 안의 미니맵(핀 찍기) ───
+let kakaoMapsReadyPromise = null;
+function ensureKakaoMapsReady() {
+    if (kakaoMapsReadyPromise) return kakaoMapsReadyPromise;
+    kakaoMapsReadyPromise = new Promise((resolve, reject) => {
+        if (typeof kakao === 'undefined' || !kakao.maps) {
+            reject(new Error('카카오맵 SDK를 불러오지 못했습니다.'));
+            return;
+        }
+        kakao.maps.load(resolve);
+    });
+    return kakaoMapsReadyPromise;
+}
+
+let geoRouteMapInstance = null;
+let geoRouteMapOverlays = [];
+
+function clearGeoRouteMapOverlays() {
+    geoRouteMapOverlays.forEach(ov => ov.setMap(null));
+    geoRouteMapOverlays = [];
+}
+
+async function updateGeoRouteMap(results) {
+    const container = document.getElementById('geoRouteMap');
+    if (!container) return;
+    try {
+        await ensureKakaoMapsReady();
+    } catch {
+        container.textContent = '지도를 불러오지 못했습니다.';
+        return;
+    }
+
+    const points = results.filter(r => r.geo && r.geo.ok && typeof r.geo.lat === 'number' && typeof r.geo.lng === 'number');
+
+    if (!geoRouteMapInstance) {
+        geoRouteMapInstance = new kakao.maps.Map(container, {
+            center: new kakao.maps.LatLng(37.5665, 126.9780),
+            level: 6
+        });
+    }
+    clearGeoRouteMapOverlays();
+    geoRouteMapInstance.relayout();
+
+    if (points.length === 0) return;
+
+    const bounds = new kakao.maps.LatLngBounds();
+    results.forEach(({ geo }, idx) => {
+        if (!(geo && geo.ok && typeof geo.lat === 'number' && typeof geo.lng === 'number')) return;
+        const position = new kakao.maps.LatLng(geo.lat, geo.lng);
+        bounds.extend(position);
+
+        const pinEl = document.createElement('div');
+        pinEl.className = 'geo-route-map-pin';
+        pinEl.innerHTML = `<span>${idx + 1}</span>`;
+        pinEl.addEventListener('click', () => {
+            window.openGeoRouteNav(geo.lat, geo.lng, geo.roadAddress || geo.jibunAddress || '');
+        });
+
+        const overlay = new kakao.maps.CustomOverlay({
+            position,
+            content: pinEl,
+            yAnchor: 1
+        });
+        overlay.setMap(geoRouteMapInstance);
+        geoRouteMapOverlays.push(overlay);
+    });
+
+    if (points.length === 1) {
+        geoRouteMapInstance.setCenter(new kakao.maps.LatLng(points[0].geo.lat, points[0].geo.lng));
+        geoRouteMapInstance.setLevel(4);
+    } else {
+        geoRouteMapInstance.setBounds(bounds);
+    }
+}
+
 window.openGeoRouteModal = async (year, month, day) => {
     const modal = document.getElementById('geoRouteModal');
     const list = document.getElementById('geoRouteList');
@@ -49,6 +124,7 @@ window.openGeoRouteModal = async (year, month, day) => {
 
     if (dayLogs.length === 0) {
         list.innerHTML = `<div class="geo-route-empty">이 날짜에 주소가 등록된 카드가 없습니다.</div>`;
+        clearGeoRouteMapOverlays();
         return;
     }
 
@@ -91,6 +167,7 @@ function renderGeoRouteList(results, totalCount) {
         if (hasCoords) prevPoint = geo;
 
         const timeText = log.workTime || log.time || '';
+        const nameText = log.customerName || log.content || log.taskType || '';
         const resolvedAddr = geo && (geo.roadAddress || geo.jibunAddress) || '';
         const statusHtml = hasCoords
             ? (resolvedAddr ? `<div class="geo-route-address-resolved">${escapeHtml(resolvedAddr)}</div>` : '')
@@ -104,6 +181,7 @@ function renderGeoRouteList(results, totalCount) {
             <div class="geo-route-item-head">
                 <span class="geo-route-order">${idx + 1}</span>
                 ${timeText ? `<span class="geo-route-time">${escapeHtml(timeText)}</span>` : ''}
+                ${nameText ? `<span class="geo-route-name">${escapeHtml(nameText)}</span>` : ''}
             </div>
             <div class="geo-route-address-original">${escapeHtml(address)}</div>
             ${statusHtml}
@@ -124,6 +202,8 @@ function renderGeoRouteList(results, totalCount) {
             window.openGeoRouteNav(parseFloat(btn.dataset.lat), parseFloat(btn.dataset.lng), btn.dataset.addr || '');
         });
     });
+
+    updateGeoRouteMap(results);
 }
 
 window.openGeoRouteNav = (lat, lng, address) => {
