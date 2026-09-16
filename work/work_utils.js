@@ -26,9 +26,18 @@ window.formatTimeInput = (input) => {
     else if(val.length === 3) { h = '0' + val.slice(0, 1); m = val.slice(1, 3); } 
     else if(val.length === 4) { h = val.slice(0, 2); m = val.slice(2, 4); }
     
-    h = Math.min(23, parseInt(h)).toString().padStart(2,'0'); 
+    h = Math.min(23, parseInt(h)).toString().padStart(2,'0');
     m = Math.min(59, parseInt(m)).toString().padStart(2,'0');
     input.value = `${h}:${m}`;
+};
+
+// 거리(km) 입력창에 천 단위 콤마를 실시간으로 붙여준다 (예: 12345 -> 12,345)
+window.formatKmInput = (input) => {
+    const caretFromEnd = input.value.length - (input.selectionEnd ?? input.value.length);
+    let digits = input.value.replace(/[^0-9]/g, '').replace(/^0+(?=\d)/, '');
+    input.value = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    const pos = Math.max(0, input.value.length - caretFromEnd);
+    if (input.setSelectionRange) input.setSelectionRange(pos, pos);
 };
 
 // 분(minute) 단위 총시간을 "H:MM" 문자열로 변환 (작업일지 시작/종료 총시간용)

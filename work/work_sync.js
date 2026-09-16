@@ -16,13 +16,27 @@ window.lastRemoteCheckAt = 0;
 window.fetchWithTimeout = async function (url, options = {}, timeoutMs = 15000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const externalSignal = options.signal;
+    const onExternalAbort = () => controller.abort();
+    if (externalSignal) {
+        if (externalSignal.aborted) controller.abort();
+        else externalSignal.addEventListener("abort", onExternalAbort);
+    }
     try {
         return await fetch(url, { ...options, signal: controller.signal });
     } catch (e) {
-        if (e.name === "AbortError") throw new Error(`서버 응답 시간 초과: ${timeoutMs / 1000}초`);
+        if (e.name === "AbortError") {
+            if (externalSignal && externalSignal.aborted) {
+                const cancelled = new Error("요청이 취소되었습니다.");
+                cancelled.cancelled = true;
+                throw cancelled;
+            }
+            throw new Error(`서버 응답 시간 초과: ${timeoutMs / 1000}초`);
+        }
         throw e;
     } finally {
         clearTimeout(timer);
+        if (externalSignal) externalSignal.removeEventListener("abort", onExternalAbort);
     }
 };
 
@@ -173,21 +187,28 @@ window.uploadToStorage = async function (src, originalName = "") {
 
 // 출퇴근 사진에서 시간/거리를 자동으로 읽어오는 Google Vision OCR — 서버(worker.js)의
 // /api/ocr로 이미지를 보내면, 실제 Vision API 키는 서버에만 있는 채로 인식된 텍스트만 돌려준다.
-window.runVisionOcr = async function (dataUrlOrBlob) {
+window.runVisionOcr = async function (dataUrlOrBlob, signal = null) {
     const blob = typeof dataUrlOrBlob === "string" ? window.dataUrlToBlob(dataUrlOrBlob) : dataUrlOrBlob;
     const response = await window.fetchWithTimeout(
         `${WORK_API_BASE}/api/ocr`,
         {
             method: "POST",
             headers: { "Content-Type": blob.type || "application/octet-stream" },
-            body: blob
+            body: blob,
+            signal
         },
         20000
     );
     const text = await response.text();
-    if (!response.ok) throw new Error(`OCR 실패: ${response.status} / ${text}`);
     const result = text ? JSON.parse(text) : {};
-    if (!result.ok) throw new Error(result.error || "OCR 실패");
+    if (result.used !== undefined && result.limit !== undefined) {
+        window.setVisionOcrUsage?.(result.used, result.limit);
+    }
+    if (!response.ok || !result.ok) {
+        const err = new Error(result.error || `OCR 실패: ${response.status}`);
+        err.quotaExceeded = !!result.quotaExceeded;
+        throw err;
+    }
     return result.text || "";
 };
 

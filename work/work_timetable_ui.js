@@ -267,6 +267,7 @@
                     <div class="tt-settings-section">
                         <div class="tt-settings-label">구글 비전(OCR) — 출퇴근 사진에서 시간/거리 자동 인식</div>
                         <label class="tt-settings-check"><input type="checkbox" id="ttOptVisionOcr"> 켜기(서버에 API 키 설정 필요)</label>
+                        <div id="ttVisionOcrUsage" class="tt-settings-usage"></div>
                     </div>
                 </div>
                 <div class="modal-footer" style="padding:6px; background:var(--w-gray);">
@@ -290,6 +291,7 @@
         document.getElementById(s.longNameMode === 'ellipsis' ? 'ttOptLongNameEllipsis' : 'ttOptLongNameWrap').checked = true;
         document.getElementById(s.gridPattern === 'checker' ? 'ttOptGridPatternChecker' : 'ttOptGridPatternNone').checked = true;
         document.getElementById('ttOptVisionOcr').checked = !!window.isVisionOcrEnabled?.();
+        window.refreshVisionOcrUsageDisplay?.();
         document.getElementById('ttSettingsModal').style.display = 'flex';
     }
     function closeSettingsModal() {

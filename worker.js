@@ -2,6 +2,8 @@
 const DATA_KEY = "work_master_backup";
 const FEED_KEY = "work_change_feed";
 const MAX_FEED_EVENTS = 200;
+// Google Vision 무료 한도(월 1,000건)를 넘기 전에 자동으로 차단해 과금을 막는다.
+const OCR_MONTHLY_FREE_LIMIT = 1000;
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -27,6 +29,17 @@ function getImageExtension(contentType) {
   if (type === "image/webp") return "webp";
   if (type === "image/gif") return "gif";
   return "bin";
+}
+
+function ocrUsageKeyForNow() {
+  const d = new Date();
+  return `vision_ocr_usage_${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+async function readOcrUsage(env) {
+  const key = ocrUsageKeyForNow();
+  const raw = await env.WORK_KV.get(key);
+  return { key, used: raw ? (parseInt(raw, 10) || 0) : 0 };
 }
 
 function decodeOriginalName(value) {
@@ -288,6 +301,8 @@ export default {
         if (!env.GOOGLE_VISION_API_KEY) {
           return json({ ok: false, error: "GOOGLE_VISION_API_KEY secret is missing" }, 500);
         }
+        if (!env.WORK_KV) return json({ ok: false, error: "WORK_KV binding is missing" }, 500);
+
         const contentType = request.headers.get("Content-Type") || "application/octet-stream";
         if (!contentType.toLowerCase().startsWith("image/")) {
           return json({ ok: false, error: "Only image upload is allowed" }, 400);
@@ -297,6 +312,20 @@ export default {
         const bytes = new Uint8Array(await request.arrayBuffer());
         if (bytes.byteLength === 0) return json({ ok: false, error: "Image body is empty" }, 400);
         if (bytes.byteLength > 12 * 1024 * 1024) return json({ ok: false, error: "Image too large for OCR" }, 400);
+
+        // 무료 한도(월 1,000건)를 넘기 전에 Vision API를 아예 호출하지 않고 차단 — 과금 방지.
+        const { key: usageKey, used } = await readOcrUsage(env);
+        if (used >= OCR_MONTHLY_FREE_LIMIT) {
+          return json({
+            ok: false,
+            error: "이번 달 무료 인식 한도를 초과하여 자동으로 중지되었습니다.",
+            quotaExceeded: true,
+            used,
+            limit: OCR_MONTHLY_FREE_LIMIT
+          }, 429);
+        }
+        const newUsed = used + 1;
+        await env.WORK_KV.put(usageKey, String(newUsed));
 
         // base64 인코딩(큰 이미지에서 스택 오버플로 안 나게 chunk 단위로 처리)
         let binary = "";
@@ -321,16 +350,16 @@ export default {
         );
         const visionResult = await visionResponse.json();
         if (!visionResponse.ok) {
-          return json({ ok: false, error: visionResult?.error?.message || `Vision API HTTP ${visionResponse.status}` }, 502);
+          return json({ ok: false, error: visionResult?.error?.message || `Vision API HTTP ${visionResponse.status}`, used: newUsed, limit: OCR_MONTHLY_FREE_LIMIT }, 502);
         }
         const annotation = visionResult?.responses?.[0];
         if (annotation?.error) {
-          return json({ ok: false, error: annotation.error.message || "Vision API error" }, 502);
+          return json({ ok: false, error: annotation.error.message || "Vision API error", used: newUsed, limit: OCR_MONTHLY_FREE_LIMIT }, 502);
         }
         const text = annotation?.fullTextAnnotation?.text
           || annotation?.textAnnotations?.[0]?.description
           || "";
-        return json({ ok: true, text });
+        return json({ ok: true, text, used: newUsed, limit: OCR_MONTHLY_FREE_LIMIT });
       } catch (e) {
         return json({ ok: false, error: e.message }, 500);
       }
