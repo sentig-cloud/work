@@ -423,6 +423,38 @@ export default {
       }
     }
 
+    // ─── 자동차 길찾기(카카오 모빌리티) — 동선 관리의 "현재 위치에서 소요시간" 계산용 ───
+    // 같은 KAKAO_REST_API_KEY로 바로 호출 가능(별도 사업자 인증 불필요, 확인됨).
+    if (url.pathname === "/api/directions" && request.method === "POST") {
+      try {
+        if (!env.KAKAO_REST_API_KEY) {
+          return json({ ok: false, error: "KAKAO_REST_API_KEY secret is missing" }, 500);
+        }
+        const body = await request.json().catch(() => ({}));
+        const { originLat, originLng, destLat, destLng } = body;
+        if ([originLat, originLng, destLat, destLng].some(v => typeof v !== "number" || Number.isNaN(v))) {
+          return json({ ok: false, error: "좌표가 올바르지 않습니다" }, 400);
+        }
+
+        const directionsResponse = await fetch(
+          `https://apis-navi.kakaomobility.com/v1/directions?origin=${originLng},${originLat}&destination=${destLng},${destLat}&priority=RECOMMEND`,
+          { headers: { Authorization: `KakaoAK ${env.KAKAO_REST_API_KEY}` } }
+        );
+        const directionsResult = await directionsResponse.json();
+        if (!directionsResponse.ok) {
+          return json({ ok: false, error: directionsResult?.message || `Kakao Mobility API HTTP ${directionsResponse.status}` }, 502);
+        }
+        const route = directionsResult?.routes?.[0];
+        if (!route || route.result_code !== 0) {
+          return json({ ok: false, error: route?.result_msg || "경로를 찾지 못했습니다", notFound: true });
+        }
+
+        return json({ ok: true, distanceM: route.summary.distance, durationSec: route.summary.duration });
+      } catch (e) {
+        return json({ ok: false, error: e.message }, 500);
+      }
+    }
+
     // ─── 이미지 조회 / 파일명 경로 기반 다운로드 ───
     const isImageView = url.pathname === "/api/image";
     const isNamedDownload = url.pathname.startsWith("/api/download/");
