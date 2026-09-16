@@ -730,6 +730,8 @@ window.openImageViewer = (index, mode, refId = null) => {
         imageArray = window.workImgs;
     } else if (mode === "tempCommute") {
         imageArray = window.tempCommuteImg ? [{ src: window.tempCommuteImg, originalName: window.tempCommuteOriginalName || "" }] : [];
+    } else if (mode === "pendingInsert") {
+        imageArray = window.piPendingImgs || [];
     } else if (mode === "log" || mode === "edit") {
         const log = window.logs.find((item) => item.id === refId);
 
@@ -739,6 +741,7 @@ window.openImageViewer = (index, mode, refId = null) => {
     }
 
     window.currentViewerImages = imageArray;
+    const wasOpen = document.getElementById("imageViewer").style.display === "flex";
     window.currentViewerIndex = index;
 
     if (!imageArray || imageArray.length === 0 || index < 0 || index >= imageArray.length) {
@@ -746,8 +749,11 @@ window.openImageViewer = (index, mode, refId = null) => {
     }
 
     const viewerImage = document.getElementById("viewerImg");
-    viewerImage.style.transform = "translate(0px, 0px) scale(1)";
     viewerImage.src = imageArray[index].src;
+    // 뷰어를 새로 열 때만 확대 배율을 초기화한다 — 다음/이전 사진으로 넘길 때는(뷰어가 이미 열려
+    // 있던 상태) 지금 배율을 그대로 유지해서 확대한 채로 사진들을 넘겨볼 수 있게 한다.
+    if (wasOpen && window.reapplyImageViewerZoom) window.reapplyImageViewerZoom();
+    else if (window.resetImageViewerZoom) window.resetImageViewerZoom();
 
     document.getElementById("imageViewer").style.display = "flex";
 
@@ -766,6 +772,7 @@ window.closeImageViewer = () => {
     document.getElementById("imageViewer").style.display = "none";
     document.getElementById("viewerImg").src = "";
     window.currentViewerIndex = -1;
+    if (window.resetImageViewerZoom) window.resetImageViewerZoom();
 };
 
 window.changeViewerImage = (direction) => {
@@ -948,13 +955,25 @@ window.deleteViewerImage = () => {
         return;
     }
 
+    const mode = window.currentViewerMode;
+    const refId = window.currentViewerRefId;
+
+    // 아직 아무 기록에도 저장되지 않은, "사진 먼저 담기"의 대기 중 사진은 휴지통에 보낼 대상이
+    // 없으므로(저장된 적이 없음) 그냥 담긴 목록에서 뺀다.
+    if (mode === "pendingInsert") {
+        if (!confirm("담은 사진에서 빼시겠습니까?")) return;
+        images.splice(idx, 1);
+        if (window.renderPiPendingStrip) window.renderPiPendingStrip();
+        if (images.length === 0) window.closeImageViewer();
+        else window.openImageViewer(Math.min(idx, images.length - 1), mode, refId);
+        return;
+    }
+
     if (!confirm("이 사진을 삭제하시겠습니까? 휴지통으로 이동합니다.")) {
         return;
     }
 
     const image = images[idx];
-    const mode = window.currentViewerMode;
-    const refId = window.currentViewerRefId;
     const owningLog = (mode === "log" || mode === "edit")
         ? window.logs.find((item) => item.id === refId)
         : null;

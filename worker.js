@@ -279,6 +279,63 @@ export default {
       }
     }
 
+    // ─── 출퇴근 사진 OCR(Google Cloud Vision) ───
+    // API 키는 여기(서버)에만 있고 클라이언트에는 절대 내려가지 않는다.
+    // 배포 시 다음을 한 번 실행해서 시크릿으로 등록해야 한다:
+    //   wrangler secret put GOOGLE_VISION_API_KEY
+    if (url.pathname === "/api/ocr" && request.method === "POST") {
+      try {
+        if (!env.GOOGLE_VISION_API_KEY) {
+          return json({ ok: false, error: "GOOGLE_VISION_API_KEY secret is missing" }, 500);
+        }
+        const contentType = request.headers.get("Content-Type") || "application/octet-stream";
+        if (!contentType.toLowerCase().startsWith("image/")) {
+          return json({ ok: false, error: "Only image upload is allowed" }, 400);
+        }
+        if (!request.body) return json({ ok: false, error: "Image body is empty" }, 400);
+
+        const bytes = new Uint8Array(await request.arrayBuffer());
+        if (bytes.byteLength === 0) return json({ ok: false, error: "Image body is empty" }, 400);
+        if (bytes.byteLength > 12 * 1024 * 1024) return json({ ok: false, error: "Image too large for OCR" }, 400);
+
+        // base64 인코딩(큰 이미지에서 스택 오버플로 안 나게 chunk 단위로 처리)
+        let binary = "";
+        const chunkSize = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+        }
+        const base64 = btoa(binary);
+
+        const visionResponse = await fetch(
+          `https://vision.googleapis.com/v1/images:annotate?key=${env.GOOGLE_VISION_API_KEY}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              requests: [{
+                image: { content: base64 },
+                features: [{ type: "TEXT_DETECTION", maxResults: 1 }]
+              }]
+            })
+          }
+        );
+        const visionResult = await visionResponse.json();
+        if (!visionResponse.ok) {
+          return json({ ok: false, error: visionResult?.error?.message || `Vision API HTTP ${visionResponse.status}` }, 502);
+        }
+        const annotation = visionResult?.responses?.[0];
+        if (annotation?.error) {
+          return json({ ok: false, error: annotation.error.message || "Vision API error" }, 502);
+        }
+        const text = annotation?.fullTextAnnotation?.text
+          || annotation?.textAnnotations?.[0]?.description
+          || "";
+        return json({ ok: true, text });
+      } catch (e) {
+        return json({ ok: false, error: e.message }, 500);
+      }
+    }
+
     // ─── 이미지 조회 / 파일명 경로 기반 다운로드 ───
     const isImageView = url.pathname === "/api/image";
     const isNamedDownload = url.pathname.startsWith("/api/download/");

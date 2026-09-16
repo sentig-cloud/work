@@ -4,7 +4,10 @@
 // (window.saveToLocalStore)을 그대로 재사용한다. 새 컬렉션/스키마 없음.
 
 (() => {
-    let pendingImgs = []; // {id, src, originalName, originalPreserved, updatedAt}
+    // window.piPendingImgs: {id, src, originalName, originalPreserved, updatedAt}[]
+    // 전역에 둬야 work_logic.js의 openImageViewer('pendingInsert' 모드)가 같은 배열을 보고
+    // 확대/삭제 등 기존 사진 뷰어 기능을 그대로 재사용할 수 있다.
+    window.piPendingImgs = window.piPendingImgs || [];
 
     function escapeHtml(str) {
         return String(str == null ? '' : str).replace(/[&<>"']/g, ch => ({
@@ -62,7 +65,7 @@
         files.forEach(file => {
             window.safeProcessImage(file, (dataUrl, imageMeta = {}) => {
                 if (dataUrl) {
-                    pendingImgs.push({
+                    window.piPendingImgs.push({
                         id: `pi_${Date.now()}_${Math.random()}`,
                         src: dataUrl,
                         originalName: imageMeta.originalName || file.name || '',
@@ -94,29 +97,33 @@
     }
 
     function removePending(id) {
-        pendingImgs = pendingImgs.filter(img => img.id !== id);
+        window.piPendingImgs = window.piPendingImgs.filter(img => img.id !== id);
         renderPendingStrip();
-        if (pendingImgs.length === 0) close();
+        if (window.piPendingImgs.length === 0) close();
     }
 
     function renderPendingStrip() {
         const strip = document.getElementById('piPendingStrip');
         if (!strip) return;
-        if (pendingImgs.length === 0) {
+        if (window.piPendingImgs.length === 0) {
             strip.innerHTML = `<div class="pi-empty-hint">담긴 사진이 없습니다.</div>`;
             return;
         }
-        strip.innerHTML = `<div class="pi-pending-count">담은 사진 ${pendingImgs.length}장 · 아래에서 넣을 곳을 찾으세요</div>
-            <div class="pi-pending-thumbs">${pendingImgs.map(img => `
+        strip.innerHTML = `<div class="pi-pending-count">담은 사진 ${window.piPendingImgs.length}장 · 탭하면 확대, 아래에서 넣을 곳을 찾으세요</div>
+            <div class="pi-pending-thumbs">${window.piPendingImgs.map((img, idx) => `
                 <div class="pi-thumb">
-                    <img src="${img.src}">
+                    <img src="${img.src}" data-idx="${idx}">
                     <button type="button" class="pi-thumb-del" data-img-id="${img.id}">×</button>
                 </div>
             `).join('')}</div>`;
+        strip.querySelectorAll('.pi-thumb img').forEach(img => {
+            img.addEventListener('click', () => window.openImageViewer(Number(img.dataset.idx), 'pendingInsert'));
+        });
         strip.querySelectorAll('.pi-thumb-del').forEach(btn => {
             btn.addEventListener('click', () => removePending(btn.dataset.imgId));
         });
     }
+    window.renderPiPendingStrip = renderPendingStrip;
 
     // ─── 대상 검색 ───
     const CAT_LABEL = { work: '작업', commute_in: '출근', commute_out: '퇴근', memo: '메모', photo: '사진' };
@@ -171,18 +178,18 @@
 
     function insertInto(logId) {
         const log = (window.logs || []).find(l => String(l.id) === String(logId));
-        if (!log || pendingImgs.length === 0) return;
+        if (!log || window.piPendingImgs.length === 0) return;
 
         if (!log.imgs) log.imgs = [];
         const now = new Date().toISOString();
-        pendingImgs.forEach(img => log.imgs.push({ ...img, updatedAt: now }));
+        window.piPendingImgs.forEach(img => log.imgs.push({ ...img, updatedAt: now }));
         log.updatedAt = now;
         if (log.cat === 'memo' || log.cat === 'photo') log.cat = 'photo';
 
         window.saveToLocalStore('logs', log);
 
-        const count = pendingImgs.length;
-        pendingImgs = [];
+        const count = window.piPendingImgs.length;
+        window.piPendingImgs = [];
         close();
         showInsertedToast(count, log);
     }

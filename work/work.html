@@ -7,7 +7,7 @@
     <title>Work Master Local Pro</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-<link rel="stylesheet" href="work_style.css?v=20260916-2">
+<link rel="stylesheet" href="work_style.css?v=20260916-3">
 </head>
 <body>
 
@@ -19,9 +19,9 @@
             <button type="button" class="w95-btn icon-btn" onclick="window.openSearch()" title="통합검색"><i class="fa-solid fa-magnifying-glass"></i></button>
             <button type="button" class="w95-btn icon-btn" onclick="window.openTrash()" title="휴지통"><i class="fa-solid fa-trash-can"></i></button>
             <button type="button" class="w95-btn icon-btn" onclick="window.goToWeeklyTimetable()" title="주간 시간표"><i class="fa-solid fa-table-cells"></i></button>
+            <button type="button" class="w95-btn icon-btn" onclick="window.openPhotoInsert()" title="사진 먼저 담아서 넣기"><i class="fa-solid fa-images" style="color:#7c3aed;"></i></button>
         </div>
         <div class="toolbar-group header-right-tools">
-            <button type="button" class="w95-btn icon-btn" onclick="window.openPhotoInsert()" title="사진 먼저 담아서 넣기"><i class="fa-solid fa-images" style="color:#7c3aed;"></i></button>
             <button type="button" class="w95-btn icon-btn" onclick="window.triggerImport()" title="백업 복원"><i class="fa-solid fa-file-import" style="color:#dc2626;"></i></button>
             <button type="button" class="w95-btn icon-btn" onclick="if(window.WorkExportUI) window.WorkExportUI.open(); else alert('내보내기 모듈이 로드되지 않았습니다.');" title="엑셀 내보내기"><i class="fa-solid fa-file-excel" style="color:#10b981;"></i></button>
         </div>
@@ -67,6 +67,7 @@
                 <button type="button" class="w95-btn icon-btn" onclick="if(!window.isSyncLongPress) window.closePop()" onmousedown="window.startSyncPress(event)" onmouseup="window.endSyncPress(event)" onmouseleave="window.cancelSyncPress()" ontouchstart="window.startSyncPress(event)" ontouchend="window.endSyncPress(event)" ontouchcancel="window.cancelSyncPress()" oncontextmenu="return false;" style="margin-right: 8px; touch-action: manipulation; user-select: none;" title="길게 누르면 강제 동기화"><i class="fa-solid fa-chevron-left"></i></button>
                 <div class="pop-title" id="monthLabel" onclick="window.closePop()">0월</div>
                 <button type="button" class="w95-btn icon-btn" id="timetableToggleBtn" onclick="window.toggleTimetableView()" title="주간 시간표 보기"><i class="fa-solid fa-table-cells"></i></button>
+                <button type="button" class="w95-btn icon-btn" onclick="window.openPhotoInsert()" title="사진 먼저 담아서 넣기"><i class="fa-solid fa-images" style="color:#7c3aed;"></i></button>
             </div>
             <div class="pop-nav-stats">
                 <span class="pop-month-summary">
@@ -417,7 +418,7 @@
         <div style="padding:8px; display:flex; flex-direction:column; gap:6px; background:var(--w-gray); border-bottom:2px solid var(--w-black);">
             <div style="display:flex; gap:4px;">
                 <select id="searchMonth" class="m-input w95-in" style="flex:0.3; padding:0 2px;" onchange="window.handleSelectChange(this)"></select>
-                <input type="text" id="searchInput" class="m-input w95-in" style="flex:0.7;" placeholder="검색어 실시간 입력..." oninput="window.doSearch()">
+                <input type="text" id="searchInput" class="m-input w95-in" style="flex:0.7;" placeholder="검색어 실시간 입력..." oninput="window.doSearchDebounced()">
             </div>
             <div id="searchFilterGrid" class="search-filter-grid">
                 <select id="searchType" class="m-input w95-in" style="padding:0 2px; font-size:0.85rem !important;" onchange="window.handleSelectChange(this)"></select>
@@ -460,17 +461,17 @@
 <script src="work_data.js"></script>
 <script src="work_utils.js"></script>
 <script src="work_service.js?v=20260720-4"></script>
-<script src="work_commute.js"></script>
+<script src="work_commute.js?v=20260916-1"></script>
 <script src="work_tag_manager.js"></script>
-<script src="work_sync.js?v=20260722-10"></script>
+<script src="work_sync.js?v=20260916-1"></script>
 <script src="work_render.js?v=20260724-43"></script>
-<script src="work_ui.js?v=20260722-1"></script>
+<script src="work_ui.js?v=20260916-1"></script>
 <script src="work_modal.js?v=20260722-4"></script>
-<script src="work_logic.js?v=20260724-47"></script>
-<script src="work_timetable.js?v=20260916-2"></script>
-<script src="work_timetable_ui.js?v=20260916-2"></script>
-<script src="work_photo_insert.js?v=20260915-1"></script>
-<script src="work_enhancements.js?v=20260724-47"></script>
+<script src="work_logic.js?v=20260916-1"></script>
+<script src="work_timetable.js?v=20260916-3"></script>
+<script src="work_timetable_ui.js?v=20260916-3"></script>
+<script src="work_photo_insert.js?v=20260916-1"></script>
+<script src="work_enhancements.js?v=20260916-1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 <script src="work_export_html.js?v=20260721-2"></script>

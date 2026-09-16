@@ -33,6 +33,10 @@ window.handleCommuteFile = async (input) => {
             preview.src = dataUrl;
 
             document.getElementById("commuteImgDelBtn").style.display = "block";
+
+            if (window.isVisionOcrEnabled?.()) {
+                window.runCommuteVisionOcr?.(dataUrl);
+            }
         }
 
         if (window.hideLoading) {
@@ -44,6 +48,92 @@ window.handleCommuteFile = async (input) => {
 };
 
 window.handleCommuteImg = window.handleCommuteFile;
+
+// ─── 구글 비전 OCR: 출퇴근 사진에서 시간/거리(km) 자동 인식 (설정에서 켜고 끌 수 있음) ───
+window.isVisionOcrEnabled = () => localStorage.getItem("wm_vision_ocr_enabled") === "1";
+window.setVisionOcrEnabled = enabled => localStorage.setItem("wm_vision_ocr_enabled", enabled ? "1" : "0");
+
+window.runCommuteVisionOcr = async (dataUrl) => {
+    const requestImg = dataUrl;
+    if (!window.runVisionOcr) return;
+    const hint = ensureCommuteOcrHintDom();
+    hint.style.display = "block";
+    hint.className = "commute-ocr-hint";
+    hint.textContent = "사진에서 시간/거리 인식 중...";
+    try {
+        const text = await window.runVisionOcr(requestImg);
+        // 그 사이 사진이 바뀌었거나 모달이 닫혔으면 결과를 반영하지 않는다.
+        if (window.tempCommuteImg !== requestImg) return;
+        applyCommuteOcrResult(text);
+    } catch (e) {
+        console.warn("출퇴근 사진 OCR 실패:", e);
+        if (window.tempCommuteImg !== requestImg) return;
+        hint.className = "commute-ocr-hint is-warning";
+        hint.textContent = "사진 인식에 실패했습니다. 시간/거리를 직접 확인해주세요.";
+    }
+};
+
+function ensureCommuteOcrHintDom() {
+    let el = document.getElementById("commuteOcrHint");
+    if (!el) {
+        el = document.createElement("div");
+        el.id = "commuteOcrHint";
+        el.className = "commute-ocr-hint";
+        el.style.display = "none";
+        const noteInput = document.getElementById("commuteNote");
+        noteInput?.parentElement?.insertBefore(el, noteInput);
+    }
+    return el;
+}
+
+function applyCommuteOcrResult(text) {
+    const hint = ensureCommuteOcrHintDom();
+    if (!text) {
+        hint.className = "commute-ocr-hint is-warning";
+        hint.textContent = "사진에서 글자를 읽지 못했습니다. 시간/거리를 직접 확인해주세요.";
+        return;
+    }
+
+    const timeMatch = text.match(/([01]?\d|2[0-3])\s*[:시]\s*([0-5]?\d)\s*분?/);
+    const kmMatch = text.match(/(\d{1,3}(?:,\d{3})+|\d{4,7})\s*(?:km|KM|Km)/) || text.match(/(\d{1,3}(?:,\d{3})+|\d{4,7})/);
+
+    let ocrTime = null;
+    if (timeMatch) {
+        const hh = String(Math.min(23, parseInt(timeMatch[1], 10))).padStart(2, "0");
+        const mm = String(Math.min(59, parseInt(timeMatch[2], 10))).padStart(2, "0");
+        ocrTime = `${hh}:${mm}`;
+        const timeInput = document.getElementById("commuteTime");
+        if (timeInput) {
+            timeInput.value = ocrTime.replace(":", "");
+            window.formatTimeInput?.(timeInput);
+            window.updateOvertime?.();
+        }
+    }
+    if (kmMatch) {
+        const kmInput = document.getElementById("commuteKm");
+        if (kmInput) kmInput.value = kmMatch[1].replace(/,/g, "");
+    }
+
+    if (!timeMatch && !kmMatch) {
+        hint.className = "commute-ocr-hint is-warning";
+        hint.textContent = "사진에서 시간/거리를 찾지 못했습니다. 직접 입력해주세요.";
+        return;
+    }
+
+    if (ocrTime) {
+        const now = window.getCurrentTimeString();
+        const toMin = t => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+        const diff = Math.abs(toMin(ocrTime) - toMin(now));
+        if (diff > 30) {
+            hint.className = "commute-ocr-hint is-warning";
+            hint.textContent = `⚠ 사진에서 읽은 시간(${ocrTime})이 현재 시각(${now})과 ${diff}분 차이가 있습니다. 확인해주세요.`;
+            return;
+        }
+    }
+
+    hint.className = "commute-ocr-hint is-ok";
+    hint.textContent = `사진에서 인식: ${ocrTime ? `시간 ${ocrTime}` : ""}${ocrTime && kmMatch ? " · " : ""}${kmMatch ? `거리 ${kmMatch[1].replace(/,/g, "")}km` : ""} (자동 입력됨, 확인 후 저장하세요)`;
+}
 
 window.handleCommuteThumbClick = (event) => {
     if (event && event.target && event.target.id === "commuteImgDelBtn") {
@@ -77,6 +167,9 @@ window.removeCommuteImg = (event) => {
     document.getElementById("commuteImgPreview").style.display = "none";
     document.getElementById("commuteImgPreview").src = "";
     document.getElementById("commuteImgDelBtn").style.display = "none";
+
+    const hint = document.getElementById("commuteOcrHint");
+    if (hint) hint.style.display = "none";
 };
 
 window.updateOvertime = () => {
