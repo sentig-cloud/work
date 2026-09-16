@@ -2,6 +2,8 @@
 const DATA_KEY = "work_master_backup";
 const FEED_KEY = "work_change_feed";
 const MAX_FEED_EVENTS = 200;
+// Google Vision 무료 한도(월 1,000건)를 넘기 전에 자동으로 차단해 과금을 막는다.
+const OCR_MONTHLY_FREE_LIMIT = 1000;
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -27,6 +29,17 @@ function getImageExtension(contentType) {
   if (type === "image/webp") return "webp";
   if (type === "image/gif") return "gif";
   return "bin";
+}
+
+function ocrUsageKeyForNow() {
+  const d = new Date();
+  return `vision_ocr_usage_${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+async function readOcrUsage(env) {
+  const key = ocrUsageKeyForNow();
+  const raw = await env.WORK_KV.get(key);
+  return { key, used: raw ? (parseInt(raw, 10) || 0) : 0 };
 }
 
 function decodeOriginalName(value) {
@@ -288,6 +301,8 @@ export default {
         if (!env.GOOGLE_VISION_API_KEY) {
           return json({ ok: false, error: "GOOGLE_VISION_API_KEY secret is missing" }, 500);
         }
+        if (!env.WORK_KV) return json({ ok: false, error: "WORK_KV binding is missing" }, 500);
+
         const contentType = request.headers.get("Content-Type") || "application/octet-stream";
         if (!contentType.toLowerCase().startsWith("image/")) {
           return json({ ok: false, error: "Only image upload is allowed" }, 400);
@@ -297,6 +312,20 @@ export default {
         const bytes = new Uint8Array(await request.arrayBuffer());
         if (bytes.byteLength === 0) return json({ ok: false, error: "Image body is empty" }, 400);
         if (bytes.byteLength > 12 * 1024 * 1024) return json({ ok: false, error: "Image too large for OCR" }, 400);
+
+        // 무료 한도(월 1,000건)를 넘기 전에 Vision API를 아예 호출하지 않고 차단 — 과금 방지.
+        const { key: usageKey, used } = await readOcrUsage(env);
+        if (used >= OCR_MONTHLY_FREE_LIMIT) {
+          return json({
+            ok: false,
+            error: "이번 달 무료 인식 한도를 초과하여 자동으로 중지되었습니다.",
+            quotaExceeded: true,
+            used,
+            limit: OCR_MONTHLY_FREE_LIMIT
+          }, 429);
+        }
+        const newUsed = used + 1;
+        await env.WORK_KV.put(usageKey, String(newUsed));
 
         // base64 인코딩(큰 이미지에서 스택 오버플로 안 나게 chunk 단위로 처리)
         let binary = "";
@@ -321,16 +350,74 @@ export default {
         );
         const visionResult = await visionResponse.json();
         if (!visionResponse.ok) {
-          return json({ ok: false, error: visionResult?.error?.message || `Vision API HTTP ${visionResponse.status}` }, 502);
+          return json({ ok: false, error: visionResult?.error?.message || `Vision API HTTP ${visionResponse.status}`, used: newUsed, limit: OCR_MONTHLY_FREE_LIMIT }, 502);
         }
         const annotation = visionResult?.responses?.[0];
         if (annotation?.error) {
-          return json({ ok: false, error: annotation.error.message || "Vision API error" }, 502);
+          return json({ ok: false, error: annotation.error.message || "Vision API error", used: newUsed, limit: OCR_MONTHLY_FREE_LIMIT }, 502);
         }
         const text = annotation?.fullTextAnnotation?.text
           || annotation?.textAnnotations?.[0]?.description
           || "";
-        return json({ ok: true, text });
+        return json({ ok: true, text, used: newUsed, limit: OCR_MONTHLY_FREE_LIMIT });
+      } catch (e) {
+        return json({ ok: false, error: e.message }, 500);
+      }
+    }
+
+    // ─── 주소 → 좌표 변환(지오코딩, 카카오 로컬 API) — 동선 관리용 ───
+    // REST API 키는 여기(서버)에만 있고 클라이언트에는 절대 내려가지 않는다.
+    // 배포 시 다음을 한 번 실행해서 시크릿으로 등록해야 한다:
+    //   wrangler secret put KAKAO_REST_API_KEY
+    if (url.pathname === "/api/geocode" && request.method === "POST") {
+      try {
+        if (!env.KAKAO_REST_API_KEY) {
+          return json({ ok: false, error: "KAKAO_REST_API_KEY secret is missing" }, 500);
+        }
+        const body = await request.json().catch(() => ({}));
+        const address = String(body.address || "").trim();
+        if (!address) return json({ ok: false, error: "주소가 비어있습니다" }, 400);
+
+        const kakaoHeaders = { Authorization: `KakaoAK ${env.KAKAO_REST_API_KEY}` };
+
+        // 1) 지번/도로명 주소 검색 — 정확한 주소 문자열에 가장 잘 맞는다.
+        const addrResponse = await fetch(
+          `https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(address)}`,
+          { headers: kakaoHeaders }
+        );
+        const addrResult = await addrResponse.json();
+        if (!addrResponse.ok) {
+          return json({ ok: false, error: addrResult?.errorType || `Kakao API HTTP ${addrResponse.status}` }, 502);
+        }
+        let doc = addrResult?.documents?.[0];
+        let source = "address";
+
+        // 2) 정식 주소로 못 찾으면 장소/키워드 검색으로 한 번 더 시도 (상호명, 축약 주소 등)
+        if (!doc) {
+          const kwResponse = await fetch(
+            `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(address)}`,
+            { headers: kakaoHeaders }
+          );
+          const kwResult = await kwResponse.json();
+          if (kwResponse.ok && kwResult?.documents?.[0]) {
+            doc = kwResult.documents[0];
+            source = "keyword";
+          }
+        }
+
+        if (!doc) {
+          return json({ ok: false, error: "주소를 찾지 못했습니다", notFound: true });
+        }
+
+        return json({
+          ok: true,
+          lat: parseFloat(doc.y),
+          lng: parseFloat(doc.x),
+          roadAddress: doc.road_address?.address_name || "",
+          jibunAddress: doc.address_name || doc.address?.address_name || "",
+          placeName: doc.place_name || "",
+          source
+        });
       } catch (e) {
         return json({ ok: false, error: e.message }, 500);
       }

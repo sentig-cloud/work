@@ -621,6 +621,7 @@ window.openCommuteModal = (type) => {
 
     document.getElementById('commuteTime').value = window.getCurrentTimeString().replace(':', '');
     document.getElementById('commuteKm').value = lastKm;
+    window.formatKmInput?.(document.getElementById('commuteKm'));
     document.getElementById('commuteNote').value = '';
 
     const baseEl = document.getElementById('commuteBaseTime');
@@ -649,6 +650,7 @@ window.openCommuteModal = (type) => {
     if (existingLog) {
         document.getElementById('commuteTime').value = existingLog.time ? existingLog.time.replace(':', '') : '';
         document.getElementById('commuteKm').value = existingLog.km || lastKm;
+        window.formatKmInput?.(document.getElementById('commuteKm'));
         document.getElementById('commuteNote').value = existingLog.commuteNote || '';
         if (existingLog.imgs && existingLog.imgs.length > 0) {
             window.tempCommuteImg = existingLog.imgs[0].src;

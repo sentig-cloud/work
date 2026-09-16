@@ -53,37 +53,79 @@ window.handleCommuteImg = window.handleCommuteFile;
 window.isVisionOcrEnabled = () => localStorage.getItem("wm_vision_ocr_enabled") === "1";
 window.setVisionOcrEnabled = enabled => localStorage.setItem("wm_vision_ocr_enabled", enabled ? "1" : "0");
 
+function ocrUsageMonthKey() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+window.setVisionOcrUsage = (used, limit) => {
+    localStorage.setItem("wm_vision_ocr_usage", JSON.stringify({ month: ocrUsageMonthKey(), used, limit }));
+    window.refreshVisionOcrUsageDisplay?.();
+};
+
+window.getVisionOcrUsage = () => {
+    try {
+        const stored = JSON.parse(localStorage.getItem("wm_vision_ocr_usage") || "null");
+        if (!stored || stored.month !== ocrUsageMonthKey()) return null;
+        return stored;
+    } catch {
+        return null;
+    }
+};
+
+window.refreshVisionOcrUsageDisplay = () => {
+    const el = document.getElementById("ttVisionOcrUsage");
+    if (!el) return;
+    const usage = window.getVisionOcrUsage();
+    el.textContent = usage ? `이번 달 인식: ${usage.used}/${usage.limit}` : "";
+};
+
+// 사진이 빠르게 여러 번 바뀌어도 이전 요청은 즉시 취소하고, 같은 사진에 대한 중복 호출은 무시해
+// OCR이 중복/반복 처리되거나 할당량을 불필요하게 소모하지 않도록 한다.
+let ocrAbortController = null;
+let ocrInFlightImg = null;
+
 window.runCommuteVisionOcr = async (dataUrl) => {
-    const requestImg = dataUrl;
     if (!window.runVisionOcr) return;
+    if (ocrInFlightImg === dataUrl) return; // 동일 사진에 대한 중복 호출 무시
+
+    const usage = window.getVisionOcrUsage();
     const hint = ensureCommuteOcrHintDom();
-    hint.style.display = "block";
-    hint.className = "commute-ocr-hint";
+    if (usage && usage.used >= usage.limit) {
+        hint.className = "commute-ocr-hint is-warning";
+        hint.textContent = `이번 달 무료 인식 한도(${usage.limit}건)를 초과하여 자동 인식이 중지되었습니다. 시간/거리를 직접 입력해주세요.`;
+        return;
+    }
+
+    ocrAbortController?.abort();
+    const controller = new AbortController();
+    ocrAbortController = controller;
+    ocrInFlightImg = dataUrl;
+    const requestImg = dataUrl;
+
+    hint.className = "commute-ocr-hint is-active";
     hint.textContent = "사진에서 시간/거리 인식 중...";
     try {
-        const text = await window.runVisionOcr(requestImg);
+        const text = await window.runVisionOcr(requestImg, controller.signal);
         // 그 사이 사진이 바뀌었거나 모달이 닫혔으면 결과를 반영하지 않는다.
         if (window.tempCommuteImg !== requestImg) return;
         applyCommuteOcrResult(text);
     } catch (e) {
+        if (e && e.cancelled) return; // 새 사진으로 교체되어 취소된 요청 — 조용히 무시
         console.warn("출퇴근 사진 OCR 실패:", e);
         if (window.tempCommuteImg !== requestImg) return;
         hint.className = "commute-ocr-hint is-warning";
-        hint.textContent = "사진 인식에 실패했습니다. 시간/거리를 직접 확인해주세요.";
+        hint.textContent = (e && e.quotaExceeded)
+            ? "이번 달 무료 인식 한도를 초과하여 자동 인식이 중지되었습니다. 시간/거리를 직접 입력해주세요."
+            : "사진 인식에 실패했습니다. 시간/거리를 직접 확인해주세요.";
+    } finally {
+        if (ocrInFlightImg === requestImg) ocrInFlightImg = null;
+        if (ocrAbortController === controller) ocrAbortController = null;
     }
 };
 
 function ensureCommuteOcrHintDom() {
-    let el = document.getElementById("commuteOcrHint");
-    if (!el) {
-        el = document.createElement("div");
-        el.id = "commuteOcrHint";
-        el.className = "commute-ocr-hint";
-        el.style.display = "none";
-        const noteInput = document.getElementById("commuteNote");
-        noteInput?.parentElement?.insertBefore(el, noteInput);
-    }
-    return el;
+    return document.getElementById("commuteOcrHint");
 }
 
 function applyCommuteOcrResult(text) {
@@ -111,7 +153,10 @@ function applyCommuteOcrResult(text) {
     }
     if (kmMatch) {
         const kmInput = document.getElementById("commuteKm");
-        if (kmInput) kmInput.value = kmMatch[1].replace(/,/g, "");
+        if (kmInput) {
+            kmInput.value = kmMatch[1].replace(/,/g, "");
+            window.formatKmInput?.(kmInput);
+        }
     }
 
     if (!timeMatch && !kmMatch) {
@@ -168,8 +213,15 @@ window.removeCommuteImg = (event) => {
     document.getElementById("commuteImgPreview").src = "";
     document.getElementById("commuteImgDelBtn").style.display = "none";
 
+    ocrAbortController?.abort();
+    ocrAbortController = null;
+    ocrInFlightImg = null;
+
     const hint = document.getElementById("commuteOcrHint");
-    if (hint) hint.style.display = "none";
+    if (hint) {
+        hint.className = "commute-ocr-hint";
+        hint.textContent = "";
+    }
 };
 
 window.updateOvertime = () => {

@@ -7,7 +7,7 @@
     <title>Work Master Local Pro</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-<link rel="stylesheet" href="work_style.css?v=20260916-3">
+<link rel="stylesheet" href="work_style.css?v=20260917-2">
 </head>
 <body>
 
@@ -260,35 +260,43 @@
     </div>
 
     <div id="commuteModal" class="modal-overlay" style="z-index: 2500;">
-        <div class="modal-box w95-window">
+        <div class="modal-box w95-window commute-modal-box">
             <div class="w95-titlebar">
                 <span id="commuteTitle">출/퇴근 기록</span>
                 <button type="button" class="w95-btn" style="padding:0 6px;" onclick="window.closeCommuteModal()">X</button>
             </div>
-            <div class="modal-content-scroll" style="padding:8px; display:flex; flex-direction:column; gap:6px;">
-                
-                <div style="display:flex; gap:8px; align-items: stretch;">
-                    <div id="commuteThumbZone" style="width: 85px; height: auto; min-height: 105px; border:2px solid var(--w-dark-gray); background:var(--w-white); position:relative; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0; cursor:pointer;" onclick="window.handleCommuteThumbClick(event)">
+            <div class="modal-content-scroll" style="padding:10px; display:flex; flex-direction:column; gap:8px;">
+
+                <div style="display:flex; gap:10px; align-items: stretch;">
+                    <div id="commuteThumbZone" style="width: 118px; height: auto; min-height: 128px; border:2px solid var(--w-dark-gray); background:var(--w-white); position:relative; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0; cursor:pointer;" onclick="window.handleCommuteThumbClick(event)">
                         <span id="commuteNoPhotoText" style="font-size:0.75rem; color:#888; text-align:center; pointer-events:none;">사진 없음</span>
                         <img id="commuteImgPreview" style="display:none; width:100%; height:100%; object-fit:cover; pointer-events:none;">
                         <button type="button" id="commuteImgDelBtn" class="w95-btn" style="display:none; position:absolute; top:0; right:0; width:22px; height:22px; padding:0; font-size:10px; color:red; z-index:10;" onclick="window.removeCommuteImg(event)">X</button>
                     </div>
                     <input type="file" id="commuteImgInput" hidden accept="image/*, .heic" onchange="window.handleCommuteImg(this)">
-                    
-                    <div style="flex:1; display:flex; flex-direction:column; justify-content:space-between; gap:6px;">
-                        <div style="display:flex; gap:4px; align-items:center;">
-                            <input type="text" id="commuteTime" inputmode="numeric" class="m-input w95-in" style="flex:1;" placeholder="시간" onblur="window.formatTimeInput(this); if(window.updateOvertime) window.updateOvertime();" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
-                            <input type="number" id="commuteKm" inputmode="numeric" class="m-input w95-in" style="flex:1;" placeholder="거리(km)">
+
+                    <div style="flex:1; min-width:0; display:flex; flex-direction:column; justify-content:space-between; gap:6px;">
+                        <div style="display:flex; gap:4px; align-items:flex-end;">
+                            <div style="flex:1.1; min-width:0;">
+                                <label class="commute-field-label">시간</label>
+                                <input type="text" id="commuteTime" inputmode="numeric" class="m-input w95-in" style="width:100%;" placeholder="시간" onblur="window.formatTimeInput(this); if(window.updateOvertime) window.updateOvertime();" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
+                            </div>
+                            <div style="flex:0.9; min-width:0;">
+                                <label class="commute-field-label">거리(km)</label>
+                                <input type="text" id="commuteKm" inputmode="numeric" class="m-input w95-in" style="width:100%;" placeholder="거리(km)" oninput="window.formatKmInput(this)">
+                            </div>
                         </div>
                         <div style="display:flex; gap:4px; align-items:center;">
-                            <button type="button" id="editBaseTimeBtn" class="w95-btn icon-btn" style="width:28px; height:32px; flex-shrink:0; padding:0;" onclick="window.toggleEditBaseTime()"><i class="fa-solid fa-pen"></i></button>
-                            <input type="text" id="commuteBaseTime" class="m-input w95-in" style="width:55px; flex-shrink:0; text-align:center;" readonly onblur="window.formatTimeInput(this); if(window.updateOvertime) window.updateOvertime();" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
-                            <input type="text" id="commuteOvertime" class="m-input w95-in" style="flex:1;" readonly placeholder="초과">
+                            <button type="button" id="editBaseTimeBtn" class="w95-btn icon-btn" style="width:26px; height:32px; flex-shrink:0; padding:0;" onclick="window.toggleEditBaseTime()"><i class="fa-solid fa-pen"></i></button>
+                            <input type="text" id="commuteBaseTime" class="m-input w95-in" style="width:58px; flex-shrink:0; text-align:center; padding:0 2px;" readonly onblur="window.formatTimeInput(this); if(window.updateOvertime) window.updateOvertime();" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
+                            <input type="text" id="commuteOvertime" class="m-input w95-in" style="flex:1; min-width:0;" readonly placeholder="초과">
                             <button type="button" id="commuteExceptionBtn" class="w95-btn" style="padding:0 6px; height:32px; flex-shrink:0;" onclick="window.toggleException()">예외</button>
                         </div>
                         <input type="text" id="commuteNote" class="m-input w95-in" placeholder="특이사항 (지각사유 등)">
                     </div>
                 </div>
+
+                <div id="commuteOcrHint" class="commute-ocr-hint"></div>
 
             </div>
             <div class="modal-footer" style="padding:6px; background:var(--w-gray);">
@@ -304,6 +312,21 @@
                 <button type="button" class="w95-btn" style="height:40px; font-size:1.1rem; font-weight:bold;" onclick="window.openSpecificMap('tmap')">T맵</button>
                 <button type="button" class="w95-btn" style="height:40px; font-size:1.1rem; font-weight:bold;" onclick="window.openSpecificMap('naver')">네이버 지도</button>
                 <button type="button" class="w95-btn" style="height:40px; font-size:1.1rem; font-weight:bold;" onclick="window.openSpecificMap('kakaomap')">카카오맵</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="geoRouteModal" class="modal-overlay" style="z-index: 2650;">
+        <div class="modal-box w95-window geo-route-modal-box">
+            <div class="w95-titlebar">
+                <span id="geoRouteTitle">동선 관리</span>
+                <button type="button" class="w95-btn" style="padding:0 6px;" onclick="window.closeGeoRouteModal()">X</button>
+            </div>
+            <div class="modal-content-scroll" style="padding:10px;">
+                <div id="geoRouteList"></div>
+            </div>
+            <div class="modal-footer" style="padding:6px; background:var(--w-gray);">
+                <button type="button" class="w95-btn" style="width:100%; height:32px; font-weight:bold;" onclick="window.closeGeoRouteModal()">닫기</button>
             </div>
         </div>
     </div>
@@ -459,18 +482,19 @@
 </div>
 
 <script src="work_data.js"></script>
-<script src="work_utils.js"></script>
+<script src="work_utils.js?v=20260917-2"></script>
 <script src="work_service.js?v=20260720-4"></script>
-<script src="work_commute.js?v=20260916-1"></script>
+<script src="work_commute.js?v=20260917-1"></script>
 <script src="work_tag_manager.js"></script>
-<script src="work_sync.js?v=20260916-1"></script>
-<script src="work_render.js?v=20260724-43"></script>
+<script src="work_sync.js?v=20260917-2"></script>
+<script src="work_render.js?v=20260917-1"></script>
 <script src="work_ui.js?v=20260916-1"></script>
-<script src="work_modal.js?v=20260722-4"></script>
-<script src="work_logic.js?v=20260916-1"></script>
+<script src="work_modal.js?v=20260917-1"></script>
+<script src="work_logic.js?v=20260917-1"></script>
 <script src="work_timetable.js?v=20260916-3"></script>
-<script src="work_timetable_ui.js?v=20260916-3"></script>
+<script src="work_timetable_ui.js?v=20260917-2"></script>
 <script src="work_photo_insert.js?v=20260916-1"></script>
+<script src="work_georoute.js?v=20260917-1"></script>
 <script src="work_enhancements.js?v=20260916-1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
