@@ -434,23 +434,54 @@ window.setupImageViewer = () => {
     const vImg = document.getElementById('viewerImg');
     if (!viewerImgArea || !vImg) return;
 
+    // transform-origin을 0 0으로 고정해두면 "핀치 중심점을 화면에 고정시키는" 계산이 단순해진다.
+    vImg.style.transformOrigin = '0 0';
+
     let viewerScale = 1; let viewerPointX = 0; let viewerPointY = 0; let viewerPanning = false; let viewerStart = { x: 0, y: 0 }; let viewerDistance = 0;
+    let pinchMidX = 0, pinchMidY = 0;
+
+    const applyTransform = () => {
+        vImg.style.transform = `translate(${viewerPointX}px, ${viewerPointY}px) scale(${viewerScale})`;
+    };
+
+    // 사진을 넘겨도(다음/이전) 지금 확대 배율을 그대로 유지하고, 뷰어를 새로 열 때만 초기화한다.
+    window.resetImageViewerZoom = () => {
+        viewerScale = 1; viewerPointX = 0; viewerPointY = 0;
+        applyTransform();
+    };
+    window.reapplyImageViewerZoom = applyTransform;
 
     viewerImgArea.addEventListener('touchstart', e => {
         e.preventDefault();
-        if (e.touches.length === 2) { viewerDistance = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); } 
+        if (e.touches.length === 2) {
+            viewerDistance = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+            pinchMidX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+            pinchMidY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        }
         else if (e.touches.length === 1) { viewerPanning = true; viewerStart = { x: e.touches[0].clientX - viewerPointX, y: e.touches[0].clientY - viewerPointY }; }
     });
 
     viewerImgArea.addEventListener('touchmove', e => {
         e.preventDefault();
         if (e.touches.length === 2) {
+            const areaRect = viewerImgArea.getBoundingClientRect();
+            const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+            const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
             let dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-            viewerScale = Math.min(Math.max(1, viewerScale * (dist / viewerDistance)), 5); viewerDistance = dist;
-            vImg.style.transform = `translate(${viewerPointX}px, ${viewerPointY}px) scale(${viewerScale})`;
+            const newScale = Math.min(Math.max(1, viewerScale * (dist / viewerDistance)), 5);
+            viewerDistance = dist;
+
+            // 핀치 중심(두 손가락 사이 지점)이 화면상에서 그대로 고정되도록 이동값을 재계산한다.
+            const relX = mx - areaRect.left, relY = my - areaRect.top;
+            const imgX = (relX - viewerPointX) / viewerScale;
+            const imgY = (relY - viewerPointY) / viewerScale;
+            viewerPointX = relX - imgX * newScale;
+            viewerPointY = relY - imgY * newScale;
+            viewerScale = newScale;
+            applyTransform();
         } else if (e.touches.length === 1 && viewerPanning) {
             viewerPointX = e.touches[0].clientX - viewerStart.x; viewerPointY = e.touches[0].clientY - viewerStart.y;
-            vImg.style.transform = `translate(${viewerPointX}px, ${viewerPointY}px) scale(${viewerScale})`;
+            applyTransform();
         }
     });
 
@@ -460,7 +491,7 @@ window.setupImageViewer = () => {
             viewerPanning = false;
             if (viewerScale === 1 && Math.abs(viewerPointX) > 60) {
                 if (viewerPointX > 60) window.changeViewerImage(-1); else if (viewerPointX < -60) window.changeViewerImage(1);
-                viewerPointX = 0; vImg.style.transform = `translate(0px, 0px) scale(1)`;
+                viewerPointX = 0; applyTransform();
             }
         }
     });
@@ -468,7 +499,7 @@ window.setupImageViewer = () => {
     let lastTap = 0;
     viewerImgArea.addEventListener('touchend', e => {
         let currentTime = new Date().getTime(); let tapLength = currentTime - lastTap;
-        if (tapLength < 300 && tapLength > 0 && e.touches.length === 0) { viewerScale = 1; viewerPointX = 0; viewerPointY = 0; vImg.style.transform = `translate(0px, 0px) scale(1)`; e.preventDefault(); }
+        if (tapLength < 300 && tapLength > 0 && e.touches.length === 0) { window.resetImageViewerZoom(); e.preventDefault(); }
         lastTap = currentTime;
     });
 };

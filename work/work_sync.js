@@ -171,6 +171,26 @@ window.uploadToStorage = async function (src, originalName = "") {
     return result.url;
 };
 
+// 출퇴근 사진에서 시간/거리를 자동으로 읽어오는 Google Vision OCR — 서버(worker.js)의
+// /api/ocr로 이미지를 보내면, 실제 Vision API 키는 서버에만 있는 채로 인식된 텍스트만 돌려준다.
+window.runVisionOcr = async function (dataUrlOrBlob) {
+    const blob = typeof dataUrlOrBlob === "string" ? window.dataUrlToBlob(dataUrlOrBlob) : dataUrlOrBlob;
+    const response = await window.fetchWithTimeout(
+        `${WORK_API_BASE}/api/ocr`,
+        {
+            method: "POST",
+            headers: { "Content-Type": blob.type || "application/octet-stream" },
+            body: blob
+        },
+        20000
+    );
+    const text = await response.text();
+    if (!response.ok) throw new Error(`OCR 실패: ${response.status} / ${text}`);
+    const result = text ? JSON.parse(text) : {};
+    if (!result.ok) throw new Error(result.error || "OCR 실패");
+    return result.text || "";
+};
+
 window.migrateImagesInItem = async function (item, uploadedBySource) {
     if (!item || !Array.isArray(item.imgs)) return 0;
     let uploadedCount = 0;

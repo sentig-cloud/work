@@ -1252,7 +1252,14 @@
         }
         return [String(value)];
     };
+    // 검색어 대상 텍스트는 로그 하나당 필드가 많아 꽤 무겁다(중첩 객체 펼치기 포함) — 매 키 입력마다
+    // 전체 로그를 다시 훑으며 매번 새로 만들지 않도록, 로그 객체(참조) 기준으로 결과를 캐시해둔다.
+    // 로그가 수정되면 saveToLocalStore가 항상 새 객체로 교체하므로 캐시는 자연히 무효화된다.
+    const keywordTextCache = new WeakMap();
     const buildLogKeywordText = log => {
+        if (!log) return '';
+        const cached = keywordTextCache.get(log);
+        if (cached !== undefined) return cached;
         const dateTokens = log?.y && log?.m && log?.d
             ? [
                 `${log.y}-${String(log.m).padStart(2, '0')}-${String(log.d).padStart(2, '0')}`,
@@ -1260,7 +1267,7 @@
                 `${log.m}월 ${log.d}일`
             ]
             : [];
-        return [
+        const text = [
             log?.memo, log?.content, log?.note, log?.taskNo, log?.address, log?.customerName,
             log?.commuteNote, log?.taskType, log?.status, log?.workTime, log?.startTime, log?.endTime,
             log?.personalCheck, ...dateTokens,
@@ -1273,6 +1280,8 @@
             ...flattenSearchValues(log?.tagQuantities),
             ...(log?.imgs || []).map(image => image?.originalName || '')
         ].filter(Boolean).join(' ').toLowerCase();
+        keywordTextCache.set(log, text);
+        return text;
     };
     window.doSearch = () => {
         if (window.isSearchEditMode) return;
@@ -1320,6 +1329,13 @@
         }).join('');
         summary.textContent = results.length ? `총 ${results.length}건 검색됨` : '조건에 맞는 기록이 없습니다.';
         summary.style.display = 'block';
+    };
+    // 검색어 입력창 전용 — 타이핑 중 매 글자마다 전체 로그를 다시 훑고 카드들을 다시 그리지
+    // 않도록 살짝 미룬다. 드롭다운 필터 변경 등 다른 호출부는 계속 window.doSearch()를 즉시 쓴다.
+    let searchDebounceTimer = null;
+    window.doSearchDebounced = () => {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => window.doSearch(), 180);
     };
 
     // ─── 카드 다중 선택 / 읽기 쉬운 텍스트 복사 / 시스템 공유(카카오톡 포함) ───

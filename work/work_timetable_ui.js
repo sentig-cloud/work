@@ -99,7 +99,7 @@
         area.innerHTML = `
             <div class="tt-nav w95-out">
                 <button type="button" class="w95-btn icon-btn" id="ttPrevWeekBtn" title="이전 주"><i class="fa-solid fa-chevron-left"></i></button>
-                <span id="ttWeekLabel" class="tt-week-label"></span>
+                <span id="ttWeekLabel" class="tt-week-label" title="탭하면 이번 주로 이동"></span>
                 <button type="button" class="w95-btn icon-btn" id="ttNextWeekBtn" title="다음 주"><i class="fa-solid fa-chevron-right"></i></button>
                 <button type="button" class="w95-btn icon-btn" id="ttUndoNavBtn" style="margin-left:auto;" title="되돌리기" disabled><i class="fa-solid fa-rotate-left"></i></button>
                 <button type="button" class="w95-btn icon-btn" id="ttRedoNavBtn" title="다시 실행" disabled><i class="fa-solid fa-rotate-right"></i></button>
@@ -118,6 +118,7 @@
 
         document.getElementById('ttPrevWeekBtn').addEventListener('click', () => shiftWeek(-1));
         document.getElementById('ttNextWeekBtn').addEventListener('click', () => shiftWeek(1));
+        document.getElementById('ttWeekLabel').addEventListener('click', goToCurrentWeek);
         document.getElementById('ttSettingsBtn').addEventListener('click', openSettingsModal);
         document.getElementById('ttUndoBtn').addEventListener('click', performUndo);
         document.getElementById('ttUndoNavBtn').addEventListener('click', performUndo);
@@ -262,6 +263,11 @@
                         <label class="tt-settings-check"><input type="radio" name="ttGridPattern" id="ttOptGridPatternNone" value="none"> 없음</label>
                         <label class="tt-settings-check"><input type="radio" name="ttGridPattern" id="ttOptGridPatternChecker" value="checker"> 바둑판 무늬</label>
                     </div>
+                    <div class="tt-settings-group-title">사진 자동 인식</div>
+                    <div class="tt-settings-section">
+                        <div class="tt-settings-label">구글 비전(OCR) — 출퇴근 사진에서 시간/거리 자동 인식</div>
+                        <label class="tt-settings-check"><input type="checkbox" id="ttOptVisionOcr"> 켜기(서버에 API 키 설정 필요)</label>
+                    </div>
                 </div>
                 <div class="modal-footer" style="padding:6px; background:var(--w-gray);">
                     <button type="button" class="w95-btn" id="ttSettingsSaveBtn" style="width:100%; height:32px; font-weight:bold; color:var(--w-blue);">저장</button>
@@ -283,6 +289,7 @@
         document.getElementById(`ttOptScale${s.scale.charAt(0).toUpperCase()}${s.scale.slice(1)}`).checked = true;
         document.getElementById(s.longNameMode === 'ellipsis' ? 'ttOptLongNameEllipsis' : 'ttOptLongNameWrap').checked = true;
         document.getElementById(s.gridPattern === 'checker' ? 'ttOptGridPatternChecker' : 'ttOptGridPatternNone').checked = true;
+        document.getElementById('ttOptVisionOcr').checked = !!window.isVisionOcrEnabled?.();
         document.getElementById('ttSettingsModal').style.display = 'flex';
     }
     function closeSettingsModal() {
@@ -305,6 +312,7 @@
             longNameMode: longNameEl ? longNameEl.value : 'wrap',
             gridPattern: gridPatternEl ? gridPatternEl.value : 'none'
         });
+        window.setVisionOcrEnabled?.(document.getElementById('ttOptVisionOcr').checked);
         closeSettingsModal();
         if (active) { applyScaleClass(); renderWeek(); }
     }
@@ -369,6 +377,12 @@
         const d = new Date(currentMonday);
         d.setDate(d.getDate() + delta * 7);
         currentMonday = d;
+        renderWeek();
+    }
+
+    // 주 범위 표시("2026.09.14 ~ 09.20")를 탭하면 오늘이 속한 주로 바로 이동한다.
+    function goToCurrentWeek() {
+        currentMonday = WT.mondayOf(new Date());
         renderWeek();
     }
 
