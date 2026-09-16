@@ -235,6 +235,30 @@ window.geocodeAddress = async function (address, signal = null) {
     return result;
 };
 
+// 현재 위치 → 목적지 자동차 길찾기(카카오 모빌리티, 동선 관리의 소요시간 표시용) —
+// 서버(worker.js)의 /api/directions로 좌표만 보내면, 카카오 REST API 키는 서버에만
+// 있는 채로 거리(m)/소요시간(초)만 돌려준다.
+window.fetchDrivingRoute = async function (originLat, originLng, destLat, destLng, signal = null) {
+    const response = await window.fetchWithTimeout(
+        `${WORK_API_BASE}/api/directions`,
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ originLat, originLng, destLat, destLng }),
+            signal
+        },
+        15000
+    );
+    const text = await response.text();
+    const result = text ? JSON.parse(text) : {};
+    if (!response.ok || !result.ok) {
+        const err = new Error(result.error || `길찾기 실패: ${response.status}`);
+        err.notFound = !!result.notFound;
+        throw err;
+    }
+    return result;
+};
+
 window.migrateImagesInItem = async function (item, uploadedBySource) {
     if (!item || !Array.isArray(item.imgs)) return 0;
     let uploadedCount = 0;

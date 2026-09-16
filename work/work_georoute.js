@@ -2,9 +2,10 @@
 // 주간표 요일 헤더 / 월간 달력 날짜를 롱프레스하면, 그날 등록된 카드들의 주소를 모아
 // 좌표로 변환하고(카카오 지오코딩), 순서·거리와 함께 미니 카카오맵에 번호 핀으로 찍어
 // 보여주는 "동선 관리" 팝업을 연다. 지도의 번호 핀을 누르면 그 지점 하나만, 빈 공간을
-// 누르면 그날 전체 동선을 순서대로 보여준다. 목록의 길찾기 아이콘은 작업일지 상의
-// 지도 버튼(startMapPress/endMapPress)과 똑같이 짧게 누르면 앱 선택 팝업, 길게 누르면
-// 마지막에 쓴 지도 앱으로 바로 이동한다.
+// 누르면 그날 전체 동선을 순서대로 보여준다. 각 항목에는 현재 위치에서 그곳까지 자동차로
+// 걸리는 시간(카카오 모빌리티 실시간 길찾기)이 같이 표시된다. 목록의 길찾기 아이콘은
+// 작업일지 상의 지도 버튼(startMapPress/endMapPress)과 똑같이 짧게 누르면 앱 선택 팝업,
+// 길게 누르면 마지막에 쓴(또는 설정에서 고른) 지도 앱으로 바로 이동한다.
 
 function escapeHtml(str) {
     return String(str == null ? '' : str).replace(/[&<>"']/g, ch => ({
@@ -36,11 +37,9 @@ let geoRouteCurrentResults = [];
 let geoRouteCurrentTotal = 0;
 let geoRouteSelectedIdx = null; // null = 전체 동선 보기, 숫자면 그 지점만 보기
 
-// ─── 현재 위치 → 자동차 이동시간(추정) ───
-// 실제 도로/교통 기반 경로 API가 아니라 직선거리 기준의 대략치임을 항상 문구로 밝힌다.
-const ROUGH_CAR_SPEED_KMH = 28;
-function formatEtaMinutes(distanceKm) {
-    const minutes = Math.max(1, Math.round((distanceKm / ROUGH_CAR_SPEED_KMH) * 60));
+// ─── 현재 위치 → 자동차 이동시간(카카오 모빌리티 실제 도로/교통 기반 길찾기) ───
+function formatDurationSec(sec) {
+    const minutes = Math.max(1, Math.round(sec / 60));
     if (minutes < 60) return `${minutes}분`;
     return `${Math.floor(minutes / 60)}시간 ${minutes % 60}분`;
 }
@@ -169,8 +168,8 @@ function renderGeoRouteDateChips(year, month, day) {
 }
 
 // ─── 목록 카드 ───
-function buildItemCardHtml(item, idx, opts) {
-    const { log, address, geo } = item;
+function buildItemCardHtml(item, idx) {
+    const { log, address, geo, eta } = item;
     const hasCoords = !!(geo && geo.ok && typeof geo.lat === 'number' && typeof geo.lng === 'number');
     const timeText = log.workTime || log.time || '';
     const nameText = log.customerName || log.content || log.taskType || '';
@@ -179,24 +178,23 @@ function buildItemCardHtml(item, idx, opts) {
         ? (resolvedAddr ? `<div class="geo-route-address-resolved">${escapeHtml(resolvedAddr)}</div>` : '')
         : `<div class="geo-route-address-failed">⚠ 위치를 찾지 못했습니다${geo?.error ? ` (${escapeHtml(geo.error)})` : ''}</div>`;
 
+    // 현재 위치 → 이 지점까지 자동차 소요시간(카카오 모빌리티). 아직 계산 전이면 비워둔다.
+    const etaHtml = (eta && eta.ok && typeof eta.durationSec === 'number')
+        ? `<span class="geo-route-eta" title="현재 위치에서 자동차로 약 ${formatDurationSec(eta.durationSec)}"><i class="fa-solid fa-car"></i> ${formatDurationSec(eta.durationSec)}</span>`
+        : '';
+
     const navBtn = hasCoords
         ? `<button type="button" class="w95-btn geo-route-nav-icon-btn" data-lat="${geo.lat}" data-lng="${geo.lng}" data-addr="${escapeHtml(resolvedAddr || address)}" title="길찾기"><i class="fa-solid fa-diamond-turn-right"></i></button>`
         : '';
-
-    let locLineHtml = '';
-    if (opts.showCurrentLocLine && hasCoords && geoRouteUserLocation) {
-        const d = window.haversineKm(geoRouteUserLocation.lat, geoRouteUserLocation.lng, geo.lat, geo.lng);
-        locLineHtml = `<div class="geo-route-current-loc">📍 현재 위치에서 자동차로 약 ${d.toFixed(1)}km · 약 ${formatEtaMinutes(d)} (직선거리 기준 추정)</div>`;
-    }
 
     return `<div class="geo-route-item">
         <div class="geo-route-item-head">
             <span class="geo-route-order">${idx + 1}</span>
             ${timeText ? `<span class="geo-route-time">${escapeHtml(timeText)}</span>` : ''}
             ${nameText ? `<span class="geo-route-name">${escapeHtml(nameText)}</span>` : ''}
+            ${etaHtml}
             ${navBtn}
         </div>
-        ${locLineHtml}
         <div class="geo-route-address-original">${escapeHtml(address)}</div>
         ${statusHtml}
     </div>`;
@@ -229,7 +227,7 @@ function renderGeoRouteList() {
         const idx = geoRouteSelectedIdx;
         list.innerHTML =
             `<div class="geo-route-back-all">← 전체 동선 보기 (${geoRouteCurrentTotal}건)</div>` +
-            buildItemCardHtml(results[idx], idx, { showCurrentLocLine: true });
+            buildItemCardHtml(results[idx], idx);
         wireGeoRouteListInteractions(list);
         const backBtn = list.querySelector('.geo-route-back-all');
         if (backBtn) backBtn.addEventListener('click', () => {
@@ -241,7 +239,6 @@ function renderGeoRouteList() {
         return;
     }
 
-    const firstCoordIdx = results.findIndex(r => r.geo && r.geo.ok && typeof r.geo.lat === 'number');
     let prevPoint = null;
     let totalKm = 0;
 
@@ -255,7 +252,7 @@ function renderGeoRouteList() {
             distanceHtml = `<div class="geo-route-distance">↓ 이전 지점에서 약 ${d.toFixed(1)}km</div>`;
         }
         if (hasCoords) prevPoint = geo;
-        return `${distanceHtml}${buildItemCardHtml(item, idx, { showCurrentLocLine: idx === firstCoordIdx })}`;
+        return `${distanceHtml}${buildItemCardHtml(item, idx)}`;
     }).join('');
 
     const pendingCount = geoRouteCurrentTotal - results.length;
@@ -282,10 +279,7 @@ window.openGeoRouteModal = async (year, month, day) => {
     title.textContent = `동선 관리 · ${month}/${day}(${weekday})`;
     modal.style.display = 'flex';
     renderGeoRouteDateChips(year, month, day);
-
-    ensureUserLocation().then(loc => {
-        if (myRequestId === geoRouteRequestId && loc) renderGeoRouteList();
-    });
+    ensureUserLocation(); // 위치 권한 요청을 미리 시작해둔다 (지오코딩과 병렬로 진행)
 
     const dayLogs = (window.logs || [])
         .filter(l => l && l.y === year && l.m === month && l.d === day && l.address && String(l.address).trim())
@@ -315,9 +309,25 @@ window.openGeoRouteModal = async (year, month, day) => {
         }
         // 그 사이 다른 날짜로 다시 열었으면 이 결과는 버린다 (중복/반복 렌더 방지)
         if (myRequestId !== geoRouteRequestId) return;
-        geoRouteCurrentResults.push({ log, address, geo });
+        geoRouteCurrentResults.push({ log, address, geo, eta: undefined });
         renderGeoRouteList();
         updateGeoRouteMap(geoRouteCurrentResults);
+    }
+
+    // 주소 지오코딩이 모두 끝난 뒤, 현재 위치 기준 자동차 소요시간을 순서대로 채운다.
+    // (위치 요청은 위에서 미리 시작해뒀으니 대부분 이미 끝나있거나 곧 끝난다)
+    const userLoc = await ensureUserLocation();
+    if (myRequestId !== geoRouteRequestId || !userLoc) return;
+    for (const item of geoRouteCurrentResults) {
+        if (myRequestId !== geoRouteRequestId) return;
+        if (!(item.geo && item.geo.ok)) { item.eta = null; continue; }
+        try {
+            item.eta = await window.fetchDrivingRoute(userLoc.lat, userLoc.lng, item.geo.lat, item.geo.lng);
+        } catch (e) {
+            item.eta = null;
+        }
+        if (myRequestId !== geoRouteRequestId) return;
+        renderGeoRouteList();
     }
 };
 

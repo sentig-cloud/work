@@ -232,42 +232,58 @@
         modal.className = 'modal-overlay';
         modal.style.zIndex = '2650';
         modal.innerHTML = `
-            <div class="modal-box w95-window" style="max-width:280px;">
+            <div class="modal-box w95-window" style="max-width:330px;">
                 <div class="w95-titlebar"><span>메인 설정</span><button type="button" class="w95-btn" id="ttSettingsCloseBtn">X</button></div>
                 <div class="tt-settings-body">
-                    <div class="tt-settings-section">
-                        <div class="tt-settings-label">타임테이블에 표시</div>
-                        <label class="tt-settings-check"><input type="checkbox" id="ttOptCatWork"> 작업</label>
-                        <label class="tt-settings-check"><input type="checkbox" id="ttOptCatCommute"> 출퇴근</label>
-                        <label class="tt-settings-check"><input type="checkbox" id="ttOptCatMemo"> 메모/사진</label>
+                    <div class="tt-settings-group">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-table-cells"></i> 타임테이블</div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">표시할 항목</div>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptCatWork"> 작업</label>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptCatCommute"> 출퇴근</label>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptCatMemo"> 메모/사진</label>
+                        </div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">기본 진입 뷰</div>
+                            <label class="tt-settings-check"><input type="radio" name="ttDefaultView" id="ttOptViewMonth" value="month"> 월간 달력</label>
+                            <label class="tt-settings-check"><input type="radio" name="ttDefaultView" id="ttOptViewTimetable" value="timetable"> 주간 시간표</label>
+                        </div>
                     </div>
-                    <div class="tt-settings-section">
-                        <div class="tt-settings-label">기본 진입 뷰</div>
-                        <label class="tt-settings-check"><input type="radio" name="ttDefaultView" id="ttOptViewMonth" value="month"> 월간 달력</label>
-                        <label class="tt-settings-check"><input type="radio" name="ttDefaultView" id="ttOptViewTimetable" value="timetable"> 주간 시간표</label>
+                    <div class="tt-settings-group">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-eye"></i> 시인성</div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">표시 크기(시간/줄/글씨)</div>
+                            <label class="tt-settings-check"><input type="radio" name="ttScale" id="ttOptScaleSmall" value="small"> 작게</label>
+                            <label class="tt-settings-check"><input type="radio" name="ttScale" id="ttOptScaleMedium" value="medium"> 보통</label>
+                            <label class="tt-settings-check"><input type="radio" name="ttScale" id="ttOptScaleLarge" value="large"> 크게</label>
+                        </div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">긴 이름 표시</div>
+                            <label class="tt-settings-check"><input type="radio" name="ttLongName" id="ttOptLongNameWrap" value="wrap"> 줄바꿈(칸 높이 늘어남)</label>
+                            <label class="tt-settings-check"><input type="radio" name="ttLongName" id="ttOptLongNameEllipsis" value="ellipsis"> 말줄임(한 줄, ...)</label>
+                        </div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">격자 무늬(칸 구분)</div>
+                            <label class="tt-settings-check"><input type="radio" name="ttGridPattern" id="ttOptGridPatternNone" value="none"> 없음</label>
+                            <label class="tt-settings-check"><input type="radio" name="ttGridPattern" id="ttOptGridPatternChecker" value="checker"> 바둑판 무늬</label>
+                        </div>
                     </div>
-                    <div class="tt-settings-group-title">시인성</div>
-                    <div class="tt-settings-section">
-                        <div class="tt-settings-label">표시 크기(시간/줄/글씨)</div>
-                        <label class="tt-settings-check"><input type="radio" name="ttScale" id="ttOptScaleSmall" value="small"> 작게</label>
-                        <label class="tt-settings-check"><input type="radio" name="ttScale" id="ttOptScaleMedium" value="medium"> 보통</label>
-                        <label class="tt-settings-check"><input type="radio" name="ttScale" id="ttOptScaleLarge" value="large"> 크게</label>
+                    <div class="tt-settings-group">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-diamond-turn-right"></i> 지도 · 내비게이션</div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">기본 지도 앱 (길게 눌러 바로 이동할 때 사용)</div>
+                            <label class="tt-settings-check"><input type="radio" name="ttDefaultMap" id="ttOptMapTmap" value="tmap"> T맵</label>
+                            <label class="tt-settings-check"><input type="radio" name="ttDefaultMap" id="ttOptMapNaver" value="naver"> 네이버지도</label>
+                            <label class="tt-settings-check"><input type="radio" name="ttDefaultMap" id="ttOptMapKakao" value="kakaomap"> 카카오맵</label>
+                        </div>
                     </div>
-                    <div class="tt-settings-section">
-                        <div class="tt-settings-label">긴 이름 표시</div>
-                        <label class="tt-settings-check"><input type="radio" name="ttLongName" id="ttOptLongNameWrap" value="wrap"> 줄바꿈(칸 높이 늘어남)</label>
-                        <label class="tt-settings-check"><input type="radio" name="ttLongName" id="ttOptLongNameEllipsis" value="ellipsis"> 말줄임(한 줄, ...)</label>
-                    </div>
-                    <div class="tt-settings-section">
-                        <div class="tt-settings-label">격자 무늬(칸 구분)</div>
-                        <label class="tt-settings-check"><input type="radio" name="ttGridPattern" id="ttOptGridPatternNone" value="none"> 없음</label>
-                        <label class="tt-settings-check"><input type="radio" name="ttGridPattern" id="ttOptGridPatternChecker" value="checker"> 바둑판 무늬</label>
-                    </div>
-                    <div class="tt-settings-group-title">사진 자동 인식</div>
-                    <div class="tt-settings-section">
-                        <div class="tt-settings-label">구글 비전(OCR) — 출퇴근 사진에서 시간/거리 자동 인식</div>
-                        <label class="tt-settings-check"><input type="checkbox" id="ttOptVisionOcr"> 켜기(서버에 API 키 설정 필요)</label>
-                        <div id="ttVisionOcrUsage" class="tt-settings-usage"></div>
+                    <div class="tt-settings-group">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-camera"></i> 자동 인식</div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">구글 비전(OCR) — 출퇴근 사진에서 시간/거리 자동 인식</div>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptVisionOcr"> 켜기(서버에 API 키 설정 필요)</label>
+                            <div id="ttVisionOcrUsage" class="tt-settings-usage"></div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer" style="padding:6px; background:var(--w-gray);">
@@ -292,6 +308,9 @@
         document.getElementById(s.gridPattern === 'checker' ? 'ttOptGridPatternChecker' : 'ttOptGridPatternNone').checked = true;
         document.getElementById('ttOptVisionOcr').checked = !!window.isVisionOcrEnabled?.();
         window.refreshVisionOcrUsageDisplay?.();
+        const defaultMap = localStorage.getItem('wm_default_map') || 'naver';
+        const mapOptIds = { tmap: 'ttOptMapTmap', naver: 'ttOptMapNaver', kakaomap: 'ttOptMapKakao' };
+        document.getElementById(mapOptIds[defaultMap] || 'ttOptMapNaver').checked = true;
         document.getElementById('ttSettingsModal').style.display = 'flex';
     }
     function closeSettingsModal() {
@@ -315,6 +334,8 @@
             gridPattern: gridPatternEl ? gridPatternEl.value : 'none'
         });
         window.setVisionOcrEnabled?.(document.getElementById('ttOptVisionOcr').checked);
+        const defaultMapEl = document.querySelector('input[name="ttDefaultMap"]:checked');
+        if (defaultMapEl) localStorage.setItem('wm_default_map', defaultMapEl.value);
         closeSettingsModal();
         if (active) { applyScaleClass(); renderWeek(); }
     }
