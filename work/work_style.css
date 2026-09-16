@@ -1413,18 +1413,22 @@ input, textarea, [contenteditable="true"] {
 }
 .tt-settings-group-title i { width:16px; text-align:center; }
 .tt-settings-usage { font-size:0.72rem; color:var(--w-dark-gray); padding-left:22px; min-height:1em; }
+.tt-settings-icon-row { display:flex; gap:6px; }
+.tt-icon-choice-btn { width:38px; height:38px; padding:0; font-size:1.2rem; }
+.tt-icon-choice-btn.is-active { background:var(--w-blue) !important; box-shadow:inset 2px 2px #000, inset -1px -1px #fff; }
 
 /* ─── 동선 관리(주소 지오코딩) 팝업 (work_georoute.js) ─── */
 .geo-route-modal-box { max-width: 480px; }
 .geo-route-date-chips {
     display:flex; gap:4px; padding:6px 8px; background:var(--w-gray);
-    border-bottom:2px solid var(--w-dark-gray); overflow-x:auto; flex-shrink:0;
+    border-bottom:2px solid var(--w-dark-gray); overflow-x:auto; flex-shrink:0; align-items:center;
 }
+.geo-route-week-nav-btn { width:26px; height:34px; padding:0; flex-shrink:0; }
 .geo-route-date-chip {
     flex:1; min-width:0; height:34px; padding:0 2px; font-size:0.72rem; font-weight:bold;
     display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.2;
 }
-.geo-route-date-chip.is-active { color:#fff; background:var(--w-blue) !important; }
+.geo-route-date-chip.is-active { color:#fff; }
 #geoRouteMap {
     width:100%; height:200px; flex-shrink:0; background:var(--w-white);
     border-bottom:2px solid var(--w-dark-gray);
@@ -1436,8 +1440,10 @@ input, textarea, [contenteditable="true"] {
     color:#fff; font-weight:bold; font-size:0.8rem; cursor:pointer;
 }
 .geo-route-map-pin span { transform:rotate(45deg); }
-.geo-route-map-pin.is-failed { background:#dc2626; }
-.geo-route-map-pin.is-selected { background:#f59e0b; }
+.geo-route-my-location {
+    font-size:1.4rem; line-height:1; transform:translateY(-4px);
+    filter:drop-shadow(0 2px 2px rgba(0,0,0,0.5));
+}
 .geo-route-list-scroll { padding:10px; max-height:340px; overflow-y:auto; }
 .geo-route-empty { text-align:center; color:#666; font-size:0.9rem; padding:20px 8px; }
 .geo-route-back-all {
@@ -1452,25 +1458,27 @@ input, textarea, [contenteditable="true"] {
 .geo-route-item {
     background:var(--w-white); border:2px solid var(--w-dark-gray);
     box-shadow: inset -1px -1px var(--w-black), inset 1px 1px #fff;
-    padding:8px; margin-bottom:8px; display:flex; flex-direction:column; gap:4px;
+    padding:8px; margin-bottom:8px; display:flex; flex-direction:column; gap:4px; cursor:pointer;
 }
-.geo-route-item-head { display:flex; align-items:center; gap:6px; }
+.geo-route-day-tag {
+    align-self:flex-start; font-size:0.68rem; font-weight:bold; color:#fff;
+    padding:1px 6px; border-radius:3px;
+}
+.geo-route-item-head { display:flex; align-items:flex-start; gap:6px; }
 .geo-route-order {
     display:inline-flex; align-items:center; justify-content:center;
     width:20px; height:20px; border-radius:50%; background:var(--w-blue); color:#fff;
     font-size:0.75rem; font-weight:bold; flex-shrink:0;
 }
-.geo-route-time { font-weight:bold; color:var(--w-blue); font-size:0.85rem; flex-shrink:0; }
-.geo-route-name { font-weight:bold; color:#1f2937; font-size:0.85rem; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.geo-route-time { font-weight:bold; color:var(--w-blue); font-size:0.85rem; flex-shrink:0; padding-top:2px; }
+.geo-route-name {
+    font-weight:bold; color:#1f2937; font-size:0.85rem; flex:1 1 60px; min-width:60px;
+    white-space:normal; overflow-wrap:break-word; padding-top:2px;
+}
 .geo-route-address-original { font-size:0.85rem; color:#333; }
 .geo-route-address-resolved { font-size:0.78rem; color:#166534; font-weight:bold; }
 .geo-route-address-failed { font-size:0.78rem; color:#b91c1c; font-weight:bold; }
-.geo-route-distance { text-align:center; font-size:0.75rem; color:#666; margin:2px 0; }
 .geo-route-nav-icon-btn { width:28px; height:28px; padding:0; flex-shrink:0; color:var(--w-blue); font-size:0.95rem; }
-.geo-route-summary {
-    text-align:center; font-weight:bold; font-size:0.85rem; color:#1f2937;
-    background:var(--w-gray); border:2px solid var(--w-dark-gray); padding:8px; margin-top:4px;
-}
 
 /* ─── 사진 먼저 담고 나중에 넣기 (work_photo_insert.js) ─── */
 .pi-pending-strip { background:var(--w-gray); border-bottom:2px solid var(--w-black); padding:8px; flex-shrink:0; }
