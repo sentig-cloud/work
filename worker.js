@@ -406,21 +406,7 @@ export default {
         }
 
         if (!doc) {
-          // 임시 디버그 정보 — 원인 파악되면 제거 예정
-          return json({
-            ok: false,
-            error: "주소를 찾지 못했습니다",
-            notFound: true,
-            debug: {
-              receivedAddress: address,
-              keyLength: env.KAKAO_REST_API_KEY.length,
-              keyPreview: env.KAKAO_REST_API_KEY.slice(0, 4) + "..." + env.KAKAO_REST_API_KEY.slice(-4),
-              addrStatus: addrResponse.status,
-              addrMeta: addrResult?.meta,
-              addrErrorType: addrResult?.errorType,
-              addrErrorMessage: addrResult?.message
-            }
-          });
+          return json({ ok: false, error: "주소를 찾지 못했습니다", notFound: true });
         }
 
         return json({
