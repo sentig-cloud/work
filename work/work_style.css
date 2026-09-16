@@ -1409,6 +1409,15 @@ input, textarea, [contenteditable="true"] {
 
 /* ─── 동선 관리(주소 지오코딩) 팝업 (work_georoute.js) ─── */
 .geo-route-modal-box { max-width: 480px; }
+.geo-route-date-chips {
+    display:flex; gap:4px; padding:6px 8px; background:var(--w-gray);
+    border-bottom:2px solid var(--w-dark-gray); overflow-x:auto; flex-shrink:0;
+}
+.geo-route-date-chip {
+    flex:1; min-width:0; height:34px; padding:0 2px; font-size:0.72rem; font-weight:bold;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.2;
+}
+.geo-route-date-chip.is-active { color:#fff; background:var(--w-blue) !important; }
 #geoRouteMap {
     width:100%; height:200px; flex-shrink:0; background:var(--w-white);
     border-bottom:2px solid var(--w-dark-gray);
@@ -1421,7 +1430,17 @@ input, textarea, [contenteditable="true"] {
 }
 .geo-route-map-pin span { transform:rotate(45deg); }
 .geo-route-map-pin.is-failed { background:#dc2626; }
+.geo-route-map-pin.is-selected { background:#f59e0b; }
+.geo-route-list-scroll { padding:10px; max-height:340px; overflow-y:auto; }
 .geo-route-empty { text-align:center; color:#666; font-size:0.9rem; padding:20px 8px; }
+.geo-route-back-all {
+    text-align:center; font-size:0.8rem; font-weight:bold; color:var(--w-blue);
+    text-decoration:underline dotted; padding:4px 0 8px; cursor:pointer;
+}
+.geo-route-current-loc {
+    font-size:0.75rem; color:#0f766e; font-weight:bold; background:#f0fdfa;
+    border:1px solid #14b8a6; padding:4px 6px; margin:2px 0;
+}
 .geo-route-item {
     background:var(--w-white); border:2px solid var(--w-dark-gray);
     box-shadow: inset -1px -1px var(--w-black), inset 1px 1px #fff;
@@ -1433,16 +1452,13 @@ input, textarea, [contenteditable="true"] {
     width:20px; height:20px; border-radius:50%; background:var(--w-blue); color:#fff;
     font-size:0.75rem; font-weight:bold; flex-shrink:0;
 }
-.geo-route-time { font-weight:bold; color:var(--w-blue); font-size:0.85rem; }
+.geo-route-time { font-weight:bold; color:var(--w-blue); font-size:0.85rem; flex-shrink:0; }
 .geo-route-name { font-weight:bold; color:#1f2937; font-size:0.85rem; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .geo-route-address-original { font-size:0.85rem; color:#333; }
 .geo-route-address-resolved { font-size:0.78rem; color:#166534; font-weight:bold; }
 .geo-route-address-failed { font-size:0.78rem; color:#b91c1c; font-weight:bold; }
 .geo-route-distance { text-align:center; font-size:0.75rem; color:#666; margin:2px 0; }
-.geo-route-nav-btn {
-    align-self:flex-start; height:30px; padding:0 10px; font-weight:bold;
-    color:var(--w-blue); display:flex; align-items:center; gap:6px; margin-top:2px;
-}
+.geo-route-nav-icon-btn { width:28px; height:28px; padding:0; flex-shrink:0; color:var(--w-blue); font-size:0.95rem; }
 .geo-route-summary {
     text-align:center; font-weight:bold; font-size:0.85rem; color:#1f2937;
     background:var(--w-gray); border:2px solid var(--w-dark-gray); padding:8px; margin-top:4px;
