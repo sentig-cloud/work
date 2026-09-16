@@ -415,7 +415,11 @@
                 </div>`;
             }).join('');
             headerRow.querySelectorAll('.tt-day-header').forEach(el => {
-                el.addEventListener('click', () => onDayHeaderClick(days[Number(el.dataset.dayIdx)]));
+                const date = days[Number(el.dataset.dayIdx)];
+                el.addEventListener('click', () => onDayHeaderClick(date));
+                window.attachLongPress?.(el, () => {
+                    window.openGeoRouteModal?.(date.getFullYear(), date.getMonth() + 1, date.getDate());
+                });
             });
         }
 

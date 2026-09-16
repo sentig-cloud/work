@@ -1,5 +1,50 @@
 // work_utils.js
-window.getCurrentTimeString = () => { 
+
+// 탭(클릭)과 별개로 롱프레스를 인식시키는 공용 헬퍼. 롱프레스가 발동하면 그 뒤에 이어지는
+// click 이벤트를 한 번 눌러서 기존 탭 동작(예: 날짜 이동)이 같이 실행되지 않게 막는다.
+window.attachLongPress = (el, onLongPress, opts = {}) => {
+    if (!el) return;
+    const threshold = opts.threshold || 550;
+    const slop = opts.slop || 10;
+    let timer = null, startX = 0, startY = 0, suppressClick = false;
+    const clearTimer = () => { if (timer) { clearTimeout(timer); timer = null; } };
+    el.addEventListener('pointerdown', (e) => {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        startX = e.clientX; startY = e.clientY;
+        clearTimer();
+        timer = setTimeout(() => {
+            timer = null;
+            suppressClick = true;
+            onLongPress(e);
+        }, threshold);
+    });
+    el.addEventListener('pointermove', (e) => {
+        if (!timer) return;
+        if (Math.abs(e.clientX - startX) > slop || Math.abs(e.clientY - startY) > slop) clearTimer();
+    });
+    el.addEventListener('pointerup', clearTimer);
+    el.addEventListener('pointercancel', clearTimer);
+    el.addEventListener('click', (e) => {
+        if (suppressClick) {
+            suppressClick = false;
+            e.stopPropagation();
+            e.preventDefault();
+        }
+    }, true);
+};
+
+// 두 좌표 사이의 직선거리(km) — 동선 요약용 (Haversine 공식)
+window.haversineKm = (lat1, lng1, lat2, lng2) => {
+    const toRad = deg => deg * Math.PI / 180;
+    const R = 6371;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+window.getCurrentTimeString = () => {
     let now = new Date(); 
     return String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0'); 
 };

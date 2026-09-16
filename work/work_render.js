@@ -140,7 +140,7 @@ window.renderCal = (year, month) => {
         let hasOut = dayLogs.some(l => l.cat === 'commute_out' && l.outTime);
         let greenDotHtml = (hasIn && hasOut) ? `<div style="width:6px; height:6px; background-color:#10b981; border-radius:50%; box-shadow:0 1px 2px rgba(0,0,0,0.3);"></div>` : '';
 
-        html += `<td onclick="window.setCurDay(${d})" style="${d === window.curDay ? 'background:#eff6ff;border:2px solid #000; box-shadow: inset 1px 1px #fff;' : ''}">
+        html += `<td onclick="window.setCurDay(${d})" data-day="${d}" style="${d === window.curDay ? 'background:#eff6ff;border:2px solid #000; box-shadow: inset 1px 1px #fff;' : ''}">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; padding:2px; gap:2px;">
                 <span style="${dayStyle}">${d}</span>
                 ${holName}
@@ -153,6 +153,12 @@ window.renderCal = (year, month) => {
         if ((d + first) % 7 === 0) html += "</tr><tr>";
     }
     body.innerHTML = html + "</tr>";
+    // 날짜 칸 롱프레스 → 그날 등록된 카드들의 주소로 동선 관리 팝업 열기
+    body.querySelectorAll('td[data-day]').forEach(td => {
+        window.attachLongPress?.(td, () => {
+            window.openGeoRouteModal?.(year, month + 1, Number(td.dataset.day));
+        });
+    });
     window.updateUI();
 };
 

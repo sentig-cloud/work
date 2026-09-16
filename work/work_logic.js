@@ -104,9 +104,13 @@ window.toggleLogOx = (id) => {
 };
 
 window.openSpecificMap = (appType) => {
-    const address = document.getElementById("workAddress").value.trim();
+    // 동선 관리 팝업 등에서 좌표를 미리 지정해뒀으면(window.pendingMapTarget) 주소 검색 대신
+    // 좌표 기반 길찾기로 바로 연결한다 — 검색 결과가 엉뚱한 곳으로 잡히는 걸 막고 더 정확하다.
+    const target = window.pendingMapTarget;
+    const address = (target?.address || document.getElementById("workAddress").value || "").trim();
+    const hasCoords = !!(target && typeof target.lat === "number" && typeof target.lng === "number");
 
-    if (!address) {
+    if (!address && !hasCoords) {
         alert("주소를 입력해주세요.");
         return;
     }
@@ -119,14 +123,21 @@ window.openSpecificMap = (appType) => {
     let fallbackUrl = "";
 
     if (appType === "tmap") {
-        url = `tmap://search?name=${encodedAddress}`;
+        url = hasCoords
+            ? `tmap://route?goalname=${encodedAddress}&goalx=${target.lng}&goaly=${target.lat}`
+            : `tmap://search?name=${encodedAddress}`;
     } else if (appType === "naver") {
-        url = `nmap://search?query=${encodedAddress}&appname=workmaster`;
+        url = hasCoords
+            ? `nmap://route/car?dlat=${target.lat}&dlng=${target.lng}&dname=${encodedAddress}&appname=workmaster`
+            : `nmap://search?query=${encodedAddress}&appname=workmaster`;
     } else if (appType === "kakaomap") {
-        url = `kakaomap://search?q=${encodedAddress}`;
-        fallbackUrl = `https://map.kakao.com/link/search/${encodedAddress}`;
+        url = hasCoords ? `kakaomap://route?ep=${target.lat},${target.lng}&by=CAR` : `kakaomap://search?q=${encodedAddress}`;
+        fallbackUrl = hasCoords
+            ? `https://map.kakao.com/link/to/${encodedAddress},${target.lat},${target.lng}`
+            : `https://map.kakao.com/link/search/${encodedAddress}`;
     }
 
+    window.pendingMapTarget = null;
     if (url) window.launchWorkExternalApp?.(url, fallbackUrl, appType);
 };
 

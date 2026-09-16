@@ -7,7 +7,7 @@
     <title>Work Master Local Pro</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-<link rel="stylesheet" href="work_style.css?v=20260917-1">
+<link rel="stylesheet" href="work_style.css?v=20260917-2">
 </head>
 <body>
 
@@ -316,6 +316,21 @@
         </div>
     </div>
 
+    <div id="geoRouteModal" class="modal-overlay" style="z-index: 2650;">
+        <div class="modal-box w95-window geo-route-modal-box">
+            <div class="w95-titlebar">
+                <span id="geoRouteTitle">동선 관리</span>
+                <button type="button" class="w95-btn" style="padding:0 6px;" onclick="window.closeGeoRouteModal()">X</button>
+            </div>
+            <div class="modal-content-scroll" style="padding:10px;">
+                <div id="geoRouteList"></div>
+            </div>
+            <div class="modal-footer" style="padding:6px; background:var(--w-gray);">
+                <button type="button" class="w95-btn" style="width:100%; height:32px; font-weight:bold;" onclick="window.closeGeoRouteModal()">닫기</button>
+            </div>
+        </div>
+    </div>
+
 <div id="durationTimeEditModal" class="modal-overlay" style="z-index: 2750;">
         <div class="modal-box w95-window" style="max-width: 220px;">
             <div class="w95-titlebar"><span id="durationTimeEditTitle">시간 수정</span><button type="button" class="w95-btn" onclick="window.closeDurationTimeEditModal()">X</button></div>
@@ -467,18 +482,19 @@
 </div>
 
 <script src="work_data.js"></script>
-<script src="work_utils.js?v=20260917-1"></script>
+<script src="work_utils.js?v=20260917-2"></script>
 <script src="work_service.js?v=20260720-4"></script>
 <script src="work_commute.js?v=20260917-1"></script>
 <script src="work_tag_manager.js"></script>
-<script src="work_sync.js?v=20260917-1"></script>
-<script src="work_render.js?v=20260724-43"></script>
+<script src="work_sync.js?v=20260917-2"></script>
+<script src="work_render.js?v=20260917-1"></script>
 <script src="work_ui.js?v=20260916-1"></script>
 <script src="work_modal.js?v=20260917-1"></script>
-<script src="work_logic.js?v=20260916-1"></script>
+<script src="work_logic.js?v=20260917-1"></script>
 <script src="work_timetable.js?v=20260916-3"></script>
-<script src="work_timetable_ui.js?v=20260917-1"></script>
+<script src="work_timetable_ui.js?v=20260917-2"></script>
 <script src="work_photo_insert.js?v=20260916-1"></script>
+<script src="work_georoute.js?v=20260917-1"></script>
 <script src="work_enhancements.js?v=20260916-1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>

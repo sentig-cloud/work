@@ -212,6 +212,29 @@ window.runVisionOcr = async function (dataUrlOrBlob, signal = null) {
     return result.text || "";
 };
 
+// 주소 → 좌표 변환(지오코딩, 동선 관리용) — 서버(worker.js)의 /api/geocode로 주소 문자열을
+// 보내면, 실제 카카오 REST API 키는 서버에만 있는 채로 좌표/정제된 주소만 돌려준다.
+window.geocodeAddress = async function (address, signal = null) {
+    const response = await window.fetchWithTimeout(
+        `${WORK_API_BASE}/api/geocode`,
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ address }),
+            signal
+        },
+        15000
+    );
+    const text = await response.text();
+    const result = text ? JSON.parse(text) : {};
+    if (!response.ok || !result.ok) {
+        const err = new Error(result.error || `지오코딩 실패: ${response.status}`);
+        err.notFound = !!result.notFound;
+        throw err;
+    }
+    return result;
+};
+
 window.migrateImagesInItem = async function (item, uploadedBySource) {
     if (!item || !Array.isArray(item.imgs)) return 0;
     let uploadedCount = 0;

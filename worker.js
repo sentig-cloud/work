@@ -365,6 +365,64 @@ export default {
       }
     }
 
+    // ─── 주소 → 좌표 변환(지오코딩, 카카오 로컬 API) — 동선 관리용 ───
+    // REST API 키는 여기(서버)에만 있고 클라이언트에는 절대 내려가지 않는다.
+    // 배포 시 다음을 한 번 실행해서 시크릿으로 등록해야 한다:
+    //   wrangler secret put KAKAO_REST_API_KEY
+    if (url.pathname === "/api/geocode" && request.method === "POST") {
+      try {
+        if (!env.KAKAO_REST_API_KEY) {
+          return json({ ok: false, error: "KAKAO_REST_API_KEY secret is missing" }, 500);
+        }
+        const body = await request.json().catch(() => ({}));
+        const address = String(body.address || "").trim();
+        if (!address) return json({ ok: false, error: "주소가 비어있습니다" }, 400);
+
+        const kakaoHeaders = { Authorization: `KakaoAK ${env.KAKAO_REST_API_KEY}` };
+
+        // 1) 지번/도로명 주소 검색 — 정확한 주소 문자열에 가장 잘 맞는다.
+        const addrResponse = await fetch(
+          `https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(address)}`,
+          { headers: kakaoHeaders }
+        );
+        const addrResult = await addrResponse.json();
+        if (!addrResponse.ok) {
+          return json({ ok: false, error: addrResult?.errorType || `Kakao API HTTP ${addrResponse.status}` }, 502);
+        }
+        let doc = addrResult?.documents?.[0];
+        let source = "address";
+
+        // 2) 정식 주소로 못 찾으면 장소/키워드 검색으로 한 번 더 시도 (상호명, 축약 주소 등)
+        if (!doc) {
+          const kwResponse = await fetch(
+            `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(address)}`,
+            { headers: kakaoHeaders }
+          );
+          const kwResult = await kwResponse.json();
+          if (kwResponse.ok && kwResult?.documents?.[0]) {
+            doc = kwResult.documents[0];
+            source = "keyword";
+          }
+        }
+
+        if (!doc) {
+          return json({ ok: false, error: "주소를 찾지 못했습니다", notFound: true });
+        }
+
+        return json({
+          ok: true,
+          lat: parseFloat(doc.y),
+          lng: parseFloat(doc.x),
+          roadAddress: doc.road_address?.address_name || "",
+          jibunAddress: doc.address_name || doc.address?.address_name || "",
+          placeName: doc.place_name || "",
+          source
+        });
+      } catch (e) {
+        return json({ ok: false, error: e.message }, 500);
+      }
+    }
+
     // ─── 이미지 조회 / 파일명 경로 기반 다운로드 ───
     const isImageView = url.pathname === "/api/image";
     const isNamedDownload = url.pathname.startsWith("/api/download/");
