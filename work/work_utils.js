@@ -10,6 +10,7 @@ window.attachLongPress = (el, onLongPress, opts = {}) => {
     const clearTimer = () => { if (timer) { clearTimeout(timer); timer = null; } };
     el.addEventListener('pointerdown', (e) => {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
+        if (opts.ignoreSelector && e.target.closest(opts.ignoreSelector)) return;
         startX = e.clientX; startY = e.clientY;
         clearTimer();
         timer = setTimeout(() => {

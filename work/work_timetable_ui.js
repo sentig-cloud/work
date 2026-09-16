@@ -278,6 +278,16 @@
                         </div>
                     </div>
                     <div class="tt-settings-group">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-route"></i> 동선 관리</div>
+                        <div class="tt-settings-section">
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptGeoRouteEnabled"> 켜기 (날짜를 길게 누르면 동선 관리 팝업 열기)</label>
+                        </div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">지도에 표시할 내 위치 아이콘</div>
+                            <div class="tt-settings-icon-row" id="ttGeoRouteLocIconRow"></div>
+                        </div>
+                    </div>
+                    <div class="tt-settings-group">
                         <div class="tt-settings-group-title"><i class="fa-solid fa-camera"></i> 자동 인식</div>
                         <div class="tt-settings-section">
                             <div class="tt-settings-label">구글 비전(OCR) — 출퇴근 사진에서 시간/거리 자동 인식</div>
@@ -311,6 +321,23 @@
         const defaultMap = localStorage.getItem('wm_default_map') || 'naver';
         const mapOptIds = { tmap: 'ttOptMapTmap', naver: 'ttOptMapNaver', kakaomap: 'ttOptMapKakao' };
         document.getElementById(mapOptIds[defaultMap] || 'ttOptMapNaver').checked = true;
+
+        document.getElementById('ttOptGeoRouteEnabled').checked = !!window.isGeoRouteEnabled?.();
+        const iconRow = document.getElementById('ttGeoRouteLocIconRow');
+        if (iconRow && window.GEO_ROUTE_LOC_ICONS) {
+            const current = window.getGeoRouteLocIcon?.() || window.GEO_ROUTE_LOC_ICONS[0];
+            iconRow.innerHTML = window.GEO_ROUTE_LOC_ICONS.map(icon =>
+                `<button type="button" class="w95-btn tt-icon-choice-btn${icon === current ? ' is-active' : ''}" data-icon="${icon}">${icon}</button>`
+            ).join('');
+            iconRow.querySelectorAll('.tt-icon-choice-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    iconRow.querySelectorAll('.tt-icon-choice-btn').forEach(b => b.classList.remove('is-active'));
+                    btn.classList.add('is-active');
+                    iconRow.dataset.selected = btn.dataset.icon;
+                });
+            });
+            iconRow.dataset.selected = current;
+        }
         document.getElementById('ttSettingsModal').style.display = 'flex';
     }
     function closeSettingsModal() {
@@ -336,6 +363,11 @@
         window.setVisionOcrEnabled?.(document.getElementById('ttOptVisionOcr').checked);
         const defaultMapEl = document.querySelector('input[name="ttDefaultMap"]:checked');
         if (defaultMapEl) localStorage.setItem('wm_default_map', defaultMapEl.value);
+
+        window.setGeoRouteEnabled?.(document.getElementById('ttOptGeoRouteEnabled').checked);
+        const iconRow = document.getElementById('ttGeoRouteLocIconRow');
+        if (iconRow?.dataset.selected) window.setGeoRouteLocIcon?.(iconRow.dataset.selected);
+
         closeSettingsModal();
         if (active) { applyScaleClass(); renderWeek(); }
     }
