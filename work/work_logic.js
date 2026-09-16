@@ -62,6 +62,12 @@ window.cancelSyncPress = () => {
 };
 
 window.goToToday = async () => {
+    // "오늘" 버튼은 항상 최상단(z-index)이라 동선 관리 팝업이 떠 있어도 눌린다 —
+    // 날짜만 오늘로 바뀌고 팝업은 그대로 남아있으면 혼란스러우니 먼저 닫아준다.
+    if (document.getElementById('geoRouteModal')?.style.display === 'flex') {
+        window.closeGeoRouteModal?.();
+    }
+
     if (window.syncFromServerIfSafe) {
         if (window.showLoading) {
             window.showLoading("최신 데이터 확인 중...");

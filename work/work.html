@@ -7,7 +7,7 @@
     <title>Work Master Local Pro</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-<link rel="stylesheet" href="work_style.css?v=20260917-3">
+<link rel="stylesheet" href="work_style.css?v=20260917-4">
 </head>
 <body>
 
@@ -305,7 +305,7 @@
         </div>
     </div>
         
-    <div id="mapAppModal" class="modal-overlay" style="z-index: 2600;">
+    <div id="mapAppModal" class="modal-overlay" style="z-index: 2900;">
         <div class="modal-box w95-window tag-edit-window" style="max-width:300px;">
             <div class="w95-titlebar"><span>지도 앱 선택</span><button type="button" class="w95-btn" onclick="window.closeMapAppModal()">X</button></div>
             <div style="padding:10px; display:flex; flex-direction:column; gap:8px;">
@@ -322,8 +322,9 @@
                 <span id="geoRouteTitle">동선 관리</span>
                 <button type="button" class="w95-btn" style="padding:0 6px;" onclick="window.closeGeoRouteModal()">X</button>
             </div>
+            <div id="geoRouteDateChips" class="geo-route-date-chips"></div>
             <div id="geoRouteMap"></div>
-            <div class="modal-content-scroll" style="padding:10px;">
+            <div class="geo-route-list-scroll">
                 <div id="geoRouteList"></div>
             </div>
             <div class="modal-footer" style="padding:6px; background:var(--w-gray);">
@@ -491,12 +492,12 @@
 <script src="work_render.js?v=20260917-1"></script>
 <script src="work_ui.js?v=20260916-1"></script>
 <script src="work_modal.js?v=20260917-1"></script>
-<script src="work_logic.js?v=20260917-1"></script>
+<script src="work_logic.js?v=20260917-2"></script>
 <script src="work_timetable.js?v=20260916-3"></script>
 <script src="work_timetable_ui.js?v=20260917-2"></script>
 <script src="work_photo_insert.js?v=20260916-1"></script>
 <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=95e50bf045aa4dda112398b1ca38d9c0&autoload=false"></script>
-<script src="work_georoute.js?v=20260917-3"></script>
+<script src="work_georoute.js?v=20260917-4"></script>
 <script src="work_enhancements.js?v=20260916-1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
