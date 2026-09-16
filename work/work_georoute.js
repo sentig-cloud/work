@@ -91,6 +91,7 @@ function renderGeoRouteList(results, totalCount) {
         if (hasCoords) prevPoint = geo;
 
         const timeText = log.workTime || log.time || '';
+        const nameText = log.customerName || log.content || log.taskType || '';
         const resolvedAddr = geo && (geo.roadAddress || geo.jibunAddress) || '';
         const statusHtml = hasCoords
             ? (resolvedAddr ? `<div class="geo-route-address-resolved">${escapeHtml(resolvedAddr)}</div>` : '')
@@ -104,6 +105,7 @@ function renderGeoRouteList(results, totalCount) {
             <div class="geo-route-item-head">
                 <span class="geo-route-order">${idx + 1}</span>
                 ${timeText ? `<span class="geo-route-time">${escapeHtml(timeText)}</span>` : ''}
+                ${nameText ? `<span class="geo-route-name">${escapeHtml(nameText)}</span>` : ''}
             </div>
             <div class="geo-route-address-original">${escapeHtml(address)}</div>
             ${statusHtml}

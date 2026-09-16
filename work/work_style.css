@@ -1422,6 +1422,7 @@ input, textarea, [contenteditable="true"] {
     font-size:0.75rem; font-weight:bold; flex-shrink:0;
 }
 .geo-route-time { font-weight:bold; color:var(--w-blue); font-size:0.85rem; }
+.geo-route-name { font-weight:bold; color:#1f2937; font-size:0.85rem; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .geo-route-address-original { font-size:0.85rem; color:#333; }
 .geo-route-address-resolved { font-size:0.78rem; color:#166534; font-weight:bold; }
 .geo-route-address-failed { font-size:0.78rem; color:#b91c1c; font-weight:bold; }
