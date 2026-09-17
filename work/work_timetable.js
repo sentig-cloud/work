@@ -123,6 +123,8 @@ window.WorkTimetable = (() => {
                 taskNo: log.taskNo || '',
                 address: log.address || '',
                 memo: log.memo || '',
+                // 월간 카드와 같은 색(태그의 cardColor)을 써서 두 화면이 항상 일치하게 한다.
+                cardColor: log.cat === 'work' ? (window.getWorkCardColor?.(log) || '') : '',
                 startMin,
                 hour: hourOf(startMin)
             });

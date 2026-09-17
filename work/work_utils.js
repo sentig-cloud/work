@@ -1,5 +1,28 @@
 // work_utils.js
 
+// Task 번호를 4자리씩 띄어 표시(예: 123456789012 -> "1234 5678 9012"). 저장값 자체는 안 건드리고
+// 화면 표시에만 쓴다 — 검색/내보내기는 원래 값을 그대로 써야 하기 때문.
+window.formatTaskNo = (taskNo) => {
+    const str = String(taskNo == null ? '' : taskNo).trim();
+    if (!str) return '';
+    return str.replace(/(.{4})(?=.)/g, '$1 ');
+};
+
+// ─── 초성 검색: "ㄱㄴ" 같은 초성만으로도 "강남" 같은 텍스트를 찾을 수 있게 ───
+const CHOSUNG_LIST = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+window.extractChosung = (str) => {
+    let result = '';
+    for (const ch of String(str == null ? '' : str)) {
+        const code = ch.charCodeAt(0);
+        result += (code >= 0xAC00 && code <= 0xD7A3) ? CHOSUNG_LIST[Math.floor((code - 0xAC00) / 588)] : ch;
+    }
+    return result;
+};
+window.isChosungOnly = (str) => {
+    const s = String(str == null ? '' : str).trim();
+    return s.length > 0 && [...s].every(ch => CHOSUNG_LIST.includes(ch) || ch === ' ');
+};
+
 // 탭(클릭)과 별개로 롱프레스를 인식시키는 공용 헬퍼. 롱프레스가 발동하면 그 뒤에 이어지는
 // click 이벤트를 한 번 눌러서 기존 탭 동작(예: 날짜 이동)이 같이 실행되지 않게 막는다.
 window.attachLongPress = (el, onLongPress, opts = {}) => {

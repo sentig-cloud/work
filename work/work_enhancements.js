@@ -1283,6 +1283,16 @@
         keywordTextCache.set(log, text);
         return text;
     };
+    // 초성만으로 검색할 때만 쓰는 캐시 — 매번 만들지 않고 실제로 초성 검색어가 들어왔을 때만 채운다.
+    const keywordChosungCache = new WeakMap();
+    const buildLogKeywordChosung = log => {
+        if (!log) return '';
+        const cached = keywordChosungCache.get(log);
+        if (cached !== undefined) return cached;
+        const chosung = window.extractChosung(buildLogKeywordText(log));
+        keywordChosungCache.set(log, chosung);
+        return chosung;
+    };
     window.doSearch = () => {
         if (window.isSearchEditMode) return;
         const keyword = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
@@ -1306,9 +1316,12 @@
         const resultList = document.getElementById('searchResultList');
         const summary = document.getElementById('searchSummary');
         if (!keyword && !monthValue && !ox && !ot && !duty && !selections.length) { resultList.innerHTML = ''; summary.style.display = 'none'; return; }
+        const keywordIsChosung = !!keyword && window.isChosungOnly(keyword);
         const results = (window.logs || []).filter(log => {
             const keywordText = buildLogKeywordText(log);
-            return (!keyword || keywordText.includes(keyword)) &&
+            const keywordMatched = !keyword || keywordText.includes(keyword) ||
+                (keywordIsChosung && buildLogKeywordChosung(log).includes(keyword));
+            return keywordMatched &&
                 (!monthValue || Number(log.m) === Number(monthValue)) &&
                 (!ox || (ox === 'none'
                     ? log.personalCheck !== 'O' && log.personalCheck !== 'X'

@@ -149,8 +149,12 @@
         if (!listEl) return;
         const keyword = (document.getElementById('piSearchInput')?.value || '').trim().toLowerCase();
 
+        const keywordIsChosung = !!keyword && window.isChosungOnly(keyword);
         let results = (window.logs || []).filter(Boolean);
-        if (keyword) results = results.filter(log => searchText(log).includes(keyword));
+        if (keyword) results = results.filter(log => {
+            const text = searchText(log);
+            return text.includes(keyword) || (keywordIsChosung && window.extractChosung(text).includes(keyword));
+        });
         results = results.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))).slice(0, 80);
 
         if (results.length === 0) {

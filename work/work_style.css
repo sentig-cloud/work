@@ -1255,6 +1255,9 @@ input, textarea, [contenteditable="true"] {
     opacity:1 !important; filter:none !important;
 }
 .log-card.card-work { border:2px solid !important; border-color:#73767a #f8fafc #f8fafc #73767a !important; }
+/* 완료 상태 — 주간 시간표 칩(is-completed)과 동일하게 취소선 처리 */
+.log-card.is-completed-strike { text-decoration:line-through; }
+.log-card.is-completed-strike .btn-del, .log-card.is-completed-strike .task-no-btn { text-decoration:none; }
 .log-card.card-work .work-card-columns { gap:2px; }
 .work-card-subwidget[data-card-zone],
 .work-card-widget:not(.is-container-widget) > .work-card-section[data-card-zone] {
@@ -1344,6 +1347,8 @@ input, textarea, [contenteditable="true"] {
 .tt-chip.cat-commute_in { background:#dcfce7; border:1px solid #16a34a; color:#14532d; }
 .tt-chip.cat-commute_out { background:#fce7f3; border:1px solid #db2777; color:#831843; }
 .tt-chip.group-memo { background:#f3f4f6; border:1px solid #9ca3af; color:#374151; }
+/* 월간 카드에서 태그로 직접 고른 색(work_render.js의 getWorkCardColor)이 있으면 그걸로 덮는다 */
+.tt-chip.has-custom-color { color:#1f2937; }
 
 /* 설정 > 표시 크기 */
 #timetableArea.tt-scale-small .tt-hour-cell { min-height:24px; }
