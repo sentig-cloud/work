@@ -514,7 +514,13 @@
         const classes = ['tt-chip', `cat-${b.cat}`, `group-${b.groupCat}`];
         if (b.completed) classes.push('is-completed');
         if (b.canceled) classes.push('is-canceled');
-        return `<div class="${classes.join(' ')}" data-log-id="${escapeHtml(b.logId)}">
+        // 월간 카드와 같은 색(태그의 cardColor)을 골랐으면 그 색으로 덮어써서 두 화면을 맞춘다.
+        let colorStyle = '';
+        if (b.cardColor) {
+            classes.push('has-custom-color');
+            colorStyle = ` style="background-color:${b.cardColor}; border-color:${b.cardColor};"`;
+        }
+        return `<div class="${classes.join(' ')}" data-log-id="${escapeHtml(b.logId)}"${colorStyle}>
             <span class="tt-chip-label">${escapeHtml(b.label)}</span>
         </div>`;
     }
@@ -945,7 +951,7 @@
         };
 
         if (groupCat === 'work') {
-            addLine('Task No', log.taskNo, true);
+            addLine('Task No', window.formatTaskNo?.(log.taskNo) || log.taskNo, true);
             const addrLine = addLine('주소', log.address, true);
             addrLine.classList.add('tt-popover-address');
             if (log.address) addrLine.title = log.address;
