@@ -252,8 +252,8 @@ window.getLogCardHtml = (l, indexStr = '') => {
     else if (l.status === '이관') statusClass = 'status-transfer';
 
     // 작업 카드의 상태는 배지로만 표현한다. 상태 클래스가 카드 본문/외곽 서식을 다시 만들지 않게 분리한다.
-    // 완료(취소선)는 배지와 별개로 주간 시간표 칩과 동일하게 항상 적용한다.
-    let cardClass = `card-${l.cat} ${l.cat === 'work' ? '' : statusClass}${l.status === '완료' ? ' is-completed-strike' : ''}`;
+    // 완료 취소선은 주간 시간표에서만 쓰고, 월간 카드에는 넣지 않는다(사용자 요청).
+    let cardClass = `card-${l.cat} ${l.cat === 'work' ? '' : statusClass}`;
     let cardStyle = '';
     let displayMemo = l.memo;
 

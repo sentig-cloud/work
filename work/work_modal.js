@@ -455,7 +455,7 @@ window.openWorkModal = (id = null) => {
         if (!log) return;
         y = log.y || window.currentYear; m = log.m; d = log.d;
         document.getElementById('workTime').value = log.workTime ? log.workTime.replace(':', '') : "";
-        document.getElementById('taskNo').value = log.taskNo || "";
+        document.getElementById('taskNo').value = window.formatTaskNo?.(log.taskNo) || log.taskNo || "";
         document.getElementById('customerName').value = log.customerName || "";
         window.activeTaskTypes = log.taskType ? log.taskType.split(', ') : [];
         const addrEl = document.getElementById('workAddress'); if (addrEl) addrEl.value = log.address || "";

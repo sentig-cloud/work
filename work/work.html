@@ -7,7 +7,7 @@
     <title>Work Master Local Pro</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-<link rel="stylesheet" href="work_style.css?v=20260918-1">
+<link rel="stylesheet" href="work_style.css?v=20260918-2">
 </head>
 <body>
 
@@ -161,7 +161,7 @@
                         </div>
                         <!-- Task번호 -->
                         <div class="work-obj-wrap" data-obj-id="taskNo" data-obj-label="Task번호">
-                            <input type="text" id="taskNo" inputmode="numeric" class="m-input w95-in" style="width:100%; height:28px;" placeholder="Task 번호">
+                            <input type="text" id="taskNo" inputmode="numeric" class="m-input w95-in" style="width:100%; height:28px;" placeholder="Task 번호" oninput="window.formatTaskNoInput(this)">
                         </div>
                         <!-- 복사 -->
                         <div class="work-obj-wrap" data-obj-id="copy" data-obj-label="복사">
@@ -324,6 +324,7 @@
             </div>
             <div id="geoRouteDateChips" class="geo-route-date-chips"></div>
             <div id="geoRouteMap"></div>
+            <div id="geoRouteResizeHandle" class="geo-route-resize-handle" title="드래그해서 높이 조절"><span></span></div>
             <div class="geo-route-list-scroll">
                 <div id="geoRouteList"></div>
             </div>
@@ -484,20 +485,20 @@
 </div>
 
 <script src="work_data.js"></script>
-<script src="work_utils.js?v=20260918-1"></script>
+<script src="work_utils.js?v=20260918-2"></script>
 <script src="work_service.js?v=20260720-4"></script>
 <script src="work_commute.js?v=20260917-1"></script>
 <script src="work_tag_manager.js"></script>
 <script src="work_sync.js?v=20260917-3"></script>
-<script src="work_render.js?v=20260918-1"></script>
+<script src="work_render.js?v=20260918-2"></script>
 <script src="work_ui.js?v=20260916-1"></script>
-<script src="work_modal.js?v=20260917-1"></script>
-<script src="work_logic.js?v=20260917-2"></script>
+<script src="work_modal.js?v=20260918-1"></script>
+<script src="work_logic.js?v=20260918-1"></script>
 <script src="work_timetable.js?v=20260918-1"></script>
-<script src="work_timetable_ui.js?v=20260918-1"></script>
+<script src="work_timetable_ui.js?v=20260918-2"></script>
 <script src="work_photo_insert.js?v=20260918-1"></script>
 <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=95e50bf045aa4dda112398b1ca38d9c0&autoload=false"></script>
-<script src="work_georoute.js?v=20260917-6"></script>
+<script src="work_georoute.js?v=20260918-1"></script>
 <script src="work_enhancements.js?v=20260918-1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>

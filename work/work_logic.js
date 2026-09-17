@@ -322,7 +322,8 @@ window.saveWorkLog = async () => {
             workTime = window.getCurrentTimeString();
         }
 
-        const taskNo = document.getElementById("taskNo").value;
+        // 입력창에는 4자리씩 띄어서 보이지만(formatTaskNoInput), 저장값은 계속 순수 숫자로 유지한다.
+        const taskNo = document.getElementById("taskNo").value.replace(/\s+/g, '');
         const customerName = document.getElementById("customerName").value.trim();
         const addressElement = document.getElementById("workAddress");
         const address = addressElement ? addressElement.value.trim() : "";
