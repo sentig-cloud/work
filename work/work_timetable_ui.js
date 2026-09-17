@@ -286,6 +286,12 @@
                             <div class="tt-settings-label">지도에 표시할 내 위치 아이콘</div>
                             <div class="tt-settings-icon-row" id="ttGeoRouteLocIconRow"></div>
                         </div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">글자 크기</div>
+                            <label class="tt-settings-check"><input type="radio" name="ttGeoRouteScale" id="ttOptGeoRouteScaleSmall" value="small"> 작게</label>
+                            <label class="tt-settings-check"><input type="radio" name="ttGeoRouteScale" id="ttOptGeoRouteScaleMedium" value="medium"> 보통</label>
+                            <label class="tt-settings-check"><input type="radio" name="ttGeoRouteScale" id="ttOptGeoRouteScaleLarge" value="large"> 크게</label>
+                        </div>
                     </div>
                     <div class="tt-settings-group">
                         <div class="tt-settings-group-title"><i class="fa-solid fa-camera"></i> 자동 인식</div>
@@ -338,6 +344,8 @@
             });
             iconRow.dataset.selected = current;
         }
+        const geoScaleIds = { small: 'ttOptGeoRouteScaleSmall', medium: 'ttOptGeoRouteScaleMedium', large: 'ttOptGeoRouteScaleLarge' };
+        document.getElementById(geoScaleIds[window.getGeoRouteFontScale?.() || 'medium']).checked = true;
         document.getElementById('ttSettingsModal').style.display = 'flex';
     }
     function closeSettingsModal() {
@@ -367,6 +375,8 @@
         window.setGeoRouteEnabled?.(document.getElementById('ttOptGeoRouteEnabled').checked);
         const iconRow = document.getElementById('ttGeoRouteLocIconRow');
         if (iconRow?.dataset.selected) window.setGeoRouteLocIcon?.(iconRow.dataset.selected);
+        const geoScaleEl = document.querySelector('input[name="ttGeoRouteScale"]:checked');
+        if (geoScaleEl) window.setGeoRouteFontScale?.(geoScaleEl.value);
 
         closeSettingsModal();
         if (active) { applyScaleClass(); renderWeek(); }

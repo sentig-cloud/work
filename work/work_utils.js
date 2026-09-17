@@ -8,6 +8,16 @@ window.formatTaskNo = (taskNo) => {
     return str.replace(/(.{4})(?=.)/g, '$1 ');
 };
 
+// 작업일지 입력창에서 타이핑하는 동안에도 4자리씩 실시간으로 띄어준다(숫자만 남기고 재포맷).
+// 저장 시점(work_logic.js)에서는 공백을 다시 제거해 저장값은 계속 순수 숫자로 유지한다.
+window.formatTaskNoInput = (input) => {
+    const caretFromEnd = input.value.length - (input.selectionEnd ?? input.value.length);
+    const digits = input.value.replace(/[^0-9]/g, '');
+    input.value = window.formatTaskNo(digits);
+    const pos = Math.max(0, input.value.length - caretFromEnd);
+    if (input.setSelectionRange) input.setSelectionRange(pos, pos);
+};
+
 // ─── 초성 검색: "ㄱㄴ" 같은 초성만으로도 "강남" 같은 텍스트를 찾을 수 있게 ───
 const CHOSUNG_LIST = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
 window.extractChosung = (str) => {

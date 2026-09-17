@@ -39,6 +39,8 @@ window.setGeoRouteEnabled = (enabled) => localStorage.setItem('wm_georoute_enabl
 window.GEO_ROUTE_LOC_ICONS = ['📍', '🔵', '🚩', '🧭'];
 window.getGeoRouteLocIcon = () => localStorage.getItem('wm_georoute_loc_icon') || window.GEO_ROUTE_LOC_ICONS[0];
 window.setGeoRouteLocIcon = (icon) => localStorage.setItem('wm_georoute_loc_icon', icon);
+window.getGeoRouteFontScale = () => localStorage.getItem('wm_georoute_font_scale') || 'medium';
+window.setGeoRouteFontScale = (scale) => localStorage.setItem('wm_georoute_font_scale', scale);
 
 // 요일별 고정 색상(월=0 ... 일=6) — 여러 날을 동시에 선택했을 때 구분용
 const GEO_ROUTE_DAY_COLORS = ['#2563eb', '#ea580c', '#16a34a', '#db2777', '#7c3aed', '#0891b2', '#dc2626'];
@@ -62,6 +64,12 @@ function formatDurationSec(sec) {
 
 let geoRouteUserLocation = null;
 let geoRouteUserLocationPromise = null;
+// 팝업을 새로 열 때마다 호출해서, 예전에 잡아둔 위치를 계속 재사용하지 않고 매번 새로
+// GPS를 다시 잡게 한다 — 위치가 바뀐 채로 다시 열었는데 예전 위치가 남아있던 문제 수정.
+function resetUserLocation() {
+    geoRouteUserLocation = null;
+    geoRouteUserLocationPromise = null;
+}
 function ensureUserLocation() {
     if (geoRouteUserLocation) return Promise.resolve(geoRouteUserLocation);
     if (geoRouteUserLocationPromise) return geoRouteUserLocationPromise;
@@ -74,7 +82,7 @@ function ensureUserLocation() {
                 updateGeoRouteMap(geoRouteCurrentResults); // 위치가 늦게 잡히면 마커를 다시 그려준다
             },
             () => resolve(null),
-            { timeout: 8000, maximumAge: 300000 }
+            { timeout: 8000, maximumAge: 0 }
         );
     });
     return geoRouteUserLocationPromise;
@@ -422,11 +430,62 @@ async function loadGeoRouteDays(daysArr) {
     }
 }
 
+// ─── 목록 높이 기억 + 드래그로 조절 (기본은 남는 공간을 다 채워서 작업일지 팝업처럼 크게) ───
+function applyGeoRouteListHeight() {
+    const list = document.querySelector('#geoRouteModal .geo-route-list-scroll');
+    if (!list) return;
+    const saved = parseInt(localStorage.getItem('wm_georoute_list_height') || '', 10);
+    if (saved && saved > 80) {
+        list.style.flex = 'none';
+        list.style.height = `${saved}px`;
+    } else {
+        list.style.flex = '1';
+        list.style.height = '';
+    }
+}
+
+function wireGeoRouteResizeHandle() {
+    const handle = document.getElementById('geoRouteResizeHandle');
+    const list = document.querySelector('#geoRouteModal .geo-route-list-scroll');
+    if (!handle || !list || handle.dataset.wired) return;
+    handle.dataset.wired = '1';
+    let startY = 0, startHeight = 0;
+    const onMove = (e) => {
+        const dy = e.clientY - startY;
+        const newHeight = Math.max(100, Math.min(window.innerHeight * 0.75, startHeight + dy));
+        list.style.flex = 'none';
+        list.style.height = `${newHeight}px`;
+    };
+    const onEnd = () => {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onEnd);
+        localStorage.setItem('wm_georoute_list_height', String(Math.round(list.getBoundingClientRect().height)));
+    };
+    handle.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        startY = e.clientY;
+        startHeight = list.getBoundingClientRect().height;
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onEnd);
+    });
+}
+
+function applyGeoRouteFontScale() {
+    const modal = document.getElementById('geoRouteModal');
+    if (!modal) return;
+    modal.classList.remove('geo-route-scale-small', 'geo-route-scale-medium', 'geo-route-scale-large');
+    modal.classList.add(`geo-route-scale-${window.getGeoRouteFontScale()}`);
+}
+
 window.openGeoRouteModal = (year, month, day) => {
     if (!window.isGeoRouteEnabled()) return;
     const modal = document.getElementById('geoRouteModal');
     if (!modal) return;
     modal.style.display = 'flex';
+    resetUserLocation(); // 팝업을 새로 열 때마다 항상 지금 위치를 새로 잡는다
+    applyGeoRouteListHeight();
+    applyGeoRouteFontScale();
+    wireGeoRouteResizeHandle();
     geoRouteAnchorMonday = window.WorkTimetable
         ? window.WorkTimetable.mondayOf(new Date(year, month - 1, day))
         : new Date(year, month - 1, day);

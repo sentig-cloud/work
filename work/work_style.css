@@ -1255,9 +1255,6 @@ input, textarea, [contenteditable="true"] {
     opacity:1 !important; filter:none !important;
 }
 .log-card.card-work { border:2px solid !important; border-color:#73767a #f8fafc #f8fafc #73767a !important; }
-/* 완료 상태 — 주간 시간표 칩(is-completed)과 동일하게 취소선 처리 */
-.log-card.is-completed-strike { text-decoration:line-through; }
-.log-card.is-completed-strike .btn-del, .log-card.is-completed-strike .task-no-btn { text-decoration:none; }
 .log-card.card-work .work-card-columns { gap:2px; }
 .work-card-subwidget[data-card-zone],
 .work-card-widget:not(.is-container-widget) > .work-card-section[data-card-zone] {
@@ -1435,7 +1432,7 @@ input, textarea, [contenteditable="true"] {
 }
 .geo-route-date-chip.is-active { color:#fff; }
 #geoRouteMap {
-    width:100%; height:200px; flex-shrink:0; background:var(--w-white);
+    width:100%; height:240px; flex-shrink:0; background:var(--w-white);
     border-bottom:2px solid var(--w-dark-gray);
 }
 .geo-route-map-pin {
@@ -1449,7 +1446,17 @@ input, textarea, [contenteditable="true"] {
     font-size:1.4rem; line-height:1; transform:translateY(-4px);
     filter:drop-shadow(0 2px 2px rgba(0,0,0,0.5));
 }
-.geo-route-list-scroll { padding:10px; max-height:340px; overflow-y:auto; }
+.geo-route-resize-handle {
+    height:14px; flex-shrink:0; background:var(--w-gray); border-bottom:2px solid var(--w-dark-gray);
+    display:flex; align-items:center; justify-content:center; cursor:ns-resize; touch-action:none;
+}
+.geo-route-resize-handle span {
+    width:40px; height:4px; border-radius:2px; background:var(--w-dark-gray);
+    box-shadow:inset 1px 1px rgba(0,0,0,0.3);
+}
+/* 기본은 남는 공간을 다 채운다(작업일지 팝업처럼 크게) — 사용자가 손잡이로 늘리거나 줄이면
+   그 높이를 기억해서 다음에 열 때도 그대로 쓴다(work_georoute.js). */
+.geo-route-list-scroll { padding:10px; flex:1; min-height:100px; overflow-y:auto; }
 .geo-route-empty { text-align:center; color:#666; font-size:0.9rem; padding:20px 8px; }
 .geo-route-back-all {
     text-align:center; font-size:0.8rem; font-weight:bold; color:var(--w-blue);
@@ -1484,6 +1491,24 @@ input, textarea, [contenteditable="true"] {
 .geo-route-address-resolved { font-size:0.78rem; color:#166534; font-weight:bold; }
 .geo-route-address-failed { font-size:0.78rem; color:#b91c1c; font-weight:bold; }
 .geo-route-nav-icon-btn { width:28px; height:28px; padding:0; flex-shrink:0; color:var(--w-blue); font-size:0.95rem; }
+
+/* 설정 > 동선 관리 > 글자 크기 */
+#geoRouteModal.geo-route-scale-small .geo-route-name,
+#geoRouteModal.geo-route-scale-small .geo-route-time,
+#geoRouteModal.geo-route-scale-small .geo-route-address-original { font-size:0.75rem; }
+#geoRouteModal.geo-route-scale-small .geo-route-address-resolved,
+#geoRouteModal.geo-route-scale-small .geo-route-address-failed,
+#geoRouteModal.geo-route-scale-small .geo-route-eta,
+#geoRouteModal.geo-route-scale-small .geo-route-day-tag { font-size:0.68rem; }
+#geoRouteModal.geo-route-scale-large .geo-route-name,
+#geoRouteModal.geo-route-scale-large .geo-route-time,
+#geoRouteModal.geo-route-scale-large .geo-route-address-original { font-size:1rem; }
+#geoRouteModal.geo-route-scale-large .geo-route-address-resolved,
+#geoRouteModal.geo-route-scale-large .geo-route-address-failed,
+#geoRouteModal.geo-route-scale-large .geo-route-eta,
+#geoRouteModal.geo-route-scale-large .geo-route-day-tag { font-size:0.85rem; }
+#geoRouteModal.geo-route-scale-large .geo-route-order { width:24px; height:24px; font-size:0.85rem; }
+#geoRouteModal.geo-route-scale-large .geo-route-nav-icon-btn { width:34px; height:34px; font-size:1.1rem; }
 
 /* ─── 사진 먼저 담고 나중에 넣기 (work_photo_insert.js) ─── */
 .pi-pending-strip { background:var(--w-gray); border-bottom:2px solid var(--w-black); padding:8px; flex-shrink:0; }
