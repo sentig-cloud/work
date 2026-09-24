@@ -5,8 +5,7 @@
 // 서버(worker.js)가 이 토큰을 매번 다시 검증하므로, 여기서 막는 건 UX용이고
 // 실제 접근 차단은 서버 쪽에서 이루어진다.
 
-// TODO: Google Cloud Console에서 발급받은 OAuth 클라이언트 ID로 교체하세요.
-const GOOGLE_CLIENT_ID = "YOUR_CLIENT_ID.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "677166432997-u0vd4cmpi2al3utagjhkbmkac547e2h8.apps.googleusercontent.com";
 
 window.wmAuthToken = null;
 window.wmAuthEmail = null;
