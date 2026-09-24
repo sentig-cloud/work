@@ -54,6 +54,81 @@ async function verifyGoogleAuth(request, env) {
   return { ok: true, email };
 }
 
+// ─── 자체 세션 토큰 (7일) ───
+// 구글 ID 토큰은 수명이 1시간뿐이라, 허용 목록 검증을 한 번 통과하면(위 verifyGoogleAuth)
+// 그 이후엔 구글에 매번 안 물어보고 여기서 서명한 우리만의 토큰으로 대신한다. 이 토큰은
+// SESSION_SIGNING_KEY(서버만 아는 비밀)로 서명하므로 클라이언트가 위조할 수 없다.
+const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7일
+
+function base64UrlEncodeBytes(bytes) {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function base64UrlEncodeStr(str) {
+  return base64UrlEncodeBytes(new TextEncoder().encode(str));
+}
+function base64UrlDecodeToStr(b64url) {
+  const b64 = b64url.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((b64url.length + 3) % 4);
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+function timingSafeEqual(a, b) {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return result === 0;
+}
+async function getSessionSigningKey(env) {
+  return crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(env.SESSION_SIGNING_KEY),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign", "verify"]
+  );
+}
+
+async function signSession(email, env) {
+  const payloadStr = base64UrlEncodeStr(JSON.stringify({ email, exp: Date.now() + SESSION_DURATION_MS }));
+  const key = await getSessionSigningKey(env);
+  const sigBuffer = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payloadStr));
+  return `${payloadStr}.${base64UrlEncodeBytes(new Uint8Array(sigBuffer))}`;
+}
+
+async function verifySession(request, env) {
+  const authHeader = request.headers.get("Authorization") || "";
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+  if (!match) return { ok: false, error: "로그인이 필요합니다", status: 401 };
+  if (!env.SESSION_SIGNING_KEY) return { ok: false, error: "SESSION_SIGNING_KEY secret is missing", status: 500 };
+
+  const parts = match[1].split(".");
+  if (parts.length !== 2) return { ok: false, error: "유효하지 않은 세션입니다", status: 401 };
+  const [payloadStr, sig] = parts;
+
+  let expectedSig;
+  try {
+    const key = await getSessionSigningKey(env);
+    const sigBuffer = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payloadStr));
+    expectedSig = base64UrlEncodeBytes(new Uint8Array(sigBuffer));
+  } catch (e) {
+    return { ok: false, error: "세션 검증 오류: " + e.message, status: 500 };
+  }
+  if (!timingSafeEqual(expectedSig, sig)) return { ok: false, error: "유효하지 않은 세션입니다", status: 401 };
+
+  let payload;
+  try {
+    payload = JSON.parse(base64UrlDecodeToStr(payloadStr));
+  } catch (e) {
+    return { ok: false, error: "유효하지 않은 세션입니다", status: 401 };
+  }
+  if (!payload.exp || Date.now() >= payload.exp) return { ok: false, error: "로그인이 만료되었습니다", status: 401 };
+
+  return { ok: true, email: payload.email };
+}
+
 function getImageExtension(contentType) {
   const type = String(contentType || "").toLowerCase();
   if (type === "image/jpeg") return "jpg";
@@ -301,13 +376,28 @@ export default {
       );
     }
 
+    // ─── 구글 토큰 → 자체 세션 토큰 교환 ───
+    // 프론트엔드는 로그인 직후 구글 ID 토큰(1시간짜리)을 여기로 보내서, 허용 목록 검증을
+    // 통과하면 7일짜리 자체 세션 토큰으로 바꿔간다. 이후 모든 요청은 이 세션 토큰을 쓴다.
+    if (url.pathname === "/api/auth/exchange" && request.method === "POST") {
+      const auth = await verifyGoogleAuth(request, env);
+      if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status);
+      try {
+        const sessionToken = await signSession(auth.email, env);
+        return json({ ok: true, sessionToken, email: auth.email, exp: Date.now() + SESSION_DURATION_MS });
+      } catch (e) {
+        return json({ ok: false, error: "세션 발급 오류: " + e.message }, 500);
+      }
+    }
+
     // ─── 로그인 검증 ───
-    // 데이터를 읽거나 쓰는 모든 요청은 여기를 통과해야 한다. 이미지 조회(/api/image,
-    // /api/download/*)는 <img> 태그가 커스텀 헤더를 못 보내서 일부러 제외했다 — 대신 키가
-    // 추측 불가능한 랜덤 UUID라 URL을 모르면 접근 못 한다(완전한 보호는 아니지만 실용적 절충).
+    // 데이터를 읽거나 쓰는 모든 요청은 여기를 통과해야 한다(위 교환 엔드포인트에서 받은
+    // 세션 토큰 기준). 이미지 조회(/api/image, /api/download/*)는 <img> 태그가 커스텀
+    // 헤더를 못 보내서 일부러 제외했다 — 대신 키가 추측 불가능한 랜덤 UUID라 URL을 모르면
+    // 접근 못 한다(완전한 보호는 아니지만 실용적 절충).
     const isImageServing = url.pathname === "/api/image" || url.pathname.startsWith("/api/download/");
     if (!isImageServing) {
-      const auth = await verifyGoogleAuth(request, env);
+      const auth = await verifySession(request, env);
       if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status);
     }
 
