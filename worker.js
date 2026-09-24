@@ -7,7 +7,7 @@ const OCR_MONTHLY_FREE_LIMIT = 1000;
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Accept, X-Original-Name, Authorization",
   "Access-Control-Expose-Headers": "ETag, Content-Type, Content-Length, X-Original-Name, Content-Disposition",
 };
@@ -659,6 +659,16 @@ export default {
         const log = raw ? JSON.parse(raw) : [];
         const list = Array.isArray(log) ? log : [];
         return json({ ok: true, entries: list.slice().reverse() });
+      } catch (e) {
+        return json({ ok: false, error: e.message }, 500);
+      }
+    }
+
+    // ─── 접속 기록 전체 삭제 ───
+    if (url.pathname === "/api/auth/log" && request.method === "DELETE") {
+      try {
+        await env.WORK_KV.delete(ACCESS_LOG_KEY);
+        return json({ ok: true });
       } catch (e) {
         return json({ ok: false, error: e.message }, 500);
       }
