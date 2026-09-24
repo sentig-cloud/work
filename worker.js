@@ -49,16 +49,35 @@ async function verifyGoogleAuth(request, env) {
 
   const allowedEmails = env.ALLOWED_EMAILS.split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
   const email = String(info.email || "").toLowerCase();
-  if (!allowedEmails.includes(email)) return { ok: false, error: "허용되지 않은 계정입니다", status: 403 };
+  if (!allowedEmails.includes(email)) return { ok: false, error: "허용되지 않은 계정입니다", status: 403, email };
 
   return { ok: true, email };
 }
 
-// ─── 자체 세션 토큰 (7일) ───
+// ─── 접속 기록 (설정 > 접속 기록 보기) ───
+// 허용/거부 시도를 모두 남겨서, "설정한 적 없는 계정이 로그인됐다" 같은 문제를 실제로
+// 어떤 이메일이 시도했는지 눈으로 확인할 수 있게 한다.
+const ACCESS_LOG_KEY = "auth_access_log";
+const MAX_ACCESS_LOG_ENTRIES = 200;
+
+async function appendAccessLog(env, entry) {
+  try {
+    const raw = await env.WORK_KV.get(ACCESS_LOG_KEY);
+    const log = raw ? JSON.parse(raw) : [];
+    const list = Array.isArray(log) ? log : [];
+    list.push(entry);
+    if (list.length > MAX_ACCESS_LOG_ENTRIES) list.splice(0, list.length - MAX_ACCESS_LOG_ENTRIES);
+    await env.WORK_KV.put(ACCESS_LOG_KEY, JSON.stringify(list));
+  } catch {
+    // 로그 실패는 로그인 자체를 막으면 안 되므로 조용히 무시
+  }
+}
+
+// ─── 자체 세션 토큰 (14일) ───
 // 구글 ID 토큰은 수명이 1시간뿐이라, 허용 목록 검증을 한 번 통과하면(위 verifyGoogleAuth)
 // 그 이후엔 구글에 매번 안 물어보고 여기서 서명한 우리만의 토큰으로 대신한다. 이 토큰은
 // SESSION_SIGNING_KEY(서버만 아는 비밀)로 서명하므로 클라이언트가 위조할 수 없다.
-const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7일
+const SESSION_DURATION_MS = 14 * 24 * 60 * 60 * 1000; // 14일
 
 function base64UrlEncodeBytes(bytes) {
   let binary = "";
@@ -378,12 +397,19 @@ export default {
 
     // ─── 구글 토큰 → 자체 세션 토큰 교환 ───
     // 프론트엔드는 로그인 직후 구글 ID 토큰(1시간짜리)을 여기로 보내서, 허용 목록 검증을
-    // 통과하면 7일짜리 자체 세션 토큰으로 바꿔간다. 이후 모든 요청은 이 세션 토큰을 쓴다.
+    // 통과하면 14일짜리 자체 세션 토큰으로 바꿔간다. 이후 모든 요청은 이 세션 토큰을 쓴다.
     if (url.pathname === "/api/auth/exchange" && request.method === "POST") {
       const auth = await verifyGoogleAuth(request, env);
-      if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status);
+      if (!auth.ok) {
+        if (auth.email) {
+          await appendAccessLog(env, { email: auth.email, at: new Date().toISOString(), result: "denied" });
+        }
+        return json({ ok: false, error: auth.error }, auth.status);
+      }
+      if (!env.SESSION_SIGNING_KEY) return json({ ok: false, error: "SESSION_SIGNING_KEY secret is missing" }, 500);
       try {
         const sessionToken = await signSession(auth.email, env);
+        await appendAccessLog(env, { email: auth.email, at: new Date().toISOString(), result: "allowed" });
         return json({ ok: true, sessionToken, email: auth.email, exp: Date.now() + SESSION_DURATION_MS });
       } catch (e) {
         return json({ ok: false, error: "세션 발급 오류: " + e.message }, 500);
@@ -625,6 +651,18 @@ export default {
     }
 
     if (!env.WORK_KV) return json({ ok: false, error: "WORK_KV binding is missing" }, 500);
+
+    // ─── 접속 기록 조회(설정 > 접속 기록 보기) ───
+    if (url.pathname === "/api/auth/log" && request.method === "GET") {
+      try {
+        const raw = await env.WORK_KV.get(ACCESS_LOG_KEY);
+        const log = raw ? JSON.parse(raw) : [];
+        const list = Array.isArray(log) ? log : [];
+        return json({ ok: true, entries: list.slice().reverse() });
+      } catch (e) {
+        return json({ ok: false, error: e.message }, 500);
+      }
+    }
 
     // ─── 전체 저장 ───
     if (url.pathname === "/api/save" && request.method === "POST") {

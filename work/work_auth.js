@@ -3,7 +3,7 @@
 //
 // 구글 로그인 자체는 "성공하면 통과"가 아니라, 받은 구글 ID 토큰을 서버(worker.js)
 // /api/auth/exchange로 보내서 허용 목록(ALLOWED_EMAILS)에 있는지 먼저 확인한다 — 여기서
-// 거부되면 허용 안 된 계정으로는 앱 화면 자체가 안 열린다. 통과하면 서버가 서명한 7일짜리
+// 거부되면 허용 안 된 계정으로는 앱 화면 자체가 안 열린다. 통과하면 서버가 서명한 14일짜리
 // 자체 세션 토큰을 대신 받아서 쓰고(구글 ID 토큰은 1시간이라 매시간 재로그인해야 했음),
 // 이후 모든 서버 요청에 그 세션 토큰을 실어 보낸다(실제 첨부는 work_sync.js의
 // window.fetchWithTimeout 한 곳에서 처리 — 모든 API 호출이 그 함수를 거쳐가기 때문).
@@ -140,6 +140,71 @@ async function onCredential(response) {
 window.wmRequireReauth = () => {
     clearAuth();
     showGate("로그인이 만료되었습니다. 다시 로그인해주세요.");
+};
+
+// ─── 접속 기록 (설정 > 계정 > 접속 기록 보기) ───
+// "설정한 적 없는 계정이 로그인됐다" 같은 문제를 실제로 어떤 이메일이 언제 시도했는지
+// 눈으로 확인할 수 있게, 서버(worker.js)가 남긴 허용/거부 기록을 그대로 보여준다.
+function ensureAccessLogModalDom() {
+    if (document.getElementById("accessLogModal")) return;
+    const modal = document.createElement("div");
+    modal.id = "accessLogModal";
+    modal.className = "modal-overlay";
+    modal.style.display = "none";
+    modal.innerHTML = `
+        <div class="modal-box w95-window" style="max-width:360px;">
+            <div class="w95-titlebar"><span>접속 기록</span><button type="button" class="w95-btn" id="accessLogCloseBtn">X</button></div>
+            <div id="accessLogBody" class="access-log-body"></div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    document.getElementById("accessLogCloseBtn").addEventListener("click", () => {
+        modal.style.display = "none";
+    });
+    modal.addEventListener("click", (e) => {
+        if (e.target === modal) modal.style.display = "none";
+    });
+}
+
+function formatAccessLogTime(iso) {
+    try {
+        const d = new Date(iso);
+        const pad = (n) => String(n).padStart(2, "0");
+        return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch {
+        return iso || "";
+    }
+}
+
+window.showAccessLog = async function () {
+    ensureAccessLogModalDom();
+    const modal = document.getElementById("accessLogModal");
+    const body = document.getElementById("accessLogBody");
+    modal.style.display = "flex";
+    body.innerHTML = `<div class="access-log-status">불러오는 중...</div>`;
+    try {
+        const res = await window.fetchWithTimeout(`${AUTH_API_BASE}/api/auth/log`, { method: "GET" }, 15000);
+        const text = await res.text();
+        const result = text ? JSON.parse(text) : {};
+        if (!res.ok || !result.ok) {
+            body.innerHTML = `<div class="access-log-status">기록을 불러오지 못했습니다: ${result.error || res.status}</div>`;
+            return;
+        }
+        const entries = result.entries || [];
+        if (entries.length === 0) {
+            body.innerHTML = `<div class="access-log-status">기록이 없습니다.</div>`;
+            return;
+        }
+        body.innerHTML = entries.map(e => `
+            <div class="access-log-row ${e.result === "denied" ? "access-log-denied" : ""}">
+                <span class="access-log-email">${e.email || "-"}</span>
+                <span class="access-log-badge">${e.result === "denied" ? "거부됨" : "허용됨"}</span>
+                <span class="access-log-time">${formatAccessLogTime(e.at)}</span>
+            </div>
+        `).join("");
+    } catch (e) {
+        body.innerHTML = `<div class="access-log-status">기록을 불러오지 못했습니다: ${e.message}</div>`;
+    }
 };
 
 function boot() {
