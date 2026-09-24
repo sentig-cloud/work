@@ -8,7 +8,7 @@ const OCR_MONTHLY_FREE_LIMIT = 1000;
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Accept, X-Original-Name",
+  "Access-Control-Allow-Headers": "Content-Type, Accept, X-Original-Name, Authorization",
   "Access-Control-Expose-Headers": "ETag, Content-Type, Content-Length, X-Original-Name, Content-Disposition",
 };
 
@@ -20,6 +20,38 @@ function json(data, status = 200) {
       "Content-Type": "application/json; charset=utf-8",
     },
   });
+}
+
+// ─── 구글 로그인 검증 ───
+// Worker 안에서 JWT 서명을 직접 검증하는 대신, 구글이 제공하는 tokeninfo 엔드포인트에
+// 토큰을 그대로 넘겨서 "진짜 구글이 방금 발급한 유효한 토큰인지"를 구글이 직접 확인해주게
+// 한다 — 서명 검증용 암호화 라이브러리가 필요 없고, 만료·위조 여부까지 구글이 대신 봐준다.
+async function verifyGoogleAuth(request, env) {
+  const authHeader = request.headers.get("Authorization") || "";
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+  if (!match) return { ok: false, error: "로그인이 필요합니다", status: 401 };
+  const idToken = match[1];
+
+  if (!env.GOOGLE_OAUTH_CLIENT_ID) return { ok: false, error: "GOOGLE_OAUTH_CLIENT_ID secret is missing", status: 500 };
+  if (!env.ALLOWED_EMAILS) return { ok: false, error: "ALLOWED_EMAILS secret is missing", status: 500 };
+
+  let info;
+  try {
+    const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
+    if (!res.ok) return { ok: false, error: "유효하지 않거나 만료된 로그인입니다", status: 401 };
+    info = await res.json();
+  } catch (e) {
+    return { ok: false, error: "로그인 확인 중 오류: " + e.message, status: 500 };
+  }
+
+  if (info.aud !== env.GOOGLE_OAUTH_CLIENT_ID) return { ok: false, error: "잘못된 로그인 토큰입니다", status: 401 };
+  if (info.email_verified !== "true" && info.email_verified !== true) return { ok: false, error: "이메일이 확인되지 않은 계정입니다", status: 403 };
+
+  const allowedEmails = env.ALLOWED_EMAILS.split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
+  const email = String(info.email || "").toLowerCase();
+  if (!allowedEmails.includes(email)) return { ok: false, error: "허용되지 않은 계정입니다", status: 403 };
+
+  return { ok: true, email };
 }
 
 function getImageExtension(contentType) {
@@ -267,6 +299,16 @@ export default {
         "# WORK Worker 실행중\nKV + R2 + 부분 동기화 연결 완료 (v2)",
         { headers: { ...CORS_HEADERS, "Content-Type": "text/plain; charset=utf-8" } }
       );
+    }
+
+    // ─── 로그인 검증 ───
+    // 데이터를 읽거나 쓰는 모든 요청은 여기를 통과해야 한다. 이미지 조회(/api/image,
+    // /api/download/*)는 <img> 태그가 커스텀 헤더를 못 보내서 일부러 제외했다 — 대신 키가
+    // 추측 불가능한 랜덤 UUID라 URL을 모르면 접근 못 한다(완전한 보호는 아니지만 실용적 절충).
+    const isImageServing = url.pathname === "/api/image" || url.pathname.startsWith("/api/download/");
+    if (!isImageServing) {
+      const auth = await verifyGoogleAuth(request, env);
+      if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status);
     }
 
     // ─── 이미지 업로드 ───
