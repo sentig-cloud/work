@@ -1573,6 +1573,7 @@ input, textarea, [contenteditable="true"] {
 .auth-gate-title { font-size:1.3rem; font-weight:900; color:var(--w-black); }
 .auth-gate-sub { font-size:0.85rem; color:#444; margin-bottom:14px; }
 .auth-gate-btn-slot { min-height:44px; display:flex; align-items:center; justify-content:center; }
+.auth-gate-busy { font-size:0.82rem; font-weight:bold; color:var(--w-blue); margin-top:10px; }
 .auth-gate-error {
     margin-top:14px; font-size:0.78rem; font-weight:bold; color:#b91c1c;
     background:#fef2f2; border:2px solid #ef4444; padding:6px 8px; width:100%;
