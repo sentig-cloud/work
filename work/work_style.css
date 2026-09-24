@@ -1578,3 +1578,18 @@ input, textarea, [contenteditable="true"] {
     margin-top:14px; font-size:0.78rem; font-weight:bold; color:#b91c1c;
     background:#fef2f2; border:2px solid #ef4444; padding:6px 8px; width:100%;
 }
+
+.access-log-body { max-height:60vh; overflow-y:auto; padding:10px; }
+.access-log-status { text-align:center; font-size:0.85rem; color:#555; padding:16px 0; }
+.access-log-row {
+    display:flex; align-items:center; gap:8px; padding:7px 4px; border-bottom:1px solid #ddd;
+    font-size:0.8rem;
+}
+.access-log-row:last-child { border-bottom:none; }
+.access-log-email { flex:1 1 auto; min-width:0; overflow-wrap:break-word; }
+.access-log-badge {
+    flex:0 0 auto; font-size:0.7rem; font-weight:bold; color:#166534;
+    background:#dcfce7; border:1px solid #86efac; padding:1px 6px; border-radius:3px;
+}
+.access-log-denied .access-log-badge { color:#b91c1c; background:#fef2f2; border-color:#ef4444; }
+.access-log-time { flex:0 0 auto; font-size:0.72rem; color:#666; white-space:nowrap; }

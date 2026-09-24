@@ -301,6 +301,13 @@
                             <div id="ttVisionOcrUsage" class="tt-settings-usage"></div>
                         </div>
                     </div>
+                    <div class="tt-settings-group">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-user-shield"></i> 계정</div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label" id="ttAccountEmailLabel"></div>
+                            <button type="button" class="w95-btn" id="ttAccessLogBtn" style="width:100%; height:28px; margin-top:4px;">접속 기록 보기</button>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer" style="padding:6px; background:var(--w-gray);">
                     <button type="button" class="w95-btn" id="ttSettingsSaveBtn" style="width:100%; height:32px; font-weight:bold; color:var(--w-blue);">저장</button>
@@ -310,6 +317,7 @@
         document.body.appendChild(modal);
         document.getElementById('ttSettingsCloseBtn').addEventListener('click', closeSettingsModal);
         document.getElementById('ttSettingsSaveBtn').addEventListener('click', saveSettingsFromModal);
+        document.getElementById('ttAccessLogBtn').addEventListener('click', () => window.showAccessLog?.());
     }
 
     function openSettingsModal() {
@@ -327,6 +335,9 @@
         const defaultMap = localStorage.getItem('wm_default_map') || 'naver';
         const mapOptIds = { tmap: 'ttOptMapTmap', naver: 'ttOptMapNaver', kakaomap: 'ttOptMapKakao' };
         document.getElementById(mapOptIds[defaultMap] || 'ttOptMapNaver').checked = true;
+
+        const emailLabel = document.getElementById('ttAccountEmailLabel');
+        if (emailLabel) emailLabel.textContent = window.wmAuthEmail ? `현재 로그인: ${window.wmAuthEmail}` : '';
 
         document.getElementById('ttOptGeoRouteEnabled').checked = !!window.isGeoRouteEnabled?.();
         const iconRow = document.getElementById('ttGeoRouteLocIconRow');
