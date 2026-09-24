@@ -1522,8 +1522,13 @@ input, textarea, [contenteditable="true"] {
     background:#ef4444; color:#fff; border:1px solid #fff; font-size:12px; line-height:1; cursor:pointer;
 }
 
-.pi-search-bar { display:flex; gap:6px; padding:8px; background:var(--w-gray); border-bottom:2px solid var(--w-black); flex-shrink:0; }
+.pi-mode-tabs { display:flex; gap:4px; padding:6px 8px 0; background:var(--w-gray); flex-shrink:0; }
+.pi-mode-tab { flex:1; height:30px; font-weight:bold; font-size:0.82rem; }
+.pi-mode-tab.is-active { background:var(--w-blue) !important; color:#fff; box-shadow:inset 2px 2px #000, inset -1px -1px #fff; }
+.pi-search-bar, .pi-date-bar { display:flex; gap:6px; padding:8px; background:var(--w-gray); border-bottom:2px solid var(--w-black); flex-shrink:0; }
 .pi-search-bar input { flex:1; margin:0; }
+.pi-date-bar input[type="date"] { flex:1; margin:0; }
+.pi-date-bar .icon-btn { width:32px; flex-shrink:0; }
 
 .pi-result-row { display:flex; align-items:center; gap:8px; padding:10px 8px; border-bottom:1px solid var(--w-dark-gray); background:var(--w-white); }
 .pi-result-main { flex:1; min-width:0; }

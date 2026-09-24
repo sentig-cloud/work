@@ -36,9 +36,18 @@
                 <span><i class="fa-solid fa-chevron-left" style="margin-right:8px;"></i> 사진 넣을 곳 찾기</span>
             </div>
             <div class="pi-pending-strip" id="piPendingStrip"></div>
-            <div class="pi-search-bar">
+            <div class="pi-mode-tabs">
+                <button type="button" class="w95-btn pi-mode-tab is-active" id="piModeSearchBtn"><i class="fa-solid fa-magnifying-glass"></i> 검색</button>
+                <button type="button" class="w95-btn pi-mode-tab" id="piModeDateBtn"><i class="fa-solid fa-calendar-day"></i> 날짜로 찾기</button>
+            </div>
+            <div class="pi-search-bar" id="piSearchBar">
                 <input type="text" id="piSearchInput" class="m-input w95-in" placeholder="고객명 / 주소 / 작업유형 / Task No 검색...">
                 <button type="button" class="w95-btn icon-btn" id="piAddMoreBtn" title="사진 더 담기"><i class="fa-solid fa-plus"></i></button>
+            </div>
+            <div class="pi-date-bar" id="piDateBar" style="display:none;">
+                <button type="button" class="w95-btn icon-btn" id="piDatePrevBtn"><i class="fa-solid fa-chevron-left"></i></button>
+                <input type="date" id="piDateInput" class="m-input w95-in">
+                <button type="button" class="w95-btn icon-btn" id="piDateNextBtn"><i class="fa-solid fa-chevron-right"></i></button>
             </div>
             <div id="piResultList" class="list-area" style="margin:0; border:none;"></div>
         `;
@@ -47,6 +56,43 @@
         document.getElementById('piCloseTitlebar').addEventListener('click', close);
         document.getElementById('piSearchInput').addEventListener('input', () => renderResults());
         document.getElementById('piAddMoreBtn').addEventListener('click', () => document.getElementById('piFileInput').click());
+        document.getElementById('piModeSearchBtn').addEventListener('click', () => setMode('search'));
+        document.getElementById('piModeDateBtn').addEventListener('click', () => setMode('date'));
+        document.getElementById('piDateInput').addEventListener('change', () => renderResults());
+        document.getElementById('piDatePrevBtn').addEventListener('click', () => shiftDate(-1));
+        document.getElementById('piDateNextBtn').addEventListener('click', () => shiftDate(1));
+    }
+
+    // ─── 검색 / 날짜로 찾기 모드 전환 ───
+    let piMode = 'search';
+    function setMode(mode) {
+        piMode = mode;
+        document.getElementById('piModeSearchBtn').classList.toggle('is-active', mode === 'search');
+        document.getElementById('piModeDateBtn').classList.toggle('is-active', mode === 'date');
+        document.getElementById('piSearchBar').style.display = mode === 'search' ? 'flex' : 'none';
+        document.getElementById('piDateBar').style.display = mode === 'date' ? 'flex' : 'none';
+        if (mode === 'date' && !document.getElementById('piDateInput').value) {
+            document.getElementById('piDateInput').value = toDateInputValue(new Date());
+        }
+        renderResults();
+    }
+    function toDateInputValue(date) {
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+    function shiftDate(deltaDays) {
+        const dateInput = document.getElementById('piDateInput');
+        // new Date("YYYY-MM-DD")는 UTC 자정으로 해석돼 타임존에 따라 하루 밀릴 수 있어
+        // 연/월/일을 직접 분리해서 로컬 날짜로 만든다(다른 화면의 날짜 입력 처리 방식과 동일).
+        let current;
+        if (dateInput.value) {
+            const [yy, mm, dd] = dateInput.value.split('-').map(Number);
+            current = new Date(yy, mm - 1, dd);
+        } else {
+            current = new Date();
+        }
+        current.setDate(current.getDate() + deltaDays);
+        dateInput.value = toDateInputValue(current);
+        renderResults();
     }
 
     // ─── 진입 ───
@@ -141,14 +187,42 @@
             if (first) return first;
         }
         if (log.memo) return String(log.memo).slice(0, 20);
+        // 출퇴근은 보통 이름/내용이 없어서 검색어로 찾기 어렵다 — 시간이라도 붙여서 구분되게 한다.
+        if ((log.cat === 'commute_in' || log.cat === 'commute_out') && log.time) {
+            return `${CAT_LABEL[log.cat]} ${log.time}`;
+        }
         return CAT_LABEL[log.cat] || '(내용없음)';
     }
 
-    function renderResults() {
+    function buildResultRowHtml(log) {
+        const dateStr = `${log.y}.${String(log.m).padStart(2, '0')}.${String(log.d).padStart(2, '0')}(${days[new Date(log.y, log.m - 1, log.d).getDay()]})`;
+        const timeStr = log.workTime || log.time || '';
+        const imgCount = (log.imgs || []).length;
+        return `<div class="pi-result-row" data-log-id="${escapeHtml(log.id)}">
+            <div class="pi-result-main">
+                <div class="pi-result-date">${dateStr}${timeStr ? ` ${escapeHtml(timeStr)}` : ''} <span class="pi-result-cat">[${CAT_LABEL[log.cat] || log.cat}]</span></div>
+                <div class="pi-result-label">${escapeHtml(labelOf(log))}</div>
+            </div>
+            <div class="pi-result-meta">${imgCount > 0 ? `사진 ${imgCount}장` : ''}</div>
+            <button type="button" class="w95-btn pi-insert-btn" data-log-id="${escapeHtml(log.id)}">추가</button>
+        </div>`;
+    }
+
+    function renderResultRows(results, emptyMessage) {
         const listEl = document.getElementById('piResultList');
         if (!listEl) return;
-        const keyword = (document.getElementById('piSearchInput')?.value || '').trim().toLowerCase();
+        if (results.length === 0) {
+            listEl.innerHTML = `<div class="pi-empty-hint" style="padding:16px; text-align:center;">${emptyMessage}</div>`;
+            return;
+        }
+        listEl.innerHTML = results.map(buildResultRowHtml).join('');
+        listEl.querySelectorAll('.pi-insert-btn').forEach(btn => {
+            btn.addEventListener('click', () => insertInto(btn.dataset.logId));
+        });
+    }
 
+    function renderSearchResults() {
+        const keyword = (document.getElementById('piSearchInput')?.value || '').trim().toLowerCase();
         const keywordIsChosung = !!keyword && window.isChosungOnly(keyword);
         let results = (window.logs || []).filter(Boolean);
         if (keyword) results = results.filter(log => {
@@ -156,28 +230,26 @@
             return text.includes(keyword) || (keywordIsChosung && window.extractChosung(text).includes(keyword));
         });
         results = results.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))).slice(0, 80);
+        renderResultRows(results, keyword ? '검색 결과가 없습니다.' : '최근 기록이 없습니다. 검색어를 입력해보세요.');
+    }
 
-        if (results.length === 0) {
-            listEl.innerHTML = `<div class="pi-empty-hint" style="padding:16px; text-align:center;">${keyword ? '검색 결과가 없습니다.' : '최근 기록이 없습니다. 검색어를 입력해보세요.'}</div>`;
-            return;
-        }
+    // 날짜로 찾기 — 출퇴근처럼 검색어로는 잘 안 잡히는 카드도 날짜만 알면 바로 고를 수 있다.
+    // 그날 실제로 등록된 카드만 나오므로, 출근/퇴근 기록이 없는 날은 자연히 선택지에 없다.
+    function renderDateResults() {
+        const dateInput = document.getElementById('piDateInput');
+        const value = dateInput?.value;
+        if (!value) { renderResultRows([], '날짜를 선택해주세요.'); return; }
+        const [yy, mm, dd] = value.split('-').map(Number);
+        const results = (window.logs || [])
+            .filter(l => l && Number(l.y) === yy && Number(l.m) === mm && Number(l.d) === dd)
+            .sort((a, b) => String(a.workTime || a.time || '').localeCompare(String(b.workTime || b.time || '')));
+        renderResultRows(results, '이 날짜에 등록된 카드가 없습니다.');
+    }
 
-        listEl.innerHTML = results.map(log => {
-            const dateStr = `${log.y}.${String(log.m).padStart(2, '0')}.${String(log.d).padStart(2, '0')}(${days[new Date(log.y, log.m - 1, log.d).getDay()]})`;
-            const imgCount = (log.imgs || []).length;
-            return `<div class="pi-result-row" data-log-id="${escapeHtml(log.id)}">
-                <div class="pi-result-main">
-                    <div class="pi-result-date">${dateStr} <span class="pi-result-cat">[${CAT_LABEL[log.cat] || log.cat}]</span></div>
-                    <div class="pi-result-label">${escapeHtml(labelOf(log))}</div>
-                </div>
-                <div class="pi-result-meta">${imgCount > 0 ? `사진 ${imgCount}장` : ''}</div>
-                <button type="button" class="w95-btn pi-insert-btn" data-log-id="${escapeHtml(log.id)}">추가</button>
-            </div>`;
-        }).join('');
-
-        listEl.querySelectorAll('.pi-insert-btn').forEach(btn => {
-            btn.addEventListener('click', () => insertInto(btn.dataset.logId));
-        });
+    function renderResults() {
+        if (!document.getElementById('piResultList')) return;
+        if (piMode === 'date') renderDateResults();
+        else renderSearchResults();
     }
 
     function insertInto(logId) {

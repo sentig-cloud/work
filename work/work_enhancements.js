@@ -1317,7 +1317,7 @@
         const summary = document.getElementById('searchSummary');
         if (!keyword && !monthValue && !ox && !ot && !duty && !selections.length) { resultList.innerHTML = ''; summary.style.display = 'none'; return; }
         const keywordIsChosung = !!keyword && window.isChosungOnly(keyword);
-        const results = (window.logs || []).filter(log => {
+        const allMatches = (window.logs || []).filter(log => {
             const keywordText = buildLogKeywordText(log);
             const keywordMatched = !keyword || keywordText.includes(keyword) ||
                 (keywordIsChosung && buildLogKeywordChosung(log).includes(keyword));
@@ -1330,17 +1330,26 @@
                 (!duty || !!(log.isDuty || log.isDutyLog || log.cat === 'duty') === (duty === 'yes')) &&
                 selections.every(s => groupHasSearchValue(log, s.groupId, s.value));
         });
+        // 카드 하나하나가 그리기 무거워서(위젯/그룹 색상 등) 매치가 많으면 타이핑할 때마다
+        // 눈에 띄게 느려진다 — 최근 것부터 상위 RESULT_RENDER_CAP개만 그려서 체감 속도를 지킨다.
+        const RESULT_RENDER_CAP = 150;
+        allMatches.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+        const results = allMatches.slice(0, RESULT_RENDER_CAP);
         const perDay = {};
-        (window.logs || []).filter(l => l?.cat === 'work').forEach(log => {
-            const key = `${log.y}-${log.m}-${log.d}`; perDay[key] = perDay[key] || [];
-            perDay[key].push(log);
-        });
+        if (results.some(log => log.cat === 'work')) {
+            (window.logs || []).filter(l => l?.cat === 'work').forEach(log => {
+                const key = `${log.y}-${log.m}-${log.d}`; perDay[key] = perDay[key] || [];
+                perDay[key].push(log);
+            });
+        }
         resultList.innerHTML = results.map(log => {
             const key = `${log.y}-${log.m}-${log.d}`;
             const index = log.cat === 'work' ? (perDay[key] || []).findIndex(x => String(x.id) === String(log.id)) + 1 : '';
             return window.getLogCardHtml(log, index || '');
         }).join('');
-        summary.textContent = results.length ? `총 ${results.length}건 검색됨` : '조건에 맞는 기록이 없습니다.';
+        summary.textContent = !allMatches.length ? '조건에 맞는 기록이 없습니다.'
+            : allMatches.length > RESULT_RENDER_CAP ? `총 ${allMatches.length}건 중 최근 ${RESULT_RENDER_CAP}건 표시(검색어를 더 구체적으로 입력해보세요)`
+            : `총 ${allMatches.length}건 검색됨`;
         summary.style.display = 'block';
     };
     // 검색어 입력창 전용 — 타이핑 중 매 글자마다 전체 로그를 다시 훑고 카드들을 다시 그리지
@@ -1348,7 +1357,7 @@
     let searchDebounceTimer = null;
     window.doSearchDebounced = () => {
         clearTimeout(searchDebounceTimer);
-        searchDebounceTimer = setTimeout(() => window.doSearch(), 180);
+        searchDebounceTimer = setTimeout(() => window.doSearch(), 260);
     };
 
     // ─── 카드 다중 선택 / 읽기 쉬운 텍스트 복사 / 시스템 공유(카카오톡 포함) ───
