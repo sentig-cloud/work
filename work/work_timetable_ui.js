@@ -306,6 +306,10 @@
                         <div class="tt-settings-section">
                             <div class="tt-settings-label" id="ttAccountEmailLabel"></div>
                             <button type="button" class="w95-btn" id="ttAccessLogBtn" style="width:100%; height:28px; margin-top:4px;">접속 기록 보기</button>
+                            <div style="display:flex; gap:6px; margin-top:6px;">
+                                <button type="button" class="w95-btn" id="ttSwitchAccountBtn" style="flex:1; height:28px;">계정 전환</button>
+                                <button type="button" class="w95-btn" id="ttLogoutBtn" style="flex:1; height:28px;">로그아웃</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -318,6 +322,12 @@
         document.getElementById('ttSettingsCloseBtn').addEventListener('click', closeSettingsModal);
         document.getElementById('ttSettingsSaveBtn').addEventListener('click', saveSettingsFromModal);
         document.getElementById('ttAccessLogBtn').addEventListener('click', () => window.showAccessLog?.());
+        document.getElementById('ttSwitchAccountBtn').addEventListener('click', () => {
+            if (confirm('현재 계정에서 로그아웃하고 다른 계정으로 로그인할까요?')) window.wmLogout?.(true);
+        });
+        document.getElementById('ttLogoutBtn').addEventListener('click', () => {
+            if (confirm('로그아웃할까요?')) window.wmLogout?.(false);
+        });
     }
 
     function openSettingsModal() {
@@ -337,7 +347,14 @@
         document.getElementById(mapOptIds[defaultMap] || 'ttOptMapNaver').checked = true;
 
         const emailLabel = document.getElementById('ttAccountEmailLabel');
-        if (emailLabel) emailLabel.textContent = window.wmAuthEmail ? `현재 로그인: ${window.wmAuthEmail}` : '';
+        if (emailLabel) {
+            if (window.wmAuthEmail) {
+                const expText = window.wmAuthExp ? new Date(window.wmAuthExp).toLocaleDateString('ko-KR') : '';
+                emailLabel.textContent = `현재 로그인: ${window.wmAuthEmail}${expText ? ` (만료: ${expText})` : ''}`;
+            } else {
+                emailLabel.textContent = '';
+            }
+        }
 
         document.getElementById('ttOptGeoRouteEnabled').checked = !!window.isGeoRouteEnabled?.();
         const iconRow = document.getElementById('ttGeoRouteLocIconRow');

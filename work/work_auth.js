@@ -17,6 +17,7 @@ const GOOGLE_CLIENT_ID = "677166432997-u0vd4cmpi2al3utagjhkbmkac547e2h8.apps.goo
 
 window.wmAuthToken = null;
 window.wmAuthEmail = null;
+window.wmAuthExp = null;
 
 function getStoredAuth() {
     try {
@@ -33,6 +34,7 @@ function getStoredAuth() {
 function storeAuth(token, email, exp) {
     window.wmAuthToken = token;
     window.wmAuthEmail = email;
+    window.wmAuthExp = exp;
     try {
         localStorage.setItem("wm_auth", JSON.stringify({ token, email, exp }));
     } catch {
@@ -43,6 +45,7 @@ function storeAuth(token, email, exp) {
 function clearAuth() {
     window.wmAuthToken = null;
     window.wmAuthEmail = null;
+    window.wmAuthExp = null;
     try {
         localStorage.removeItem("wm_auth");
     } catch {
@@ -142,6 +145,15 @@ window.wmRequireReauth = () => {
     showGate("로그인이 만료되었습니다. 다시 로그인해주세요.");
 };
 
+// 로그아웃 / 계정 전환(설정 > 계정) — 둘 다 현재 세션을 지우고 로그인 화면을 다시 띄운다.
+// "계정 전환"은 구글 로그인 버튼이 항상 계정 선택 UI를 띄우므로 별도 처리 없이도 다른
+// 계정을 고를 수 있다 — disableAutoSelect로 자동 재선택만 꺼서 확실히 선택창이 뜨게 한다.
+window.wmLogout = (switchAccount = false) => {
+    clearAuth();
+    try { google?.accounts?.id?.disableAutoSelect(); } catch { /* SDK 미로딩 시 무시 */ }
+    showGate(switchAccount ? "다른 계정으로 로그인해주세요." : null);
+};
+
 // ─── 접속 기록 (설정 > 계정 > 접속 기록 보기) ───
 // "설정한 적 없는 계정이 로그인됐다" 같은 문제를 실제로 어떤 이메일이 언제 시도했는지
 // 눈으로 확인할 수 있게, 서버(worker.js)가 남긴 허용/거부 기록을 그대로 보여준다.
@@ -151,9 +163,17 @@ function ensureAccessLogModalDom() {
     modal.id = "accessLogModal";
     modal.className = "modal-overlay";
     modal.style.display = "none";
+    // 설정 창(ttSettingsModal)이 z-index:2650으로 떠 있는 상태에서 열리므로, 그 위에
+    // 오도록 더 높은 z-index를 명시해야 한다(기본 .modal-overlay는 2000이라 가려짐).
+    modal.style.zIndex = "2700";
     modal.innerHTML = `
         <div class="modal-box w95-window" style="max-width:360px;">
             <div class="w95-titlebar"><span>접속 기록</span><button type="button" class="w95-btn" id="accessLogCloseBtn">X</button></div>
+            <div id="accessLogCurrent" class="access-log-current"></div>
+            <div class="access-log-actions">
+                <button type="button" class="w95-btn" id="accessLogExportBtn">내보내기</button>
+                <button type="button" class="w95-btn" id="accessLogClearBtn">기록 삭제</button>
+            </div>
             <div id="accessLogBody" class="access-log-body"></div>
         </div>
     `;
@@ -164,6 +184,8 @@ function ensureAccessLogModalDom() {
     modal.addEventListener("click", (e) => {
         if (e.target === modal) modal.style.display = "none";
     });
+    document.getElementById("accessLogExportBtn").addEventListener("click", exportAccessLog);
+    document.getElementById("accessLogClearBtn").addEventListener("click", clearAccessLog);
 }
 
 function formatAccessLogTime(iso) {
@@ -176,11 +198,22 @@ function formatAccessLogTime(iso) {
     }
 }
 
+let lastAccessLogEntries = [];
+
+function renderAccessLogCurrent() {
+    const el = document.getElementById("accessLogCurrent");
+    if (!el) return;
+    if (!window.wmAuthEmail) { el.textContent = ""; return; }
+    const expText = window.wmAuthExp ? `만료: ${formatAccessLogTime(new Date(window.wmAuthExp).toISOString())}` : "";
+    el.textContent = `현재 접속 중: ${window.wmAuthEmail}${expText ? " (" + expText + ")" : ""}`;
+}
+
 window.showAccessLog = async function () {
     ensureAccessLogModalDom();
     const modal = document.getElementById("accessLogModal");
     const body = document.getElementById("accessLogBody");
     modal.style.display = "flex";
+    renderAccessLogCurrent();
     body.innerHTML = `<div class="access-log-status">불러오는 중...</div>`;
     try {
         const res = await window.fetchWithTimeout(`${AUTH_API_BASE}/api/auth/log`, { method: "GET" }, 15000);
@@ -190,12 +223,12 @@ window.showAccessLog = async function () {
             body.innerHTML = `<div class="access-log-status">기록을 불러오지 못했습니다: ${result.error || res.status}</div>`;
             return;
         }
-        const entries = result.entries || [];
-        if (entries.length === 0) {
+        lastAccessLogEntries = result.entries || [];
+        if (lastAccessLogEntries.length === 0) {
             body.innerHTML = `<div class="access-log-status">기록이 없습니다.</div>`;
             return;
         }
-        body.innerHTML = entries.map(e => `
+        body.innerHTML = lastAccessLogEntries.map(e => `
             <div class="access-log-row ${e.result === "denied" ? "access-log-denied" : ""}">
                 <span class="access-log-email">${e.email || "-"}</span>
                 <span class="access-log-badge">${e.result === "denied" ? "거부됨" : "허용됨"}</span>
@@ -207,6 +240,45 @@ window.showAccessLog = async function () {
     }
 };
 
+// 지금까지 불러온 접속 기록을 CSV로 내보낸다(순수 클라이언트 동작, 서버 호출 없음).
+function exportAccessLog() {
+    if (lastAccessLogEntries.length === 0) {
+        alert("내보낼 기록이 없습니다.");
+        return;
+    }
+    const rows = [["이메일", "결과", "시각"]];
+    for (const e of lastAccessLogEntries) {
+        rows.push([e.email || "", e.result === "denied" ? "거부됨" : "허용됨", e.at || ""]);
+    }
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `access_log_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+}
+
+async function clearAccessLog() {
+    if (!confirm("접속 기록을 전부 삭제할까요? 되돌릴 수 없습니다.")) return;
+    try {
+        const res = await window.fetchWithTimeout(`${AUTH_API_BASE}/api/auth/log`, { method: "DELETE" }, 15000);
+        const text = await res.text();
+        const result = text ? JSON.parse(text) : {};
+        if (!res.ok || !result.ok) {
+            alert("삭제 실패: " + (result.error || res.status));
+            return;
+        }
+        lastAccessLogEntries = [];
+        window.showAccessLog();
+    } catch (e) {
+        alert("삭제 실패: " + e.message);
+    }
+}
+
 function boot() {
     const appEl = document.getElementById("app-container");
     if (appEl) appEl.style.display = "none"; // 로그인 확인 전까지는 항상 숨김 상태로 시작
@@ -215,6 +287,7 @@ function boot() {
     if (stored) {
         window.wmAuthToken = stored.token;
         window.wmAuthEmail = stored.email;
+        window.wmAuthExp = stored.exp;
         hideGate();
         window.dispatchEvent(new CustomEvent("wm-auth-ready"));
     } else {
