@@ -1562,3 +1562,18 @@ input, textarea, [contenteditable="true"] {
 .commute-ocr-hint.is-ok { background:#f0fdf4; border-color:#16a34a; color:#166534; }
 .commute-ocr-hint.is-warning { background:#fef2f2; border-color:#ef4444; color:#b91c1c; }
 .commute-ocr-hint.is-active:not(.is-ok):not(.is-warning) { background:var(--w-gray); border-color:var(--w-dark-gray); color:var(--w-black); }
+
+/* ─── 구글 로그인 게이트 (work_auth.js) ─── */
+.auth-gate {
+    display:none; position:fixed; inset:0; z-index:9999; background:var(--w-bg);
+    align-items:center; justify-content:center; padding:20px;
+}
+.auth-gate-box { width:100%; max-width:300px; }
+.auth-gate-body { padding:24px 20px; display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center; }
+.auth-gate-title { font-size:1.3rem; font-weight:900; color:var(--w-black); }
+.auth-gate-sub { font-size:0.85rem; color:#444; margin-bottom:14px; }
+.auth-gate-btn-slot { min-height:44px; display:flex; align-items:center; justify-content:center; }
+.auth-gate-error {
+    margin-top:14px; font-size:0.78rem; font-weight:bold; color:#b91c1c;
+    background:#fef2f2; border:2px solid #ef4444; padding:6px 8px; width:100%;
+}

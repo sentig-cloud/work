@@ -22,8 +22,19 @@ window.fetchWithTimeout = async function (url, options = {}, timeoutMs = 15000) 
         if (externalSignal.aborted) controller.abort();
         else externalSignal.addEventListener("abort", onExternalAbort);
     }
+    // 서버(worker.js)로 가는 요청에는 구글 로그인 토큰을 자동으로 실어 보낸다 — 호출부마다
+    // 따로 안 붙여도 되게 여기 한 곳에서 처리(모든 API 호출이 이 함수를 거쳐간다).
+    const isWorkApiCall = typeof url === "string" && url.startsWith(WORK_API_BASE);
+    const headers = { ...(options.headers || {}) };
+    if (isWorkApiCall && window.wmAuthToken) {
+        headers["Authorization"] = `Bearer ${window.wmAuthToken}`;
+    }
     try {
-        return await fetch(url, { ...options, signal: controller.signal });
+        const response = await fetch(url, { ...options, headers, signal: controller.signal });
+        if (response.status === 401 && isWorkApiCall) {
+            window.wmRequireReauth?.();
+        }
+        return response;
     } catch (e) {
         if (e.name === "AbortError") {
             if (externalSignal && externalSignal.aborted) {
