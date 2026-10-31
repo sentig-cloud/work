@@ -1598,3 +1598,65 @@ input, textarea, [contenteditable="true"] {
 }
 .access-log-denied .access-log-badge { color:#b91c1c; background:#fef2f2; border-color:#ef4444; }
 .access-log-time { flex:0 0 auto; font-size:0.72rem; color:#666; white-space:nowrap; }
+
+/* ─── 선택태그 상자 압축 모드 (work_tag_compact.js, 메인 설정에서 선택) ───
+   평소엔 선택된 태그만 보이고, 상자를 누르면 그 자리에서 펼쳐진다. 레이아웃 변경 모드에선 모두 펼침. */
+#workModal.tag-compact-mode:not(.layout-edit-mode) .drag-item[data-group-ref]:not([data-group-ref="duration"]):not(.tag-box-expanded) .btn-tag-area {
+    position: relative; cursor: pointer; padding-right: 24px; min-height: 34px;
+}
+#workModal.tag-compact-mode:not(.layout-edit-mode) .drag-item[data-group-ref]:not([data-group-ref="duration"]):not(.tag-box-expanded) .btn-tag-area > *:not(.active-btn) {
+    display: none !important;
+}
+#workModal.tag-compact-mode:not(.layout-edit-mode) .drag-item[data-group-ref]:not([data-group-ref="duration"]):not(.tag-box-expanded) .btn-tag-area > * {
+    pointer-events: none;
+}
+#workModal.tag-compact-mode:not(.layout-edit-mode) .drag-item[data-group-ref]:not([data-group-ref="duration"]):not(.tag-box-expanded) .btn-tag-area::after {
+    content: "▾"; position: absolute; right: 7px; top: 50%; transform: translateY(-50%);
+    color: #64748b; font-size: 0.9rem; pointer-events: none;
+}
+#workModal.tag-compact-mode:not(.layout-edit-mode) .drag-item[data-group-ref]:not([data-group-ref="duration"]):not(.tag-box-expanded) .btn-tag-area:not(:has(.active-btn))::before {
+    content: "눌러서 선택"; color: #94a3b8; font-size: 0.8rem; padding-left: 4px; pointer-events: none;
+}
+#workModal.work-edit-locked.tag-compact-mode .drag-item[data-group-ref]:not([data-group-ref="duration"]) .btn-tag-area:not(:has(.active-btn))::before {
+    content: "선택 없음";
+}
+#workModal.tag-compact-mode .drag-item.tag-box-expanded .btn-tag-area {
+    outline: 2px solid #2563eb; outline-offset: -2px;
+}
+.tag-compact-ok {
+    display: block; width: 100%; height: 28px; margin-top: 2px;
+    font-weight: bold; color: var(--w-blue);
+}
+#workModal.layout-edit-mode .tag-compact-ok { display: none; }
+
+/* ─── 동선 관리: 좌우로 미는 날짜 띠 + 지도 마크 (work_georoute.js) ─── */
+.geo-route-date-chips { overflow: hidden; padding: 4px 6px; gap: 4px; }
+.geo-route-today-btn { flex-shrink: 0; height: 40px; padding: 0 6px; font-size: 0.72rem; font-weight: bold; }
+.geo-route-date-strip {
+    flex: 1; min-width: 0; display: flex; gap: 4px; overflow-x: auto; overflow-y: hidden;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none; touch-action: pan-x;
+}
+.geo-route-date-strip::-webkit-scrollbar { display: none; }
+.geo-route-date-strip .geo-route-date-chip {
+    flex: 0 0 38px; width: 38px; height: 40px; position: relative; padding-top: 6px;
+}
+.geo-route-date-chip.is-today { box-shadow: inset 0 -3px 0 #f59e0b; }
+.geo-chip-month {
+    position: absolute; top: 0; left: 1px; font-size: 0.55rem; line-height: 1;
+    color: #b91c1c; font-weight: 900;
+}
+.geo-route-date-chip.is-active .geo-chip-month { color: #fff; }
+.geo-route-mark {
+    display: flex; align-items: center; gap: 2px; padding: 2px 6px 2px 4px; transform: translateY(-4px);
+    background: #fffbeb; border: 2px solid #f59e0b; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.35);
+    font-size: 0.72rem; font-weight: bold; color: #92400e; white-space: nowrap; cursor: pointer;
+}
+.geo-route-mark.is-selected { background: #f59e0b; color: #fff; }
+.geo-route-mark-star { color: #f59e0b; font-size: 0.9rem; }
+.geo-route-mark.is-selected .geo-route-mark-star { color: #fff; }
+.geo-route-mark-label { max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+.geo-route-mark-actions { display: flex; gap: 4px; margin-top: 6px; }
+.geo-route-mark-actions .w95-btn { flex: 1; height: 30px; font-size: 0.8rem; }
+#workModal.tag-compact-mode .drag-item.tag-box-expanded .btn-tag-area:not(:has(.layout-tag-button))::before {
+    content: "항목 없음 · 레이아웃 변경 모드에서 + 로 추가"; color: #94a3b8; font-size: 0.78rem; padding-left: 4px;
+}

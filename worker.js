@@ -1,6 +1,8 @@
 // worker.js
 const DATA_KEY = "work_master_backup";
 const FEED_KEY = "work_change_feed";
+// 마지막 저장 시각만 담는 작은 키 — /api/changes가 변경 없음을 확인할 때 큰 데이터 전체를 읽지 않게 한다.
+const META_KEY = "work_sync_meta";
 const MAX_FEED_EVENTS = 200;
 // Google Vision 무료 한도(월 1,000건)를 넘기 전에 자동으로 차단해 과금을 막는다.
 const OCR_MONTHLY_FREE_LIMIT = 1000;
@@ -319,7 +321,13 @@ async function savePayload(env, payload, event) {
   );
 
   await appendFeed(env, { ...event, savedAt });
+  await env.WORK_KV.put(META_KEY, JSON.stringify({ savedAt }));
   return savedAt;
+}
+
+function storedSavedAt(stored) {
+  if (!stored) return null;
+  return stored.savedAt || stored.saved?.syncUpdatedAt || stored.saved?.savedAt || null;
 }
 
 function upsertItem(items, incomingItem) {
@@ -678,8 +686,9 @@ export default {
     if (url.pathname === "/api/save" && request.method === "POST") {
       try {
         const body = await request.json();
+        const prevSavedAt = storedSavedAt(await readStoredBackup(env));
         const savedAt = await savePayload(env, body, { type: "full" });
-        return json({ ok: true, message: "saved", savedAt });
+        return json({ ok: true, message: "saved", savedAt, prevSavedAt });
       } catch (e) {
         return json({ ok: false, error: e.message }, 500);
       }
@@ -702,6 +711,7 @@ export default {
         const body = await request.json();
         const operations = Array.isArray(body.operations) ? body.operations : [];
         const stored = await readStoredBackup(env);
+        const prevSavedAt = storedSavedAt(stored);
         const payload = normalizePayload(
           stored && stored.saved ? stored.saved : createEmptyPayload()
         );
@@ -715,7 +725,9 @@ export default {
           master: body.master || null,
         });
 
-        return json({ ok: true, message: "patched", savedAt, changedCards: operations.length });
+        // prevSavedAt: 이번 저장 직전의 서버 시각. 클라이언트는 자기가 마지막으로 본 시각과 비교해
+        // 그 사이에 다른 기기의 저장이 끼어 있었는지 판단한다(끼어 있으면 바로 받아온다).
+        return json({ ok: true, message: "patched", savedAt, prevSavedAt, changedCards: operations.length });
       } catch (e) {
         return json({ ok: false, error: e.message }, 500);
       }
@@ -725,6 +737,17 @@ export default {
     if (url.pathname === "/api/changes" && request.method === "GET") {
       try {
         const since = url.searchParams.get("since") || "1970-01-01T00:00:00.000Z";
+        const metaRaw = await env.WORK_KV.get(META_KEY);
+        if (metaRaw) {
+          try {
+            const meta = JSON.parse(metaRaw);
+            if (meta && meta.savedAt && meta.savedAt <= since) {
+              return json({ ok: true, changed: false, savedAt: meta.savedAt });
+            }
+          } catch {
+            // 메타가 깨졌으면 아래의 전체 확인으로 진행
+          }
+        }
         const stored = await readStoredBackup(env);
 
         if (!stored || !stored.saved) return json({ ok: true, changed: false });

@@ -2,9 +2,11 @@
 // Work Master - partial automatic sync with Cloudflare KV / R2 (v2)
 
 const WORK_API_BASE = "https://work.sentig335.workers.dev";
-const WORK_SYNC_PUSH_DELAY = 1500;
+// 저장하면 거의 바로 서버로 보낸다(연속 입력은 이 시간 안에서만 묶어서 한 번에 전송).
+const WORK_SYNC_PUSH_DELAY = 300;
 const WORK_SYNC_PULL_COOLDOWN = 15000;
-const WORK_CALENDAR_PULL_INTERVAL = 60000;
+// 화면이 켜져 있는 동안 다른 기기의 변경을 확인하는 주기
+const WORK_VISIBLE_PULL_INTERVAL = 20000;
 
 window.syncTimer = null;
 window.syncInProgress = false;
@@ -61,6 +63,15 @@ window.setSyncStamp = function (stamp = null) {
     return value;
 };
 
+// 이 기기(모든 탭 공용)에서 서버 저장이 성공할 때마다 1씩 오른다 — 서버 응답을 기다리는 사이
+// 다른 탭이 저장을 끝냈는지(그래서 받은 응답이 낡았는지) 판단하는 데 쓴다.
+window.getPushSeq = function () {
+    return localStorage.getItem("wm_push_seq") || "0";
+};
+window.bumpPushSeq = function () {
+    localStorage.setItem("wm_push_seq", String((Number(window.getPushSeq()) || 0) + 1));
+};
+
 window.getDirtyMap = function () {
     try {
         return JSON.parse(localStorage.getItem("wm_dirty_map") || "{}");
@@ -93,12 +104,91 @@ window.markDirty = function (collection, id = "_all", action = "upsert") {
     window.setDirtyMap(dirty);
 };
 
+// ─── 여러 탭 동시 사용 대비 ───
+// 같은 기기의 탭들은 localStorage를 함께 쓰지만 메모리(window.logs)는 탭마다 따로라서,
+// 예전엔 뒤에 떠 있던 탭이 저장하면 오래된 메모리 내용으로 다른 탭의 저장분을 덮어쓰거나
+// (서버 전체 저장 시 서버에서도 지워짐) 다른 탭이 표시한 변경 표시를 자기 걸로 지워버려서
+// "저장했는데 안 된" 상태가 생겼다. 그래서 쓰기 전/서버 전송 전에 다른 탭이 쓴 내용을
+// 항목(id) 단위로 합친다. 기준(base)은 이 탭이 마지막으로 읽거나 쓴 시점의 id 목록.
+const WORK_TAB_ID = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+const LOCAL_REV_KEY = "wm_local_rev";
+let localRevCounter = 0;
+let lastSeenLocalRev = localStorage.getItem(LOCAL_REV_KEY) || "";
+const localBaseIds = {
+    logs: new Set((window.logs || []).map(item => String(item && item.id))),
+    trash: new Set((window.trash || []).map(item => String(item && item.id)))
+};
+
+function mergeCollectionWithStored(key, memory, stored) {
+    const base = localBaseIds[key] || new Set();
+    const storedById = new Map();
+    stored.forEach(item => { if (item && item.id !== undefined) storedById.set(String(item.id), item); });
+    const merged = [];
+    const seen = new Set();
+    memory.forEach(item => {
+        if (!item) return;
+        const id = String(item.id);
+        seen.add(id);
+        const other = storedById.get(id);
+        if (!other) {
+            // 이 탭에만 있음: 기준에 있었다면 다른 탭이 지운 것, 없었다면 이 탭이 새로 만든 것
+            if (!base.has(id)) merged.push(item);
+            return;
+        }
+        const mine = String(item.updatedAt || "");
+        const theirs = String(other.updatedAt || "");
+        merged.push(theirs > mine ? other : item);
+    });
+    stored.forEach(item => {
+        if (!item) return;
+        const id = String(item.id);
+        if (seen.has(id)) return;
+        // 저장소에만 있음: 기준에 있었다면 이 탭이 지운 것, 없었다면 다른 탭이 새로 만든 것
+        if (!base.has(id)) merged.push(item);
+    });
+    return merged;
+}
+
+// 다른 탭이 localStorage에 쓴 내용이 있으면 이 탭 메모리에 합친다. 바뀐 게 있으면 true.
+window.mergeOtherTabsLocal = function (force = false) {
+    const rev = localStorage.getItem(LOCAL_REV_KEY) || "";
+    if (!force && rev === lastSeenLocalRev) return false;
+    lastSeenLocalRev = rev;
+    let changed = false;
+    for (const key of ["logs", "trash"]) {
+        let stored;
+        try { stored = JSON.parse(localStorage.getItem(`wm_${key}`) || "[]"); } catch (e) { continue; }
+        if (!Array.isArray(stored)) continue;
+        const before = window[key] || [];
+        const merged = mergeCollectionWithStored(key, before, stored);
+        localBaseIds[key] = new Set(stored.filter(Boolean).map(item => String(item.id)));
+        if (merged.length !== before.length || merged.some((item, i) => item !== before[i])) changed = true;
+        window[key] = merged;
+    }
+    try {
+        const storedGroups = JSON.parse(localStorage.getItem("wm_groups") || "null");
+        if (Array.isArray(storedGroups) && JSON.stringify(storedGroups) !== JSON.stringify(window.groups || [])) {
+            window.groups = storedGroups.filter(Boolean);
+            window.ensureDefaultGroups && window.ensureDefaultGroups();
+            changed = true;
+        }
+    } catch (e) { /* 그룹 파싱 실패는 무시 */ }
+    return changed;
+};
+
+function bumpLocalRev() {
+    lastSeenLocalRev = `${WORK_TAB_ID}:${++localRevCounter}`;
+    localStorage.setItem(LOCAL_REV_KEY, lastSeenLocalRev);
+}
+
 // ─── 로컬 저장 (v2: groups 통합) ───
 window.saveArrayToLocal = function (key, array) {
     localStorage.setItem(`wm_${key}`, JSON.stringify((array || []).filter(Boolean)));
 };
 
 window.saveAllLocalOnly = function () {
+    // 다른 탭이 그 사이 저장했으면 먼저 합쳐서, 이 탭의 오래된 내용으로 덮어쓰지 않게 한다.
+    window.mergeOtherTabsLocal();
     window.logs = (window.logs || []).filter(Boolean);
     window.trash = (window.trash || []).filter(Boolean);
     window.groups = (window.groups || []).filter(Boolean);
@@ -108,6 +198,9 @@ window.saveAllLocalOnly = function () {
     localStorage.setItem("wm_groups", JSON.stringify(window.groups));
     window.saveArrayToLocal("logs", window.logs);
     window.saveArrayToLocal("trash", window.trash);
+    localBaseIds.logs = new Set(window.logs.map(item => String(item.id)));
+    localBaseIds.trash = new Set(window.trash.map(item => String(item.id)));
+    bumpLocalRev();
 
     // v1 하위 호환 키도 업데이트 (구 코드 참조 대비)
     window.saveArrayToLocal("taskTypes", window.taskTypes);
@@ -329,7 +422,12 @@ window.getUiSettingsPayload = function () {
         workLayout: readJson('wm_work_layout_v3', {}),
         workDragOrder: readJson('wm_work_drag_order', []),
         exportConfig: readJson('wm_export_conf', {}),
-        basicGroupTitle: localStorage.getItem('wm_basic_group_title') || ''
+        basicGroupTitle: localStorage.getItem('wm_basic_group_title') || '',
+        tagCompact: {
+            mode: localStorage.getItem('wm_tag_compact_mode') || '0',
+            close: localStorage.getItem('wm_tag_compact_close') || 'outside'
+        },
+        geoRouteMarks: readJson('wm_georoute_marks', [])
     };
 };
 window.applyUiSettingsPayload = function (uiSettings) {
@@ -344,6 +442,16 @@ window.applyUiSettingsPayload = function (uiSettings) {
     if (uiSettings.activeCardPreset) localStorage.setItem('wm_work_card_active_preset', uiSettings.activeCardPreset);
     else localStorage.removeItem('wm_work_card_active_preset');
     if (uiSettings.basicGroupTitle) localStorage.setItem('wm_basic_group_title', uiSettings.basicGroupTitle);
+    // 아래 두 항목은 예전 버전이 보낸 설정에는 없으므로, 들어있을 때만 덮어쓴다.
+    if (uiSettings.tagCompact && typeof uiSettings.tagCompact === 'object') {
+        localStorage.setItem('wm_tag_compact_mode', uiSettings.tagCompact.mode === '1' ? '1' : '0');
+        localStorage.setItem('wm_tag_compact_close', uiSettings.tagCompact.close === 'ok' ? 'ok' : 'outside');
+        window.applyTagCompactMode?.();
+    }
+    if (Array.isArray(uiSettings.geoRouteMarks)) {
+        setJson('wm_georoute_marks', uiSettings.geoRouteMarks);
+        window.refreshGeoRouteMarks?.();
+    }
 };
 window.getMasterPayload = function () {
     return {
@@ -481,6 +589,7 @@ window.pullRemoteChanges = async function (reason = "auto", force = false) {
 
     window.lastRemoteCheckAt = now;
     const since = encodeURIComponent(window.getSyncStamp());
+    const pushSeqBefore = window.getPushSeq();
 
     try {
         const response = await window.fetchWithTimeout(
@@ -493,6 +602,9 @@ window.pullRemoteChanges = async function (reason = "auto", force = false) {
 
         const result = text ? JSON.parse(text) : {};
         if (!result.changed) return false;
+        // 응답을 기다리는 사이 이 기기(다른 탭 포함)가 저장했으면 이 응답은 이미 낡은 것 —
+        // 그대로 덮으면 방금 저장한 카드가 사라질 수 있으니 버리고 다음 확인 때 다시 받는다.
+        if (window.hasDirtyChanges() || window.getPushSeq() !== pushSeqBefore || window.getSyncStamp() !== decodeURIComponent(since)) return false;
 
         if (result.full) window.applyServerData(result.data);
         else window.applyRemoteOperations(result.operations, result.master);
@@ -582,39 +694,98 @@ window.saveDirtyPatch = async function (dirty) {
     return result;
 };
 
+// 이번에 서버로 보낸 변경 표시만 지운다. 예전엔 전송하는 동안 새로 생긴 변경 표시까지 통째로
+// 지워서(clearDirtyMap), 저장 직후 바로 고친 내용은 서버로 영영 안 가는 경우가 있었다.
+window.clearSentDirty = function (sent) {
+    const current = window.getDirtyMap();
+    Object.keys(sent || {}).forEach(collection => {
+        const sentEntries = sent[collection] || {};
+        const currentEntries = current[collection];
+        if (!currentEntries) return;
+        Object.keys(sentEntries).forEach(id => {
+            const now = currentEntries[id];
+            if (now && now.changedAt === sentEntries[id].changedAt && now.action === sentEntries[id].action) {
+                delete currentEntries[id];
+            }
+        });
+        if (Object.keys(currentEntries).length === 0) delete current[collection];
+    });
+    if (Object.keys(current).length === 0) window.clearDirtyMap();
+    else window.setDirtyMap(current);
+};
+
+// 같은 기기의 여러 탭이 동시에 서버로 보내지 않도록 브라우저 잠금을 쓴다(지원 안 하면 그냥 실행).
+// 잠금이 어떤 이유로든 오래 안 풀리면(브라우저 이상) 저장이 멈추지 않도록 일정 시간 뒤엔 잠금 없이 진행한다.
+function withSyncLock(task) {
+    if (!(navigator.locks && navigator.locks.request && typeof AbortController === "function")) return task();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 45000);
+    return navigator.locks.request("wm-sync-push", { signal: controller.signal }, (lock) => {
+        clearTimeout(timer);
+        return task();
+    }).catch((e) => {
+        clearTimeout(timer);
+        if (e && e.name === "AbortError") return task();
+        throw e;
+    });
+}
+
 window.syncNow = async function (showError = false) {
     if (window.syncInProgress) {
         window.pendingSyncAfterCurrent = true;
         return null;
     }
 
-    const dirty = window.getDirtyMap();
-    const hasDirty = Object.keys(dirty).length > 0;
-
-    if (!hasDirty) {
+    if (!window.hasDirtyChanges()) {
         if (showError) return await window.pullRemoteChanges("manual", true);
         return null;
     }
 
     window.syncInProgress = true;
+    let needsPull = false;
+    let failed = false;
 
     try {
-        let result;
-        if (dirty.snapshot) result = await window.saveFullSnapshot();
-        else result = await window.saveDirtyPatch(dirty);
+        return await withSyncLock(async () => {
+            // 잠금을 기다리는 동안 다른 탭이 이미 보냈을 수 있으니 다시 확인한다.
+            const dirty = window.getDirtyMap();
+            if (Object.keys(dirty).length === 0) return null;
+            // 다른 탭이 저장한 카드가 이 탭 메모리에 없으면 전송에서 빠지거나(부분 저장),
+            // 서버에서 지워질 수 있으므로(전체 저장) 보내기 직전에 합친다.
+            if (window.mergeOtherTabsLocal()) window.refreshCurrentUI();
 
-        if (result && result.savedAt) window.setSyncStamp(result.savedAt);
-        window.clearDirtyMap();
-        return result;
+            const stampBefore = window.getSyncStamp();
+            let result;
+            if (dirty.snapshot) result = await window.saveFullSnapshot();
+            else result = await window.saveDirtyPatch(dirty);
+
+            if (result && result.savedAt && result.savedAt !== stampBefore) {
+                // 우리 저장 직전 서버 시각이 우리가 마지막으로 본 시각과 같을 때만 시각을 앞당긴다.
+                // 그 사이 다른 기기가 저장했다면 그 변경을 놓치지 않게 바로 받아온다.
+                if (result.prevSavedAt && result.prevSavedAt <= stampBefore) window.setSyncStamp(result.savedAt);
+                else needsPull = true;
+            }
+            window.clearSentDirty(dirty);
+            window.bumpPushSeq();
+            return result;
+        });
     } catch (e) {
+        failed = true;
         console.warn("서버 저장 실패, 로컬 변경사항 유지:", e);
         if (showError) throw e;
         return null;
     } finally {
         window.syncInProgress = false;
-        if (window.pendingSyncAfterCurrent) {
+        if (failed) {
+            // 실패하면 바로 반복하지 않고 잠시 뒤 다시 시도한다(새로 저장하거나 온라인이 되면 그때도 시도).
+            window.pendingSyncAfterCurrent = false;
+            clearTimeout(window.syncRetryTimer);
+            window.syncRetryTimer = setTimeout(() => window.syncNow(false), 15000);
+        } else if (window.pendingSyncAfterCurrent || window.hasDirtyChanges()) {
             window.pendingSyncAfterCurrent = false;
             window.scheduleSync();
+        } else if (needsPull) {
+            window.pullRemoteChanges("after-push", true);
         }
     }
 };
@@ -696,14 +867,24 @@ window.startSync = async function () {
     try {
         if (window.hasDirtyChanges()) await window.syncNow(false);
 
+        const stampBeforeLoad = window.getSyncStamp();
+        const pushSeqBeforeLoad = window.getPushSeq();
         const result = await window.loadFromServer();
         const serverData = window.getServerData(result);
         const serverStamp = window.getServerStamp(result);
 
-        if (serverData && !window.hasDirtyChanges()) {
+        // 불러오는 사이 다른 탭이 저장을 마쳤다면(시각이 바뀜) 이 응답은 그 저장보다 오래된 것이라
+        // 덮어쓰지 않고, 바뀐 부분만 다시 받아온다.
+        const staleResponse = window.getSyncStamp() !== stampBeforeLoad || window.getPushSeq() !== pushSeqBeforeLoad;
+        if (serverData && !window.hasDirtyChanges() && !staleResponse) {
             window.applyServerData(serverData);
             window.setSyncStamp(serverStamp);
             console.log("초기 서버 데이터 불러오기 완료", serverStamp);
+        } else if (staleResponse) {
+            window.isInitialLoad = false;
+            window.mergeOtherTabsLocal();
+            window.refreshCurrentUI();
+            window.pullRemoteChanges("startup-retry", true);
         } else {
             window.isInitialLoad = false;
             window.refreshCurrentUI();
@@ -758,8 +939,33 @@ window.installAutomaticPull = function () {
         };
     }
 
+    // 다른 탭에서 저장하면 이 탭 화면에도 바로 반영한다.
+    let storageRefreshTimer = null;
+    window.addEventListener("storage", (e) => {
+        if (e.key !== LOCAL_REV_KEY && e.key !== "wm_logs" && e.key !== "wm_trash" && e.key !== "wm_groups") return;
+        clearTimeout(storageRefreshTimer);
+        storageRefreshTimer = setTimeout(() => {
+            if (window.mergeOtherTabsLocal(e.key !== LOCAL_REV_KEY)) window.refreshCurrentUI();
+        }, 80);
+    });
+
+    // 화면을 벗어나기 직전엔 기다리지 않고 바로 서버로 보낸다(앱 전환/탭 닫기 대비).
+    const flushNow = () => {
+        if (!window.hasDirtyChanges()) return;
+        clearTimeout(window.syncTimer);
+        window.syncNow(false);
+    };
+    window.addEventListener("pagehide", flushNow);
+
     document.addEventListener("visibilitychange", () => {
-        if (!document.hidden) window.pullRemoteChanges("visible", false);
+        if (document.hidden) {
+            flushNow();
+            return;
+        }
+        // 다시 보일 때: 잠들어 있던 동안 다른 탭이 저장한 것부터 합치고, 서버 변경도 확인
+        if (window.mergeOtherTabsLocal()) window.refreshCurrentUI();
+        if (window.hasDirtyChanges()) window.scheduleSync();
+        else window.pullRemoteChanges("visible", true);
     });
 
     window.addEventListener("online", () => {
@@ -768,10 +974,10 @@ window.installAutomaticPull = function () {
     });
 
     window.autoPullSyncTimer = setInterval(() => {
-        const popupLayer = document.getElementById("popupLayer");
-        const calendarOpen = popupLayer && popupLayer.style.display === "flex" && !document.hidden;
-        if (calendarOpen) window.pullRemoteChanges("calendar-open-interval", false);
-    }, WORK_CALENDAR_PULL_INTERVAL);
+        if (document.hidden) return;
+        if (window.hasDirtyChanges()) window.scheduleSync();
+        else window.pullRemoteChanges("visible-interval", false);
+    }, WORK_VISIBLE_PULL_INTERVAL);
 };
 
 setTimeout(() => {

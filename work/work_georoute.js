@@ -52,7 +52,7 @@ let geoRouteRequestId = 0;
 let geoRouteCurrentResults = []; // [{log,address,geo,eta,dayMeta}] — 여러 날을 합친 목록일 수 있음
 let geoRouteCurrentTotal = 0;
 let geoRouteSelectedIdx = null; // null = 전체 동선 보기, 숫자면 그 지점만 보기
-let geoRouteAnchorMonday = null; // 날짜 태그 줄이 보여주는 주의 월요일
+let suppressMapClickUntil = 0; // 지도를 길게 눌러 마크를 찍은 직후 따라오는 클릭은 무시
 let geoRouteSelectedDays = []; // [{year,month,day}] 현재 선택된 날짜(들), 항상 1개 이상
 
 // ─── 현재 위치 → 자동차 이동시간(카카오 모빌리티 실제 도로/교통 기반 길찾기) ───
@@ -135,12 +135,20 @@ async function updateGeoRouteMap(results) {
         });
         // 핀이 아닌 지도 빈 공간을 누르면 선택을 해제하고 전체 동선을 다시 보여준다.
         kakao.maps.event.addListener(geoRouteMapInstance, 'click', () => {
+            if (Date.now() < suppressMapClickUntil) return; // 방금 길게 눌러 마크를 찍은 경우
             geoRouteSelectedIdx = null;
+            geoRouteSelectedMarkId = null;
             renderGeoRouteList();
+            renderGeoRouteMarkOverlays();
+        });
+        // PC: 오른쪽 클릭으로도 마크 추가
+        kakao.maps.event.addListener(geoRouteMapInstance, 'rightclick', (mouseEvent) => {
+            addGeoRouteMark(mouseEvent.latLng.getLat(), mouseEvent.latLng.getLng());
         });
     }
     clearGeoRouteMapOverlays();
     geoRouteMapInstance.relayout();
+    renderGeoRouteMarkOverlays();
 
     const points = results.filter(r => r.geo && r.geo.ok && typeof r.geo.lat === 'number' && typeof r.geo.lng === 'number');
     const bounds = new kakao.maps.LatLngBounds();
@@ -196,37 +204,276 @@ async function updateGeoRouteMap(results) {
     refreshPinHighlight();
 }
 
-// ─── 날짜 전환 태그(중복 선택 가능, 요일별 고정 색상, 이전/다음 주 이동) ───
-function renderGeoRouteDateChips() {
-    const container = document.getElementById('geoRouteDateChips');
-    if (!container || !window.WorkTimetable || !geoRouteAnchorMonday) return;
-    const days = window.WorkTimetable.weekDays(geoRouteAnchorMonday);
-    const labels = window.WorkTimetable.DAY_LABELS;
-    const chipsHtml = days.map((d, i) => {
-        const isSelected = geoRouteSelectedDays.some(sd => sd.year === d.getFullYear() && sd.month === d.getMonth() + 1 && sd.day === d.getDate());
-        const color = dayColorFor(i);
-        const style = isSelected ? `background:${color} !important; border-color:${color}; color:#fff;` : '';
-        return `<button type="button" class="w95-btn geo-route-date-chip${isSelected ? ' is-active' : ''}" style="${style}" data-y="${d.getFullYear()}" data-m="${d.getMonth() + 1}" data-d="${d.getDate()}">
-            <span>${labels[i]}</span><span>${d.getDate()}</span>
-        </button>`;
-    }).join('');
-    container.innerHTML = `
-        <button type="button" class="w95-btn geo-route-week-nav-btn" id="geoRoutePrevWeekBtn" title="이전 주"><i class="fa-solid fa-chevron-left"></i></button>
-        ${chipsHtml}
-        <button type="button" class="w95-btn geo-route-week-nav-btn" id="geoRouteNextWeekBtn" title="다음 주"><i class="fa-solid fa-chevron-right"></i></button>
-    `;
-    container.querySelectorAll('.geo-route-date-chip').forEach(btn => {
-        btn.addEventListener('click', () => toggleGeoRouteDay(Number(btn.dataset.y), Number(btn.dataset.m), Number(btn.dataset.d)));
-    });
-    document.getElementById('geoRoutePrevWeekBtn').addEventListener('click', () => shiftGeoRouteWeek(-1));
-    document.getElementById('geoRouteNextWeekBtn').addEventListener('click', () => shiftGeoRouteWeek(1));
+// ─── 날짜 띠(좌우로 밀어서 넓은 기간 이동, 중복 선택 가능, 요일별 고정 색상) ───
+// 예전엔 한 주(7칸)만 보여서 이전/다음 주 버튼으로만 넘길 수 있었고, 주를 넘기면 선택이 초기화돼
+// 여러 주에 걸친 날짜를 함께 고를 수 없었다. 이제 날짜가 한 줄로 길게 이어지고, 끝에 가까워지면
+// 앞/뒤로 날짜가 계속 붙는다. 선택은 넘겨도 유지된다.
+const GEO_STRIP_CHUNK = 28;
+let geoRouteStripStart = null; // 띠 첫 칸의 날짜
+let geoRouteStripCount = 0;
+
+const sameDay = (sd, d) => sd.year === d.getFullYear() && sd.month === d.getMonth() + 1 && sd.day === d.getDate();
+const addDays = (date, n) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + n);
+
+function initGeoRouteStrip(centerDate) {
+    geoRouteStripStart = addDays(centerDate, -GEO_STRIP_CHUNK);
+    geoRouteStripCount = GEO_STRIP_CHUNK * 2 + 1;
 }
 
-function shiftGeoRouteWeek(delta) {
-    geoRouteAnchorMonday = new Date(geoRouteAnchorMonday.getFullYear(), geoRouteAnchorMonday.getMonth(), geoRouteAnchorMonday.getDate() + delta * 7);
-    const days = window.WorkTimetable.weekDays(geoRouteAnchorMonday);
-    // 주가 바뀌면 선택을 그 주 첫 날(월요일) 하나로 초기화한다.
-    loadGeoRouteDays([{ year: days[0].getFullYear(), month: days[0].getMonth() + 1, day: days[0].getDate() }]);
+function stripChipHtml(d, idx) {
+    const weekdayNames = ['일', '월', '화', '수', '목', '금', '토'];
+    const dow = d.getDay();
+    const isSelected = geoRouteSelectedDays.some(sd => sameDay(sd, d));
+    const color = dayColorFor((dow + 6) % 7);
+    const style = isSelected ? `background:${color} !important; border-color:${color}; color:#fff;` : '';
+    const today = new Date();
+    const isToday = d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+    const monthLabel = (idx === 0 || d.getDate() === 1) ? `<span class="geo-chip-month">${d.getMonth() + 1}월</span>` : '';
+    return `<button type="button" class="w95-btn geo-route-date-chip${isSelected ? ' is-active' : ''}${isToday ? ' is-today' : ''}" style="${style}" data-y="${d.getFullYear()}" data-m="${d.getMonth() + 1}" data-d="${d.getDate()}">
+        ${monthLabel}<span>${weekdayNames[dow]}</span><span>${d.getDate()}</span>
+    </button>`;
+}
+
+function renderGeoRouteDateChips() {
+    const container = document.getElementById('geoRouteDateChips');
+    if (!container || !geoRouteStripStart) return;
+    let strip = document.getElementById('geoRouteDateStrip');
+    if (!strip) {
+        container.innerHTML = `
+            <button type="button" class="w95-btn geo-route-today-btn" id="geoRouteTodayBtn" title="오늘로 이동">오늘</button>
+            <div class="geo-route-date-strip" id="geoRouteDateStrip"></div>
+        `;
+        strip = document.getElementById('geoRouteDateStrip');
+        document.getElementById('geoRouteTodayBtn').addEventListener('click', () => {
+            const t = new Date();
+            const td = { year: t.getFullYear(), month: t.getMonth() + 1, day: t.getDate() };
+            const firstDay = geoRouteSelectedDays[0];
+            if (geoRouteSelectedDays.length === 1 && firstDay && firstDay.year === td.year && firstDay.month === td.month && firstDay.day === td.day) {
+                scrollStripToSelected(true);
+                return;
+            }
+            loadGeoRouteDays([td], { scrollToSelected: true });
+        });
+        strip.addEventListener('click', (e) => {
+            const btn = e.target.closest('.geo-route-date-chip');
+            if (!btn) return;
+            toggleGeoRouteDay(Number(btn.dataset.y), Number(btn.dataset.m), Number(btn.dataset.d));
+        });
+        strip.addEventListener('scroll', onStripScroll, { passive: true });
+    }
+    const keepScroll = strip.scrollLeft;
+    let html = '';
+    for (let i = 0; i < geoRouteStripCount; i++) html += stripChipHtml(addDays(geoRouteStripStart, i), i);
+    strip.innerHTML = html;
+    strip.scrollLeft = keepScroll;
+}
+
+function stripChipStep(strip) {
+    const chips = strip.querySelectorAll('.geo-route-date-chip');
+    if (chips.length < 2) return 42;
+    return chips[1].offsetLeft - chips[0].offsetLeft;
+}
+
+let stripExtending = false;
+function onStripScroll() {
+    const strip = document.getElementById('geoRouteDateStrip');
+    if (!strip || stripExtending) return;
+    if (strip.scrollLeft < 60) {
+        stripExtending = true;
+        const step = stripChipStep(strip);
+        geoRouteStripStart = addDays(geoRouteStripStart, -GEO_STRIP_CHUNK);
+        geoRouteStripCount += GEO_STRIP_CHUNK;
+        const before = strip.scrollLeft;
+        renderGeoRouteDateChips();
+        strip.scrollLeft = before + step * GEO_STRIP_CHUNK;
+        stripExtending = false;
+    } else if (strip.scrollLeft + strip.clientWidth > strip.scrollWidth - 60) {
+        stripExtending = true;
+        geoRouteStripCount += GEO_STRIP_CHUNK;
+        renderGeoRouteDateChips();
+        stripExtending = false;
+    }
+}
+
+// 선택된 날짜가 띠 안에 보이도록(띠 범위 밖이면 그 날짜 중심으로 다시 만든다)
+function scrollStripToSelected(smooth) {
+    const target = geoRouteSelectedDays[geoRouteSelectedDays.length - 1];
+    if (!target) return;
+    const date = new Date(target.year, target.month - 1, target.day);
+    const end = addDays(geoRouteStripStart, geoRouteStripCount - 1);
+    if (!geoRouteStripStart || date < geoRouteStripStart || date > end) {
+        initGeoRouteStrip(date);
+        renderGeoRouteDateChips();
+    }
+    const strip = document.getElementById('geoRouteDateStrip');
+    const chip = strip?.querySelector(`.geo-route-date-chip[data-y="${target.year}"][data-m="${target.month}"][data-d="${target.day}"]`);
+    if (!strip || !chip) return;
+    const left = chip.offsetLeft - (strip.clientWidth - chip.offsetWidth) / 2;
+    stripExtending = true;
+    strip.scrollTo({ left: Math.max(0, left), behavior: smooth ? 'smooth' : 'auto' });
+    setTimeout(() => { stripExtending = false; }, smooth ? 400 : 0);
+}
+
+// 목록을 좌우로 밀면 선택된 날짜(들)를 하루씩 앞/뒤로 옮긴다(왼쪽으로 밀기 = 다음 날).
+function shiftGeoRouteSelection(deltaDays) {
+    const next = geoRouteSelectedDays.map(sd => {
+        const d = addDays(new Date(sd.year, sd.month - 1, sd.day), deltaDays);
+        return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() };
+    });
+    loadGeoRouteDays(next, { scrollToSelected: true });
+}
+
+function wireGeoRouteSwipe() {
+    const area = document.querySelector('#geoRouteModal .geo-route-list-scroll');
+    if (!area || area.dataset.swipeWired) return;
+    area.dataset.swipeWired = '1';
+    let start = null;
+    area.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) { start = null; return; }
+        start = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
+    }, { passive: true });
+    area.addEventListener('touchend', (e) => {
+        if (!start) return;
+        const touch = e.changedTouches[0];
+        const dx = touch.clientX - start.x;
+        const dy = touch.clientY - start.y;
+        const quick = Date.now() - start.t < 700;
+        start = null;
+        if (quick && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) shiftGeoRouteSelection(dx < 0 ? 1 : -1);
+    }, { passive: true });
+}
+
+// ─── 지도 마크: 지도를 길게 누르면 그 자리에 이름 붙인 마크를 남긴다(주차 위치, 자재 창고 등) ───
+// 날짜와 상관없이 항상 지도에 보이고, 화면 설정과 함께 서버에 저장돼 다른 기기에서도 보인다.
+let geoRouteMarkOverlays = [];
+let geoRouteSelectedMarkId = null;
+
+function getGeoRouteMarks() {
+    try {
+        const marks = JSON.parse(localStorage.getItem('wm_georoute_marks') || '[]');
+        return Array.isArray(marks) ? marks.filter(m => m && typeof m.lat === 'number' && typeof m.lng === 'number') : [];
+    } catch {
+        return [];
+    }
+}
+
+function saveGeoRouteMarks(marks) {
+    localStorage.setItem('wm_georoute_marks', JSON.stringify(marks));
+    window.markDirty?.('master', 'geoRouteMarks', 'upsert');
+    window.scheduleSync?.();
+    renderGeoRouteMarkOverlays();
+}
+
+function addGeoRouteMark(lat, lng) {
+    navigator.vibrate?.(30);
+    const marks = getGeoRouteMarks();
+    const label = prompt('이 위치에 남길 마크 이름', `마크 ${marks.length + 1}`);
+    if (label === null) return;
+    const mark = { id: `mk_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, lat, lng, label: label.trim() || `마크 ${marks.length + 1}`, createdAt: new Date().toISOString() };
+    saveGeoRouteMarks([...marks, mark]);
+    geoRouteSelectedMarkId = mark.id;
+    geoRouteSelectedIdx = null;
+    renderGeoRouteList();
+}
+
+function renderGeoRouteMarkOverlays() {
+    geoRouteMarkOverlays.forEach(ov => ov.setMap(null));
+    geoRouteMarkOverlays = [];
+    if (!geoRouteMapInstance || typeof kakao === 'undefined') return;
+    getGeoRouteMarks().forEach(mark => {
+        const el = document.createElement('div');
+        el.className = `geo-route-mark${mark.id === geoRouteSelectedMarkId ? ' is-selected' : ''}`;
+        el.innerHTML = `<span class="geo-route-mark-star">★</span><span class="geo-route-mark-label">${escapeHtml(mark.label)}</span>`;
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            geoRouteSelectedMarkId = mark.id;
+            geoRouteSelectedIdx = null;
+            renderGeoRouteList();
+            renderGeoRouteMarkOverlays();
+        });
+        const overlay = new kakao.maps.CustomOverlay({ position: new kakao.maps.LatLng(mark.lat, mark.lng), content: el, yAnchor: 1, zIndex: 15 });
+        overlay.setMap(geoRouteMapInstance);
+        geoRouteMarkOverlays.push(overlay);
+    });
+}
+window.refreshGeoRouteMarks = () => {
+    renderGeoRouteMarkOverlays();
+    if (geoRouteSelectedMarkId && !getGeoRouteMarks().some(m => m.id === geoRouteSelectedMarkId)) {
+        geoRouteSelectedMarkId = null;
+        renderGeoRouteList();
+    }
+};
+
+function buildMarkCardHtml(mark) {
+    return `<div class="geo-route-item geo-route-mark-card" style="border-left:4px solid #f59e0b;">
+        <div class="geo-route-item-head">
+            <span class="geo-route-order" style="background:#f59e0b;">★</span>
+            <span class="geo-route-name">${escapeHtml(mark.label)}</span>
+        </div>
+        <div class="geo-route-mark-actions">
+            <button type="button" class="w95-btn" data-mark-action="nav"><i class="fa-solid fa-diamond-turn-right"></i> 길찾기</button>
+            <button type="button" class="w95-btn" data-mark-action="rename">이름 변경</button>
+            <button type="button" class="w95-btn" data-mark-action="delete" style="color:#b91c1c;">삭제</button>
+        </div>
+    </div>`;
+}
+
+function wireMarkCard(list, mark) {
+    list.querySelectorAll('[data-mark-action]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const action = btn.dataset.markAction;
+            if (action === 'nav') {
+                window.pendingMapTarget = { lat: mark.lat, lng: mark.lng, address: mark.label };
+                const appModal = document.getElementById('mapAppModal');
+                if (appModal) appModal.style.display = 'flex';
+            } else if (action === 'rename') {
+                const label = prompt('마크 이름', mark.label);
+                if (label === null) return;
+                saveGeoRouteMarks(getGeoRouteMarks().map(m => m.id === mark.id ? { ...m, label: label.trim() || m.label } : m));
+                renderGeoRouteList();
+            } else if (action === 'delete') {
+                if (!confirm(`'${mark.label}' 마크를 삭제할까요?`)) return;
+                geoRouteSelectedMarkId = null;
+                saveGeoRouteMarks(getGeoRouteMarks().filter(m => m.id !== mark.id));
+                renderGeoRouteList();
+            }
+        });
+    });
+}
+
+// 지도 길게 누르기 → 마크 추가. 카카오맵은 터치 롱프레스 이벤트가 없어서 직접 판정한다
+// (손가락이 움직이거나 두 손가락이면 지도 이동/확대로 보고 취소).
+function wireGeoRouteMapLongPress() {
+    const container = document.getElementById('geoRouteMap');
+    if (!container || container.dataset.markWired) return;
+    container.dataset.markWired = '1';
+    let timer = null, startX = 0, startY = 0;
+    const activePointers = new Set();
+    const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+    container.addEventListener('pointerdown', (e) => {
+        activePointers.add(e.pointerId);
+        cancel();
+        if (activePointers.size > 1 || (e.pointerType === 'mouse' && e.button !== 0)) return;
+        if (e.target.closest('.geo-route-map-pin, .geo-route-mark, .geo-route-my-location')) return;
+        startX = e.clientX; startY = e.clientY;
+        timer = setTimeout(() => {
+            timer = null;
+            if (!geoRouteMapInstance) return;
+            suppressMapClickUntil = Date.now() + 800;
+            const rect = container.getBoundingClientRect();
+            const point = new kakao.maps.Point(startX - rect.left, startY - rect.top);
+            const latLng = geoRouteMapInstance.getProjection().coordsFromContainerPoint(point);
+            addGeoRouteMark(latLng.getLat(), latLng.getLng());
+        }, 650);
+    }, true);
+    container.addEventListener('pointermove', (e) => {
+        if (timer && (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10)) cancel();
+    }, true);
+    const release = (e) => { activePointers.delete(e.pointerId); cancel(); };
+    container.addEventListener('pointerup', release, true);
+    container.addEventListener('pointercancel', release, true);
+    container.addEventListener('contextmenu', (e) => e.preventDefault());
 }
 
 function toggleGeoRouteDay(year, month, day) {
@@ -323,6 +570,20 @@ function renderGeoRouteList() {
     const results = geoRouteCurrentResults;
     const multiDay = geoRouteSelectedDays.length > 1;
 
+    const selectedMark = geoRouteSelectedMarkId ? getGeoRouteMarks().find(m => m.id === geoRouteSelectedMarkId) : null;
+    if (selectedMark) {
+        list.innerHTML =
+            `<div class="geo-route-back-all">← 전체 동선 보기 (${geoRouteCurrentTotal}건)</div>` +
+            buildMarkCardHtml(selectedMark);
+        wireMarkCard(list, selectedMark);
+        list.querySelector('.geo-route-back-all')?.addEventListener('click', () => {
+            geoRouteSelectedMarkId = null;
+            renderGeoRouteList();
+            renderGeoRouteMarkOverlays();
+        });
+        return;
+    }
+
     if (geoRouteSelectedIdx !== null && results[geoRouteSelectedIdx]) {
         const idx = geoRouteSelectedIdx;
         list.innerHTML =
@@ -348,9 +609,10 @@ function renderGeoRouteList() {
     refreshPinHighlight();
 }
 
-async function loadGeoRouteDays(daysArr) {
+async function loadGeoRouteDays(daysArr, opts = {}) {
     geoRouteSelectedDays = daysArr;
     geoRouteSelectedIdx = null;
+    geoRouteSelectedMarkId = null;
     const myRequestId = ++geoRouteRequestId;
 
     const list = document.getElementById('geoRouteList');
@@ -363,6 +625,7 @@ async function loadGeoRouteDays(daysArr) {
         : `동선 관리 · ${daysArr.length}일 선택됨`;
 
     renderGeoRouteDateChips();
+    if (opts.scrollToSelected) scrollStripToSelected(true);
     ensureUserLocation(); // 위치 권한 요청을 미리 시작해둔다 (지오코딩과 병렬로 진행)
 
     const dayMetas = daysArr.map(dd => {
@@ -389,8 +652,8 @@ async function loadGeoRouteDays(daysArr) {
     geoRouteCurrentTotal = combined.length;
 
     if (combined.length === 0) {
-        list.innerHTML = `<div class="geo-route-empty">선택한 날짜에 주소가 등록된 카드가 없습니다.</div>`;
-        clearGeoRouteMapOverlays();
+        list.innerHTML = `<div class="geo-route-empty">선택한 날짜에 주소가 등록된 카드가 없습니다.<br><small>목록을 좌우로 밀면 다른 날짜로 넘어갑니다.</small></div>`;
+        updateGeoRouteMap([]); // 내 위치와 마크는 계속 보여준다
         return;
     }
 
@@ -486,10 +749,11 @@ window.openGeoRouteModal = (year, month, day) => {
     applyGeoRouteListHeight();
     applyGeoRouteFontScale();
     wireGeoRouteResizeHandle();
-    geoRouteAnchorMonday = window.WorkTimetable
-        ? window.WorkTimetable.mondayOf(new Date(year, month - 1, day))
-        : new Date(year, month - 1, day);
+    wireGeoRouteSwipe();
+    wireGeoRouteMapLongPress();
+    initGeoRouteStrip(new Date(year, month - 1, day));
     loadGeoRouteDays([{ year, month, day }]);
+    requestAnimationFrame(() => scrollStripToSelected(false));
 };
 
 window.closeGeoRouteModal = () => {
