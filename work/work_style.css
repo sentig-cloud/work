@@ -229,6 +229,8 @@ html, body {
     display: inline-flex; align-items: center; justify-content: center;
 }
 .task-no-btn:active { background: #cbd5e1; transform: scale(0.95); }
+.task-no-chunk + .task-no-chunk { margin-left: .32em; }
+.task-no-btn.is-empty { cursor: default; color: #94a3b8; }
 
 /* 작업 카드: 왼쪽 작업정보 / 오른쪽 고객정보 */
 .work-card-layout { padding:8px 10px 3px; }

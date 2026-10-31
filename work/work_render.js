@@ -298,8 +298,8 @@ window.getLogCardHtml = (l, indexStr = '') => {
     let bottomManagerHtml = '';
 
     let taskNoHtml = l.taskNo
-        ? `<div class="task-no-btn" onclick="event.stopPropagation(); window.toggleLogOx('${l.id}')">${window.formatTaskNo(l.taskNo)}</div>`
-        : `<div class="task-no-btn" onclick="event.stopPropagation(); window.toggleLogOx('${l.id}')">O/X</div>`;
+        ? `<div class="task-no-btn" title="눌러서 타스크 번호 복사" onclick="event.stopPropagation(); window.copyLogTaskNo('${l.id}')">${window.formatTaskNoHtml(l.taskNo)}</div>`
+        : '';
 
     if (isCommuteDetailCard || isCommuteCard || isMemoOrPhoto) taskNoHtml = '';
 
@@ -351,8 +351,8 @@ window.getLogCardHtml = (l, indexStr = '') => {
             ? `<span class="work-status-text">${formatCardTagValue('statuses', l.status)}</span>`
             : '';
         const inlineTaskNo = l.taskNo
-            ? `<button type="button" class="task-no-btn work-task-no" onclick="event.stopPropagation(); window.toggleLogOx('${l.id}')">${window.formatTaskNo(l.taskNo)}</button>`
-            : `<button type="button" class="task-no-btn work-task-no" onclick="event.stopPropagation(); window.toggleLogOx('${l.id}')">O/X</button>`;
+            ? `<button type="button" class="task-no-btn work-task-no" title="눌러서 타스크 번호 복사" onclick="event.stopPropagation(); window.copyLogTaskNo('${l.id}')">${window.formatTaskNoHtml(l.taskNo)}</button>`
+            : `<span class="task-no-btn work-task-no is-empty">-</span>`;
 
         let customerDetails = [];
         let workDetails = [];

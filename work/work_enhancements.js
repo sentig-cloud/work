@@ -1406,7 +1406,7 @@
         add('시간', log.workTime || log.time || log.inTime || log.outTime);
         add('작업유형', log.taskType);
         add('상태', log.status);
-        add('Task 번호', log.taskNo);
+        add('타스크 번호', String(log.taskNo || '').replace(/\s+/g, ''));
         add('고객명', log.customerName);
         add('주소', log.address);
         add('내용', log.content || log.memo || log.commuteNote);

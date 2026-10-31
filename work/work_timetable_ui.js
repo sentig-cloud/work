@@ -971,7 +971,7 @@
         bodyEl.classList.remove('tt-popover-list');
         bodyEl.innerHTML = '';
 
-        const addLine = (labelText, valueText, copyable) => {
+        const addLine = (labelText, valueText, copyable, copyText) => {
             const line = document.createElement('div');
             line.className = 'tt-popover-line';
             const b = document.createElement('b');
@@ -980,7 +980,7 @@
             span.textContent = valueText || '-';
             if (copyable && valueText) {
                 span.classList.add('tt-copyable');
-                span.onclick = () => copyToClipboard(valueText, span);
+                span.onclick = () => copyToClipboard(copyText || valueText, span);
             }
             line.appendChild(b);
             line.appendChild(span);
@@ -989,7 +989,7 @@
         };
 
         if (groupCat === 'work') {
-            addLine('Task No', window.formatTaskNo?.(log.taskNo) || log.taskNo, true);
+            addLine('타스크 번호', window.formatTaskNo?.(log.taskNo) || log.taskNo, true, String(log.taskNo || '').replace(/\s+/g, ''));
             const addrLine = addLine('주소', log.address, true);
             addrLine.classList.add('tt-popover-address');
             if (log.address) addrLine.title = log.address;

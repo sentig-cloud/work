@@ -6,7 +6,7 @@ window.WorkExportUI = {
         { id: 'date',      name: '날짜',       customName: '날짜' },
         { id: 'time',      name: '시간',       customName: '시간' },
         { id: 'taskType',  name: '작업유형',   customName: '작업유형' },
-        { id: 'taskNo',    name: 'Task',       customName: 'Task' },
+        { id: 'taskNo',    name: '타스크 번호', customName: '타스크 번호' },
         { id: 'status',    name: '상태',       customName: '상태' },
         { id: 'content',   name: '작업내용',   customName: '작업내용' },
         { id: 'note',      name: '특이사항',   customName: '특이사항' },

@@ -186,7 +186,7 @@ window.saveGeneralEntry = async () => {
 window.getWorkDraftText = () => {
     const date = document.getElementById("workDateInput")?.value || "";
     const time = document.getElementById("workTime")?.value || "";
-    const taskNo = document.getElementById("taskNo")?.value.trim() || "";
+    const taskNo = (document.getElementById("taskNo")?.value || "").replace(/\s+/g, "");
     const customerName = document.getElementById("customerName")?.value.trim() || "";
     const address = document.getElementById("workAddress")?.value.trim() || "";
     const content = document.getElementById("workContent")?.value.trim() || "";
@@ -201,7 +201,7 @@ window.getWorkDraftText = () => {
         "[작업일지]",
         date ? `일자: ${date}` : "",
         time ? `시간: ${time}` : "",
-        taskNo ? `Task: ${taskNo}` : "",
+        taskNo ? `타스크 번호: ${taskNo}` : "",
         customerName ? `고객명: ${customerName}` : "",
         address ? `주소: ${address}` : "",
         (window.activeTaskTypes || []).length ? `작업유형: ${window.activeTaskTypes.join(", ")}` : "",
@@ -1181,10 +1181,6 @@ window.handleGeneralFiles = (input) => {
         window.tempImgs = [];
     }
 
-    // 선택 화면의 썸네일이 작아서 잘못 고르기 쉬우니, 담자마자 방금 고른 첫 장부터
-    // 전체화면 확대 뷰어를 열어서 바로 큰 사진으로 확인/교체할 수 있게 한다.
-    const firstNewIdx = window.tempImgs.length;
-
     files.forEach((file) => {
         window.safeProcessImage(file, (dataUrl, imageMeta = {}) => {
             if (dataUrl) {
@@ -1208,9 +1204,6 @@ window.handleGeneralFiles = (input) => {
                     window.hideLoading();
                 }
 
-                if (window.tempImgs.length > firstNewIdx && window.openImageViewer) {
-                    window.openImageViewer(firstNewIdx, 'temp');
-                }
             }
         });
     });
@@ -1243,8 +1236,6 @@ window.handleWorkFiles = (input) => {
         window.workImgs = [];
     }
 
-    const firstNewIdx = window.workImgs.length;
-
     files.forEach((file) => {
         window.safeProcessImage(file, (dataUrl, imageMeta = {}) => {
             if (dataUrl) {
@@ -1268,9 +1259,6 @@ window.handleWorkFiles = (input) => {
                     window.hideLoading();
                 }
 
-                if (window.workImgs.length > firstNewIdx && window.openImageViewer) {
-                    window.openImageViewer(firstNewIdx, 'work');
-                }
             }
         });
     });
@@ -1295,7 +1283,6 @@ window.addFilesToEdit = (input) => {
 
     const files = Array.from(input.files);
     let completed = 0;
-    const firstNewIdx = log.imgs.length;
 
     files.forEach((file) => {
         window.safeProcessImage(file, (dataUrl, imageMeta = {}) => {
@@ -1314,9 +1301,6 @@ window.addFilesToEdit = (input) => {
             completed++;
 
             if (completed === files.length) {
-                if (log.imgs.length > firstNewIdx && window.openImageViewer) {
-                    window.openImageViewer(firstNewIdx, 'edit', log.id);
-                }
 
                 if (window.renderEditPhotoGrid) {
                     window.renderEditPhotoGrid();

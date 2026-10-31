@@ -18,6 +18,64 @@ window.formatTaskNoInput = (input) => {
     if (input.setSelectionRange) input.setSelectionRange(pos, pos);
 };
 
+// 카드 표시용: 4자리 묶음을 공백 문자 대신 CSS 간격(span)으로 띄운다.
+// 화면에서는 띄어 보이지만, 드래그해서 복사하면 공백 없이 붙은 숫자로 복사된다.
+window.formatTaskNoHtml = (taskNo) => {
+    const str = String(taskNo == null ? '' : taskNo).replace(/\s+/g, '');
+    if (!str) return '';
+    const esc = (s) => s.replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    return (str.match(/.{1,4}/g) || []).map(part => `<span class="task-no-chunk">${esc(part)}</span>`).join('');
+};
+
+// 공백 없는 순수 타스크 번호를 클립보드에 복사한다.
+window.copyTaskNoText = async (taskNo) => {
+    const text = String(taskNo == null ? '' : taskNo).replace(/\s+/g, '');
+    if (!text) return false;
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+        } else {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        }
+        window.showWorkNavigationToast?.(`타스크 번호 복사됨: ${text}`);
+        return true;
+    } catch (e) {
+        alert('복사하지 못했습니다. 브라우저의 클립보드 권한을 확인하세요.');
+        return false;
+    }
+};
+
+// 카드의 타스크 번호를 누르면 O/X 대신 번호 복사 (O/X는 번호(No.) 쪽에서만 바꾼다)
+window.copyLogTaskNo = (id) => {
+    const log = (window.logs || []).find(item => item.id === id);
+    if (log && log.taskNo) window.copyTaskNoText(log.taskNo);
+};
+
+// 작업일지 입력창의 띄어진 값을 복사/잘라내기 해도 클립보드에는 붙은 숫자로 들어가게 한다.
+const taskNoClipboardHandler = (e) => {
+    const el = e.target;
+    if (!el || el.id !== 'taskNo' || typeof el.selectionStart !== 'number' || !e.clipboardData) return;
+    const start = el.selectionStart, end = el.selectionEnd;
+    const selected = el.value.slice(start, end);
+    if (!selected) return;
+    e.clipboardData.setData('text/plain', selected.replace(/\s+/g, ''));
+    e.preventDefault();
+    if (e.type === 'cut') {
+        el.value = el.value.slice(0, start) + el.value.slice(end);
+        el.setSelectionRange(start, start);
+        window.formatTaskNoInput(el);
+    }
+};
+document.addEventListener('copy', taskNoClipboardHandler);
+document.addEventListener('cut', taskNoClipboardHandler);
+
 // ─── 초성 검색: "ㄱㄴ" 같은 초성만으로도 "강남" 같은 텍스트를 찾을 수 있게 ───
 const CHOSUNG_LIST = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
 window.extractChosung = (str) => {

@@ -41,7 +41,7 @@
                 <button type="button" class="w95-btn pi-mode-tab" id="piModeDateBtn"><i class="fa-solid fa-calendar-day"></i> 날짜로 찾기</button>
             </div>
             <div class="pi-search-bar" id="piSearchBar">
-                <input type="text" id="piSearchInput" class="m-input w95-in" placeholder="고객명 / 주소 / 작업유형 / Task No 검색...">
+                <input type="text" id="piSearchInput" class="m-input w95-in" placeholder="고객명 / 주소 / 작업유형 / 타스크 번호 검색...">
                 <button type="button" class="w95-btn icon-btn" id="piAddMoreBtn" title="사진 더 담기"><i class="fa-solid fa-plus"></i></button>
             </div>
             <div class="pi-date-bar" id="piDateBar" style="display:none;">
