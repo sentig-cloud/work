@@ -269,14 +269,14 @@
                         </div>
                     </div>
                     <div class="tt-settings-group">
-                        <div class="tt-settings-group-title"><i class="fa-solid fa-tags"></i> 작업일지 선택태그 상자</div>
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-tags"></i> 작업일지 선택태그 상자 그룹</div>
                         <div class="tt-settings-section">
                             <div class="tt-settings-label">표시 방식</div>
                             <label class="tt-settings-check"><input type="radio" name="ttTagBoxMode" id="ttOptTagBoxExpanded" value="expanded"> 펼침 (모든 태그 항상 표시)</label>
-                            <label class="tt-settings-check"><input type="radio" name="ttTagBoxMode" id="ttOptTagBoxCompact" value="compact"> 압축 (선택한 것만 표시, 누르면 펼쳐서 선택)</label>
+                            <label class="tt-settings-check"><input type="radio" name="ttTagBoxMode" id="ttOptTagBoxCompact" value="compact"> 버튼 (그룹마다 버튼 하나, 누르면 밑에 목록이 펼쳐짐)</label>
                         </div>
                         <div class="tt-settings-section">
-                            <div class="tt-settings-label">압축 모드에서 중복 선택 그룹 닫기</div>
+                            <div class="tt-settings-label">버튼 방식에서 중복 선택 그룹 닫기</div>
                             <label class="tt-settings-check"><input type="radio" name="ttTagBoxClose" id="ttOptTagBoxCloseOutside" value="outside"> 다른 곳을 누르면 선택 완료로 닫기</label>
                             <label class="tt-settings-check"><input type="radio" name="ttTagBoxClose" id="ttOptTagBoxCloseOk" value="ok"> 확인 버튼을 눌러야만 닫기</label>
                         </div>

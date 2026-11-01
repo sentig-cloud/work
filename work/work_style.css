@@ -1599,35 +1599,43 @@ input, textarea, [contenteditable="true"] {
 .access-log-denied .access-log-badge { color:#b91c1c; background:#fef2f2; border-color:#ef4444; }
 .access-log-time { flex:0 0 auto; font-size:0.72rem; color:#666; white-space:nowrap; }
 
-/* ─── 선택태그 상자 압축 모드 (work_tag_compact.js, 메인 설정에서 선택) ───
-   평소엔 선택된 태그만 보이고, 상자를 누르면 그 자리에서 펼쳐진다. 레이아웃 변경 모드에선 모두 펼침. */
-#workModal.tag-compact-mode:not(.layout-edit-mode) .drag-item[data-group-ref]:not([data-group-ref="duration"]):not(.tag-box-expanded) .btn-tag-area {
-    position: relative; cursor: pointer; padding-right: 24px; min-height: 34px;
+/* ─── 선택태그 상자 그룹 압축 모드 (work_tag_compact.js, 메인 설정에서 선택) ───
+   그룹마다 버튼 하나(위: 그룹 이름, 아래: 선택된 이름)로 한 줄에 두 개씩 보이고,
+   누르면 그 버튼 밑에 태그 목록이 드롭다운으로 펼쳐진다. 레이아웃 변경 모드에선 기존처럼 모두 펼침. */
+.tag-compact-summary, .tag-compact-ok { display: none; }
+#workModal.tag-compact-mode:not(.layout-edit-mode) #workDragContainer > .drag-item.tag-compact-box {
+    grid-column: span 2 !important; grid-row: span 1 !important;
+    display: flex; flex-direction: column; cursor: pointer;
 }
-#workModal.tag-compact-mode:not(.layout-edit-mode) .drag-item[data-group-ref]:not([data-group-ref="duration"]):not(.tag-box-expanded) .btn-tag-area > *:not(.active-btn) {
+#workModal.tag-compact-mode:not(.layout-edit-mode) .drag-item.tag-compact-box > .tag-compact-summary {
+    display: block; position: relative; height: 30px; line-height: 26px; box-sizing: border-box;
+    padding: 0 22px 0 6px; background: var(--w-white);
+    border: 2px solid; border-color: var(--w-dark-gray) var(--w-white) var(--w-white) var(--w-dark-gray);
+    color: #111827; font-weight: bold; font-size: 0.85rem;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#workModal.tag-compact-mode:not(.layout-edit-mode) .drag-item.tag-compact-box > .tag-compact-summary.is-empty {
+    color: #94a3b8; font-weight: normal; font-size: 0.8rem;
+}
+#workModal.tag-compact-mode:not(.layout-edit-mode) .drag-item.tag-compact-box > .tag-compact-summary::after {
+    content: "▾"; position: absolute; right: 6px; top: 0; color: #64748b; font-weight: normal;
+}
+#workModal.tag-compact-mode:not(.layout-edit-mode) .drag-item.tag-compact-box:not(.tag-box-expanded) > .btn-tag-area {
     display: none !important;
 }
-#workModal.tag-compact-mode:not(.layout-edit-mode) .drag-item[data-group-ref]:not([data-group-ref="duration"]):not(.tag-box-expanded) .btn-tag-area > * {
-    pointer-events: none;
-}
-#workModal.tag-compact-mode:not(.layout-edit-mode) .drag-item[data-group-ref]:not([data-group-ref="duration"]):not(.tag-box-expanded) .btn-tag-area::after {
-    content: "▾"; position: absolute; right: 7px; top: 50%; transform: translateY(-50%);
-    color: #64748b; font-size: 0.9rem; pointer-events: none;
-}
-#workModal.tag-compact-mode:not(.layout-edit-mode) .drag-item[data-group-ref]:not([data-group-ref="duration"]):not(.tag-box-expanded) .btn-tag-area:not(:has(.active-btn))::before {
-    content: "눌러서 선택"; color: #94a3b8; font-size: 0.8rem; padding-left: 4px; pointer-events: none;
-}
-#workModal.work-edit-locked.tag-compact-mode .drag-item[data-group-ref]:not([data-group-ref="duration"]) .btn-tag-area:not(:has(.active-btn))::before {
-    content: "선택 없음";
-}
-#workModal.tag-compact-mode .drag-item.tag-box-expanded .btn-tag-area {
+#workModal.tag-compact-mode:not(.layout-edit-mode) .drag-item.tag-box-expanded { z-index: 60; }
+#workModal.tag-compact-mode:not(.layout-edit-mode) .drag-item.tag-box-expanded > .tag-compact-summary {
     outline: 2px solid #2563eb; outline-offset: -2px;
 }
-.tag-compact-ok {
-    display: block; width: 100%; height: 28px; margin-top: 2px;
-    font-weight: bold; color: var(--w-blue);
+#workModal.tag-compact-mode:not(.layout-edit-mode) .drag-item.tag-box-expanded > .tag-compact-summary::after { content: "▴"; }
+#workModal.tag-compact-mode:not(.layout-edit-mode) .drag-item.tag-box-expanded > .btn-tag-area {
+    position: absolute; top: 100%; z-index: 61; box-sizing: border-box; margin-top: 1px; cursor: default;
+    outline: 2px solid #2563eb; outline-offset: -2px; box-shadow: 0 6px 14px rgba(0,0,0,0.35);
 }
-#workModal.layout-edit-mode .tag-compact-ok { display: none; }
+#workModal.tag-compact-mode:not(.layout-edit-mode) .drag-item.tag-box-expanded > .tag-compact-ok {
+    display: block; position: absolute; z-index: 61; height: 30px; box-sizing: border-box;
+    font-weight: bold; color: var(--w-blue); box-shadow: 0 6px 14px rgba(0,0,0,0.35);
+}
 
 /* ─── 동선 관리: 좌우로 미는 날짜 띠 + 지도 마크 (work_georoute.js) ─── */
 .geo-route-date-chips { overflow: hidden; padding: 4px 6px; gap: 4px; }
@@ -1646,17 +1654,32 @@ input, textarea, [contenteditable="true"] {
     color: #b91c1c; font-weight: 900;
 }
 .geo-route-date-chip.is-active .geo-chip-month { color: #fff; }
+/* 마크: 이름 없이 번호만, 동선 번호 핀(요일 색 물방울)과 확실히 구분되도록 노랑 바탕+빨강 테두리 사각 아이콘 */
 .geo-route-mark {
-    display: flex; align-items: center; gap: 2px; padding: 2px 6px 2px 4px; transform: translateY(-4px);
-    background: #fffbeb; border: 2px solid #f59e0b; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.35);
-    font-size: 0.72rem; font-weight: bold; color: #92400e; white-space: nowrap; cursor: pointer;
+    position: relative; display: flex; align-items: center; justify-content: center;
+    min-width: 30px; height: 30px; padding: 0 4px; box-sizing: border-box; transform: translateY(-9px);
+    background: #fde047; border: 3px solid #dc2626; border-radius: 7px;
+    box-shadow: 0 0 0 2px #111827, 0 4px 8px rgba(0,0,0,0.5);
+    color: #111827; font-size: 1rem; font-weight: 900; line-height: 1; cursor: pointer;
 }
-.geo-route-mark.is-selected { background: #f59e0b; color: #fff; }
-.geo-route-mark-star { color: #f59e0b; font-size: 0.9rem; }
-.geo-route-mark.is-selected .geo-route-mark-star { color: #fff; }
-.geo-route-mark-label { max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+.geo-route-mark::after {
+    content: ""; position: absolute; left: 50%; bottom: -11px; transform: translateX(-50%);
+    border: 7px solid transparent; border-top: 8px solid #dc2626; border-bottom: 0;
+}
+.geo-route-mark::before {
+    content: ""; position: absolute; inset: -7px; border-radius: 10px; border: 3px solid #facc15;
+    animation: geoMarkPulse 1.8s ease-out infinite; pointer-events: none;
+}
+@keyframes geoMarkPulse { from { opacity: 0.8; transform: scale(0.85); } to { opacity: 0; transform: scale(1.35); } }
+.geo-route-mark.is-selected { background: #dc2626; color: #fff; border-color: #fde047; transform: translateY(-9px) scale(1.15); }
+.geo-route-mark.is-selected::after { border-top-color: #fde047; }
+.geo-route-mark-order { background: #fde047 !important; color: #111827 !important; border: 2px solid #dc2626; }
+.geo-route-view-filter {
+    text-align: center; font-size: 0.8rem; color: #334155; padding: 2px 0 6px; cursor: pointer;
+}
+.geo-route-view-all { font-weight: bold; color: var(--w-blue); text-decoration: underline dotted; }
 .geo-route-mark-actions { display: flex; gap: 4px; margin-top: 6px; }
 .geo-route-mark-actions .w95-btn { flex: 1; height: 30px; font-size: 0.8rem; }
-#workModal.tag-compact-mode .drag-item.tag-box-expanded .btn-tag-area:not(:has(.layout-tag-button))::before {
+#workModal.tag-compact-mode:not(.layout-edit-mode) .drag-item.tag-box-expanded > .btn-tag-area:not(:has(.layout-tag-button))::before {
     content: "항목 없음 · 레이아웃 변경 모드에서 + 로 추가"; color: #94a3b8; font-size: 0.78rem; padding-left: 4px;
 }

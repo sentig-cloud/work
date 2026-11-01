@@ -53,6 +53,9 @@ let geoRouteCurrentResults = []; // [{log,address,geo,eta,dayMeta}] — 여러 �
 let geoRouteCurrentTotal = 0;
 let geoRouteSelectedIdx = null; // null = 전체 동선 보기, 숫자면 그 지점만 보기
 let suppressMapClickUntil = 0; // 지도를 길게 눌러 마크를 찍은 직후 따라오는 클릭은 무시
+let geoRouteViewBounds = null; // 지금 지도 화면에 보이는 영역 — 목록은 이 안에 있는 번호만 보여준다
+let geoRouteViewKey = '';      // 화면 안 번호 목록이 바뀌었을 때만 목록을 다시 그리기 위한 값
+let geoRouteAllBounds = null;  // 전체 동선이 다 들어오는 영역(전체 보기 버튼용)
 let geoRouteSelectedDays = []; // [{year,month,day}] 현재 선택된 날짜(들), 항상 1개 이상
 
 // ─── 현재 위치 → 자동차 이동시간(카카오 모빌리티 실제 도로/교통 기반 길찾기) ───
@@ -145,6 +148,14 @@ async function updateGeoRouteMap(results) {
         kakao.maps.event.addListener(geoRouteMapInstance, 'rightclick', (mouseEvent) => {
             addGeoRouteMark(mouseEvent.latLng.getLat(), mouseEvent.latLng.getLng());
         });
+        // 확대/축소/이동이 끝나면 화면 안에 들어온 번호만 목록에 남긴다
+        kakao.maps.event.addListener(geoRouteMapInstance, 'idle', () => {
+            geoRouteViewBounds = geoRouteMapInstance.getBounds();
+            const key = visibleRouteIdxs().join(',');
+            if (key === geoRouteViewKey) return;
+            geoRouteViewKey = key;
+            if (geoRouteSelectedIdx === null && !geoRouteSelectedMarkId) renderGeoRouteList();
+        });
     }
     clearGeoRouteMapOverlays();
     geoRouteMapInstance.relayout();
@@ -177,11 +188,12 @@ async function updateGeoRouteMap(results) {
         pinEl.dataset.color = item.dayMeta.color;
         pinEl.style.background = item.dayMeta.color;
         pinEl.innerHTML = `<span>${idx + 1}</span>`;
-        // 즐겨찾기처럼: 번호 핀을 누르면 그 지점 하나만 목록에 보여준다.
+        // 즐겨찾기처럼: 번호 핀을 누르면 그 지점 하나만 목록에 보여주고 지도를 그 자리로 옮긴다.
         pinEl.addEventListener('click', (e) => {
             e.stopPropagation();
             geoRouteSelectedIdx = idx;
             renderGeoRouteList();
+            moveGeoRouteMapTo(idx);
         });
 
         const overlay = new kakao.maps.CustomOverlay({ position, content: pinEl, yAnchor: 1 });
@@ -190,18 +202,51 @@ async function updateGeoRouteMap(results) {
     });
 
     if (points.length === 0) {
+        geoRouteAllBounds = null;
         if (geoRouteUserLocation) geoRouteMapInstance.setCenter(new kakao.maps.LatLng(geoRouteUserLocation.lat, geoRouteUserLocation.lng));
         refreshPinHighlight();
         return;
     }
 
-    if (points.length === 1 && !geoRouteUserLocation) {
-        geoRouteMapInstance.setCenter(new kakao.maps.LatLng(points[0].geo.lat, points[0].geo.lng));
+    geoRouteAllBounds = { bounds, single: points.length === 1 && !geoRouteUserLocation ? points[0].geo : null };
+    fitGeoRouteAll();
+    refreshPinHighlight();
+}
+
+// 전체 동선이 다 보이도록 지도를 맞춘다
+function fitGeoRouteAll() {
+    if (!geoRouteMapInstance || !geoRouteAllBounds) return;
+    if (geoRouteAllBounds.single) {
+        geoRouteMapInstance.setCenter(new kakao.maps.LatLng(geoRouteAllBounds.single.lat, geoRouteAllBounds.single.lng));
         geoRouteMapInstance.setLevel(4);
     } else {
-        geoRouteMapInstance.setBounds(bounds);
+        geoRouteMapInstance.setBounds(geoRouteAllBounds.bounds);
     }
-    refreshPinHighlight();
+}
+
+const itemHasCoords = (item) => !!(item && item.geo && item.geo.ok && typeof item.geo.lat === 'number' && typeof item.geo.lng === 'number');
+
+// 지금 지도 화면 안에 있는 번호(목록 순서 idx)들. 지도가 아직 없으면 null(= 거르지 않음)
+function visibleRouteIdxs() {
+    if (!geoRouteViewBounds || typeof kakao === 'undefined') return null;
+    const idxs = [];
+    geoRouteCurrentResults.forEach((item, idx) => {
+        if (itemHasCoords(item) && geoRouteViewBounds.contain(new kakao.maps.LatLng(item.geo.lat, item.geo.lng))) idxs.push(idx);
+    });
+    return idxs;
+}
+
+// 목록/핀을 누르면 지도를 그 좌표로 옮긴다(너무 멀리 축소돼 있으면 조금 확대)
+function moveGeoRouteMapTo(idx) {
+    const item = geoRouteCurrentResults[idx];
+    if (!geoRouteMapInstance || !itemHasCoords(item)) return;
+    const pos = new kakao.maps.LatLng(item.geo.lat, item.geo.lng);
+    if (geoRouteMapInstance.getLevel() > 5) {
+        geoRouteMapInstance.setLevel(4);
+        geoRouteMapInstance.setCenter(pos);
+    } else {
+        geoRouteMapInstance.panTo(pos);
+    }
 }
 
 // ─── 날짜 띠(좌우로 밀어서 넓은 기간 이동, 중복 선택 가능, 요일별 고정 색상) ───
@@ -364,26 +409,31 @@ function saveGeoRouteMarks(marks) {
     renderGeoRouteMarkOverlays();
 }
 
+// 지도에는 이름 없이 번호 아이콘만 보인다. 이름은 필요하면 마크를 눌러 [이름 변경]으로 붙인다.
+const markNumberOf = (markId) => getGeoRouteMarks().findIndex(m => m.id === markId) + 1;
+// 예전에 자동으로 붙던 "마크 N" 이름은 이름 없음으로 본다
+const markLabelOf = (mark) => (mark.label && !/^마크\s*\d+$/.test(mark.label)) ? mark.label : '';
+
 function addGeoRouteMark(lat, lng) {
     navigator.vibrate?.(30);
     const marks = getGeoRouteMarks();
-    const label = prompt('이 위치에 남길 마크 이름', `마크 ${marks.length + 1}`);
-    if (label === null) return;
-    const mark = { id: `mk_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, lat, lng, label: label.trim() || `마크 ${marks.length + 1}`, createdAt: new Date().toISOString() };
+    const mark = { id: `mk_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, lat, lng, label: '', createdAt: new Date().toISOString() };
     saveGeoRouteMarks([...marks, mark]);
     geoRouteSelectedMarkId = mark.id;
     geoRouteSelectedIdx = null;
     renderGeoRouteList();
+    renderGeoRouteMarkOverlays();
 }
 
 function renderGeoRouteMarkOverlays() {
     geoRouteMarkOverlays.forEach(ov => ov.setMap(null));
     geoRouteMarkOverlays = [];
     if (!geoRouteMapInstance || typeof kakao === 'undefined') return;
-    getGeoRouteMarks().forEach(mark => {
+    getGeoRouteMarks().forEach((mark, i) => {
         const el = document.createElement('div');
         el.className = `geo-route-mark${mark.id === geoRouteSelectedMarkId ? ' is-selected' : ''}`;
-        el.innerHTML = `<span class="geo-route-mark-star">★</span><span class="geo-route-mark-label">${escapeHtml(mark.label)}</span>`;
+        el.innerHTML = `<span>${i + 1}</span>`;
+        if (markLabelOf(mark)) el.title = markLabelOf(mark);
         el.addEventListener('click', (e) => {
             e.stopPropagation();
             geoRouteSelectedMarkId = mark.id;
@@ -405,10 +455,10 @@ window.refreshGeoRouteMarks = () => {
 };
 
 function buildMarkCardHtml(mark) {
-    return `<div class="geo-route-item geo-route-mark-card" style="border-left:4px solid #f59e0b;">
+    return `<div class="geo-route-item geo-route-mark-card" style="border-left:4px solid #dc2626;">
         <div class="geo-route-item-head">
-            <span class="geo-route-order" style="background:#f59e0b;">★</span>
-            <span class="geo-route-name">${escapeHtml(mark.label)}</span>
+            <span class="geo-route-order geo-route-mark-order">${markNumberOf(mark.id)}</span>
+            <span class="geo-route-name">${markLabelOf(mark) ? escapeHtml(markLabelOf(mark)) : '<span style="color:#94a3b8;">(이름 없음)</span>'}</span>
         </div>
         <div class="geo-route-mark-actions">
             <button type="button" class="w95-btn" data-mark-action="nav"><i class="fa-solid fa-diamond-turn-right"></i> 길찾기</button>
@@ -424,16 +474,16 @@ function wireMarkCard(list, mark) {
             e.stopPropagation();
             const action = btn.dataset.markAction;
             if (action === 'nav') {
-                window.pendingMapTarget = { lat: mark.lat, lng: mark.lng, address: mark.label };
+                window.pendingMapTarget = { lat: mark.lat, lng: mark.lng, address: markLabelOf(mark) || `${markNumberOf(mark.id)}번 위치` };
                 const appModal = document.getElementById('mapAppModal');
                 if (appModal) appModal.style.display = 'flex';
             } else if (action === 'rename') {
-                const label = prompt('마크 이름', mark.label);
+                const label = prompt(`${markNumberOf(mark.id)}번 이름`, markLabelOf(mark));
                 if (label === null) return;
-                saveGeoRouteMarks(getGeoRouteMarks().map(m => m.id === mark.id ? { ...m, label: label.trim() || m.label } : m));
+                saveGeoRouteMarks(getGeoRouteMarks().map(m => m.id === mark.id ? { ...m, label: label.trim() } : m));
                 renderGeoRouteList();
             } else if (action === 'delete') {
-                if (!confirm(`'${mark.label}' 마크를 삭제할까요?`)) return;
+                if (!confirm(`${markNumberOf(mark.id)}번 마크를 삭제할까요?`)) return;
                 geoRouteSelectedMarkId = null;
                 saveGeoRouteMarks(getGeoRouteMarks().filter(m => m.id !== mark.id));
                 renderGeoRouteList();
@@ -553,6 +603,7 @@ function wireGeoRouteListInteractions(list) {
             geoRouteSelectedIdx = idx;
             renderGeoRouteList();
             refreshPinHighlight();
+            moveGeoRouteMapTo(idx);
         });
         window.attachLongPress?.(card, () => {
             const item = geoRouteCurrentResults[idx];
@@ -595,16 +646,29 @@ function renderGeoRouteList() {
             geoRouteSelectedIdx = null;
             renderGeoRouteList();
             refreshPinHighlight();
+            fitGeoRouteAll();
         });
         refreshPinHighlight();
         return;
     }
 
-    const itemsHtml = results.map((item, idx) => buildItemCardHtml(item, idx, { showDayTag: multiDay })).join('');
+    // 지도를 확대/이동해서 일부 번호만 화면에 있으면 그 번호들만 보여준다.
+    // 모든 번호가 화면 안이면 예전처럼 전체(위치를 못 찾은 주소 포함)를 보여준다.
+    const visible = visibleRouteIdxs();
+    const coordCount = results.filter(itemHasCoords).length;
+    const filtered = !!visible && visible.length < coordCount;
+    const shownIdxs = filtered ? visible : results.map((_, idx) => idx);
+
+    const filterHtml = filtered
+        ? `<div class="geo-route-view-filter">지도 화면 안 <b>${visible.length}</b>건 / 전체 ${geoRouteCurrentTotal}건 · <span class="geo-route-view-all">전체 보기</span></div>`
+        : '';
+    const itemsHtml = shownIdxs.map(idx => buildItemCardHtml(results[idx], idx, { showDayTag: multiDay })).join('');
+    const emptyHtml = filtered && !visible.length ? `<div class="geo-route-empty">이 화면 안에는 번호가 없습니다.</div>` : '';
     const pendingCount = geoRouteCurrentTotal - results.length;
     const pendingHtml = pendingCount > 0 ? `<div class="geo-route-empty">나머지 ${pendingCount}건 확인 중...</div>` : '';
 
-    list.innerHTML = itemsHtml + pendingHtml;
+    list.innerHTML = filterHtml + itemsHtml + emptyHtml + pendingHtml;
+    list.querySelector('.geo-route-view-filter')?.addEventListener('click', fitGeoRouteAll);
     wireGeoRouteListInteractions(list);
     refreshPinHighlight();
 }
