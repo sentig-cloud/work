@@ -273,12 +273,12 @@
                         <div class="tt-settings-section">
                             <div class="tt-settings-label">표시 방식</div>
                             <label class="tt-settings-check"><input type="radio" name="ttTagBoxMode" id="ttOptTagBoxExpanded" value="expanded"> 펼침 (모든 태그 항상 표시)</label>
-                            <label class="tt-settings-check"><input type="radio" name="ttTagBoxMode" id="ttOptTagBoxCompact" value="compact"> 버튼 (그룹마다 버튼 하나, 누르면 밑에 목록이 펼쳐짐)</label>
+                            <label class="tt-settings-check"><input type="radio" name="ttTagBoxMode" id="ttOptTagBoxCompact" value="compact"> 태그상자 (그룹 이름이 태그상자가 되고, 누르면 말풍선으로 펼쳐짐)</label>
                         </div>
                         <div class="tt-settings-section">
-                            <div class="tt-settings-label">버튼 방식에서 중복 선택 그룹 닫기</div>
-                            <label class="tt-settings-check"><input type="radio" name="ttTagBoxClose" id="ttOptTagBoxCloseOutside" value="outside"> 다른 곳을 누르면 선택 완료로 닫기</label>
-                            <label class="tt-settings-check"><input type="radio" name="ttTagBoxClose" id="ttOptTagBoxCloseOk" value="ok"> 확인 버튼을 눌러야만 닫기</label>
+                            <div class="tt-settings-label">태그상자 방식에서 중복 선택 그룹 닫기</div>
+                            <label class="tt-settings-check"><input type="radio" name="ttTagBoxClose" id="ttOptTagBoxCloseOutside" value="outside"> 다른 곳을 누르면 선택 완료(확인)로 닫기</label>
+                            <label class="tt-settings-check"><input type="radio" name="ttTagBoxClose" id="ttOptTagBoxCloseOk" value="ok"> 확인/취소 버튼을 눌러야만 닫기</label>
                         </div>
                     </div>
                     <div class="tt-settings-group">

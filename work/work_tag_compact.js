@@ -1,19 +1,19 @@
 // work_tag_compact.js
-// 작업일지 "선택태그 상자 그룹" 압축 표시 방식(메인 설정에서 선택).
-// - 평소엔 각 그룹(작업유형, 상태, 작업 구분 …)이 버튼 하나로 보인다: 위에 그룹 이름, 아래에 선택된 이름.
-// - 버튼을 누르면 그 버튼 바로 밑에 그룹의 모든 태그가 드롭다운처럼 펼쳐진다.
-// - 단일 선택 그룹은 하나를 고르면 바로 닫히고, 중복 선택 그룹은 열린 채로 여러 개를 고른 뒤
-//   다른 곳을 누르거나(설정: 바깥 누르면 닫기) [확인]을 누르면 닫힌다. 선택값 자체는 누르는 즉시
-//   반영되므로 닫히는 것 = 선택 완료.
-// - X를 길게 눌러 들어가는 레이아웃 변경 모드에서는 기존처럼 모든 상자를 펼쳐서 보여준다(CSS 참고).
-// 태그 버튼/선택 로직은 기존 것을 그대로 쓰고, 여기서는 버튼 표시와 드롭다운 열기/닫기만 다룬다.
+// 작업일지 "선택태그 상자 그룹" 태그상자 표시 방식(메인 설정에서 선택).
+// - 작업유형, 상태, 장비 … 각 그룹이 태그상자 하나가 되어 한 줄에 이어서(넘치면 다음 줄로) 보인다.
+//   아무것도 안 골랐으면 그룹 이름(점선 상자), 고르면 그 상자 이름이 선택한 태그 이름(진한 상자)으로 바뀐다.
+// - 상자를 누르면 그 상자 밑에 말풍선이 열리고 그 그룹의 태그들이 나온다. 말풍선은 줄 안에 끼어들어서
+//   뒤쪽 상자들은 말풍선 아래 줄로 밀려난다. 닫히면 말풍선은 사라진다.
+// - 단일 선택 그룹은 하나 고르면 바로 닫힌다. 중복 선택 그룹은 [확인]/[취소] — 취소는 말풍선을 연 뒤
+//   바꾼 선택을 되돌린다. 다른 곳을 누르면(설정: 바깥 누르면 닫기) 확인으로 본다.
+// - X를 길게 눌러 들어가는 레이아웃 변경 모드에서는 기존 상자 모양 그대로 보여준다(CSS 참고).
+// 태그 버튼/선택 로직은 기존 것을 그대로 쓴다: 말풍선을 여는 동안 그룹의 태그 영역(.btn-tag-area)을
+// 말풍선 안으로 잠시 옮겼다가 닫을 때 제자리로 돌려놓는다(렌더 함수들은 id로 찾으므로 그대로 동작).
 
 (() => {
     const MODE_KEY = 'wm_tag_compact_mode';
     const CLOSE_KEY = 'wm_tag_compact_close';
-    const EXPANDED_CLASS = 'tag-box-expanded';
     const BOX_CLASS = 'tag-compact-box';
-    const TAP_SLOP = 10;
 
     window.isTagCompactMode = () => localStorage.getItem(MODE_KEY) === '1';
     window.getTagCompactCloseMode = () => localStorage.getItem(CLOSE_KEY) === 'ok' ? 'ok' : 'outside';
@@ -33,238 +33,269 @@
     const getModal = () => document.getElementById('workModal');
     const getContainer = () => document.getElementById('workDragContainer');
 
-    // 압축 대상 상자: 태그 영역이 있는 그룹 상자(시작/종료 같은 특수 그룹 제외)
-    function tagBoxOf(el) {
-        const item = el && el.closest ? el.closest('#workDragContainer > .drag-item[data-group-ref]') : null;
-        if (!item || item.dataset.groupRef === 'duration' || !item.querySelector(':scope > .btn-tag-area')) return null;
-        return item;
-    }
-
-    // ─── 버튼에 보이는 "선택된 이름" ───
-    function refreshSummary(item) {
-        let summary = item.querySelector(':scope > .tag-compact-summary');
-        if (!summary) {
-            summary = document.createElement('div');
-            summary.className = 'tag-compact-summary';
-            const title = item.querySelector(':scope > .box-title');
-            if (title) title.after(summary); else item.prepend(summary);
-        }
-        const names = [...item.querySelectorAll(':scope > .btn-tag-area .active-btn')]
-            .map(b => b.textContent.trim()).filter(Boolean);
-        const locked = getModal()?.classList.contains('work-edit-locked');
-        const text = names.length ? names.join(', ') : (locked ? '선택 없음' : '눌러서 선택');
-        // 값이 같을 때 다시 쓰면 MutationObserver가 또 불려 무한 반복되므로 바뀐 경우만 쓴다
-        if (summary.textContent !== text) summary.textContent = text;
-        if (summary.classList.contains('is-empty') !== !names.length) summary.classList.toggle('is-empty', !names.length);
-        if (summary.title !== names.join(', ')) summary.title = names.join(', ');
-    }
-
-    function refreshAll() {
-        getContainer()?.querySelectorAll(':scope > .drag-item[data-group-ref]').forEach(item => {
-            if (!tagBoxOf(item)) return;
-            if (!item.classList.contains(BOX_CLASS)) item.classList.add(BOX_CLASS);
-            refreshSummary(item);
-        });
-        const open = expandedItem();
-        if (open) positionPanel(open);
-    }
-    const queueRefresh = () => Promise.resolve().then(refreshAll);
-
-    // 태그가 다시 그려지거나 선택이 바뀌면(클래스 변경) 버튼 글자를 갱신한다.
-    function observe() {
-        const container = getContainer();
-        if (!container || container.dataset.tagCompactObserved) return;
-        container.dataset.tagCompactObserved = '1';
-        new MutationObserver((records) => {
-            // 우리가 넣은 요약 글자 변경은 무시(무한 반복 방지)
-            if (records.every(r => r.target.classList?.contains('tag-compact-summary')
-                || r.target.parentElement?.classList?.contains('tag-compact-summary'))) return;
-            refreshAll();
-        }).observe(container, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
-    }
-
-    function applyMode() {
-        const modal = getModal();
-        if (!modal) return;
-        modal.classList.toggle('tag-compact-mode', window.isTagCompactMode());
-        observe();
-        refreshAll();
-        collapseAll();
-    }
-    window.applyTagCompactMode = applyMode;
-
     const isActive = () => {
         const modal = getModal();
         return !!modal && window.isTagCompactMode() && !modal.classList.contains('layout-edit-mode');
     };
 
-    // ─── 드롭다운(버튼 밑에 펼쳐지는 태그 목록) ───
-    const panelOf = (item) => item.querySelector(':scope > .btn-tag-area');
+    // 태그상자로 바꿀 그룹: 태그 영역이 있는 그룹 상자(시작/종료 같은 특수 그룹, 숨긴 그룹 제외)
+    const tagBoxes = () => [...(getContainer()?.querySelectorAll(':scope > .drag-item[data-group-ref]') || [])]
+        .filter(item => item.dataset.groupRef !== 'duration' && !item.classList.contains('is-hidden-in-work')
+            && (item.querySelector(':scope > .btn-tag-area') || open?.item === item));
 
-    // 드롭다운은 버튼 폭이 아니라 작업일지 전체 폭으로, 버튼 바로 밑에 띄운다.
-    function positionPanel(item) {
-        const panel = panelOf(item);
+    let open = null; // { item, chip, bubble, area, placeholder, snapshot, undoLen }
+
+    const areaOf = (item) => item.querySelector(':scope > .btn-tag-area') || (open?.item === item ? open.area : null);
+    const groupTitleOf = (item) => (item.querySelector(':scope > .box-title')?.textContent || '').trim() || '그룹';
+
+    // ─── 태그상자 줄 ───
+    let observer = null;
+    function getRow() {
         const container = getContainer();
-        if (!panel || !container) return;
-        const itemRect = item.getBoundingClientRect();
-        const contRect = container.getBoundingClientRect();
-        panel.style.left = `${contRect.left - itemRect.left - 2}px`;
-        panel.style.width = `${contRect.width}px`;
-        const ok = item.querySelector(':scope > .tag-compact-ok');
-        if (ok) {
-            ok.style.left = panel.style.left;
-            ok.style.width = panel.style.width;
-            ok.style.top = `${panel.offsetTop + panel.offsetHeight}px`;
+        if (!container) return null;
+        let row = container.querySelector(':scope > .tag-chip-row');
+        if (!row) {
+            row = document.createElement('div');
+            row.className = 'tag-chip-row';
+            row.addEventListener('click', onRowClick);
         }
+        return row;
     }
 
-    let panelResizeObserver = null;
+    function refreshAll() {
+        const container = getContainer();
+        if (!container) return;
+        const row = getRow();
+        const boxes = tagBoxes();
+        boxes.forEach(item => { if (!item.classList.contains(BOX_CLASS)) item.classList.add(BOX_CLASS); });
+        // 줄은 첫 그룹 상자 자리에 둔다(레이아웃 순서를 바꾸면 따라간다)
+        if (boxes.length) {
+            if (row.nextElementSibling !== boxes[0] || row.parentNode !== container) container.insertBefore(row, boxes[0]);
+        } else if (row.parentNode) {
+            row.remove();
+        }
 
-    function collapse(item) {
-        if (!item) return;
-        item.classList.remove(EXPANDED_CLASS);
-        item.querySelector(':scope > .tag-compact-ok')?.remove();
-        const panel = panelOf(item);
-        if (panel) { panel.style.left = ''; panel.style.width = ''; }
-        panelResizeObserver?.disconnect();
-    }
-
-    function collapseAll(except = null) {
-        getModal()?.querySelectorAll(`.drag-item.${EXPANDED_CLASS}`).forEach(item => {
-            if (item !== except) collapse(item);
+        const locked = !!window.isWorkEditLocked;
+        const existing = new Map([...row.querySelectorAll(':scope > .tag-chip')].map(c => [c.dataset.groupRef, c]));
+        const seq = []; // 줄 안에 있어야 할 순서(열린 말풍선은 그 상자 바로 뒤)
+        boxes.forEach(item => {
+            const ref = item.dataset.groupRef;
+            let chip = existing.get(ref);
+            existing.delete(ref);
+            if (!chip) {
+                chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'w95-btn tag-chip';
+                chip.dataset.groupRef = ref;
+            }
+            const area = areaOf(item);
+            const names = area ? [...area.querySelectorAll('.active-btn')].map(b => b.textContent.trim()).filter(Boolean) : [];
+            const title = groupTitleOf(item);
+            const text = names.length ? names.join(', ') : title;
+            if (chip.textContent !== text) chip.textContent = text;
+            const tip = names.length ? `${title}: ${names.join(', ')}` : `${title} · 눌러서 선택`;
+            if (chip.title !== tip) chip.title = tip;
+            const excluded = !!item.querySelector(':scope > .box-title.is-log-excluded');
+            setClass(chip, 'has-value', names.length > 0);
+            setClass(chip, 'is-excluded', excluded);
+            setClass(chip, 'is-open', open?.item === item);
+            setClass(chip, 'is-locked', locked);
+            seq.push(chip);
+            if (open?.item === item) { open.chip = chip; seq.push(open.bubble); }
         });
+        existing.forEach(chip => chip.remove());
+        seq.forEach((node, i) => { if (row.children[i] !== node) row.insertBefore(node, row.children[i] || null); });
+        if (open) refreshBubbleHead();
+        if (open) positionArrow();
+        observer?.takeRecords(); // 방금 우리가 바꾼 것 때문에 다시 불리지 않게
     }
 
-    function expand(item) {
-        collapseAll(item);
-        item.classList.add(EXPANDED_CLASS);
-        if (!item.querySelector(':scope > .tag-compact-ok')) {
-            const ok = document.createElement('button');
-            ok.type = 'button';
-            ok.className = 'w95-btn tag-compact-ok';
-            ok.textContent = '확인';
-            ok.addEventListener('click', (e) => { e.stopPropagation(); collapse(item); });
-            item.appendChild(ok);
-        }
-        positionPanel(item);
-        const panel = panelOf(item);
-        if (panel && window.ResizeObserver) {
-            panelResizeObserver = panelResizeObserver || new ResizeObserver(() => {
-                const open = expandedItem();
-                if (open) positionPanel(open);
-            });
-            panelResizeObserver.disconnect();
-            panelResizeObserver.observe(panel);
-        }
-        // 아래쪽 그룹이면 펼친 목록이 화면 밖에 있을 수 있어 보이도록 살짝 스크롤
-        requestAnimationFrame(() => {
-            (item.querySelector(':scope > .tag-compact-ok') || panel)?.scrollIntoView({ block: 'nearest' });
-        });
+    function setClass(el, cls, on) {
+        if (el.classList.contains(cls) !== on) el.classList.toggle(cls, on);
     }
 
-    const expandedItem = () => getModal()?.querySelector(`.drag-item.${EXPANDED_CLASS}`) || null;
-
-    // Esc 등에서 쓰기 위해 공개: 열려 있던 드롭다운을 닫았으면 true
-    window.closeTagCompactPanel = () => {
-        const open = expandedItem();
-        if (!open) return false;
-        collapse(open);
-        return true;
-    };
-
-    // 눌린 곳이 "그룹 버튼"(드롭다운 목록/확인 버튼/그룹 이름 제외)인지.
-    // 그룹 이름은 기존처럼 탭하면 집계 포함/제외가 바뀌므로 건드리지 않는다.
-    function headerTarget(target) {
-        if (!isActive() || window.isWorkEditLocked || window.isWorkLayoutMode) return null;
-        const item = tagBoxOf(target);
-        if (!item) return null;
-        if (target.closest('.btn-tag-area, .tag-compact-ok, .box-title')) return null;
-        return item;
+    function observe() {
+        const container = getContainer();
+        if (!container || observer) return;
+        // 태그가 다시 그려지거나 선택/이름/집계 상태가 바뀌면 상자 이름을 갱신한다
+        observer = new MutationObserver(() => refreshAll());
+        observer.observe(container, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class'] });
     }
-    const toggle = (item) => item.classList.contains(EXPANDED_CLASS) ? collapse(item) : expand(item);
 
-    let press = null;
-    document.addEventListener('pointerdown', (e) => {
-        press = { x: e.clientX, y: e.clientY, type: e.pointerType, target: e.target, moved: false };
-    }, true);
-    document.addEventListener('pointermove', (e) => {
-        if (press && (Math.abs(e.clientX - press.x) > TAP_SLOP || Math.abs(e.clientY - press.y) > TAP_SLOP)) press.moved = true;
-    }, true);
-
-    // 터치: 버튼 탭을 여기서 처리하고 뒤따르는 click은 막는다(두 번 토글되는 것 방지)
-    document.addEventListener('touchend', (e) => {
-        if (!press || press.moved || press.type !== 'touch') return;
-        const item = headerTarget(press.target);
-        if (!item) return;
-        e.preventDefault();
-        toggle(item);
-        press = null;
-    }, { capture: true, passive: false });
-
-    // 마우스: 클릭으로 열고 닫는다
-    document.addEventListener('click', (e) => {
-        const item = headerTarget(e.target);
-        if (!item) return;
-        e.preventDefault();
-        e.stopPropagation();
-        toggle(item);
-    }, true);
-
-    // 펼친 그룹 바깥을 누르면 선택 완료로 보고 닫는다(설정이 '확인 버튼'이면 안 닫음).
-    // 누른 대상이 원래 동작을 먼저 끝내도록 살짝 늦게 닫는다.
-    document.addEventListener('pointerup', (e) => {
-        const current = press;
-        if (!current || current.moved) return;
-        const open = expandedItem();
-        if (!open || window.getTagCompactCloseMode() === 'ok') return;
+    function applyMode() {
         const modal = getModal();
-        if (!modal || !modal.contains(current.target) || open.contains(current.target)) return;
-        if (headerTarget(current.target)) return; // 다른 그룹 버튼을 누른 경우는 expand()가 처리
-        setTimeout(() => { if (open.classList.contains(EXPANDED_CLASS)) collapse(open); }, 350);
-    }, true);
+        if (!modal) return;
+        closeBubble('confirm');
+        modal.classList.toggle('tag-compact-mode', window.isTagCompactMode());
+        observe();
+        refreshAll();
+    }
+    window.applyTagCompactMode = applyMode;
 
-    window.addEventListener('resize', () => {
-        const open = expandedItem();
-        if (open) positionPanel(open);
-    });
-
-    // 단일 선택 그룹은 하나 고르면 바로 닫는다
+    // ─── 말풍선 ───
     const isSingleSelect = (type) => {
-        if (type === 'status') return true;
+        if (type === 'status' || type === 'statuses') return true;
         const groupId = window.typeToGroupId ? window.typeToGroupId(type) : type;
         if (groupId === 'statuses') return true;
         const g = window.getGroupById?.(groupId);
         return !!g && g.selectionMode === 'single';
     };
+
+    const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
+    const SELECTION_KEYS = ['activeTaskTypes', 'selectedCoworkers', 'activeStatus', 'activeEquips', 'activeCustomGroupSelections', 'activeWorkTagQuantities'];
+
+    function openBubble(chip) {
+        const item = tagBoxes().find(b => b.dataset.groupRef === chip.dataset.groupRef);
+        const area = item && item.querySelector(':scope > .btn-tag-area');
+        if (!item || !area) return;
+        closeBubble('confirm');
+
+        const placeholder = document.createElement('span');
+        placeholder.className = 'tag-area-placeholder';
+        placeholder.hidden = true;
+        area.before(placeholder);
+
+        const bubble = document.createElement('div');
+        bubble.className = 'tag-chip-bubble';
+        bubble.innerHTML = `<div class="tag-chip-bubble-arrow"></div>
+            <div class="tag-chip-bubble-head"><span class="tag-chip-bubble-title"></span><span class="tag-chip-bubble-excl"></span></div>`;
+        bubble.appendChild(area);
+        const multi = !isSingleSelect(item.dataset.groupRef);
+        if (multi) {
+            const actions = document.createElement('div');
+            actions.className = 'tag-chip-bubble-actions';
+            actions.innerHTML = `<button type="button" class="w95-btn" data-act="ok">확인</button><button type="button" class="w95-btn" data-act="cancel">취소</button>`;
+            actions.addEventListener('click', (e) => {
+                const act = e.target.closest('[data-act]')?.dataset.act;
+                if (act) { e.stopPropagation(); closeBubble(act === 'cancel' ? 'cancel' : 'confirm'); }
+            });
+            bubble.appendChild(actions);
+        }
+        // 그룹 이름을 누르면 기존처럼 이 일지의 집계 포함/제외가 바뀐다
+        bubble.querySelector('.tag-chip-bubble-head').addEventListener('click', (e) => {
+            e.stopPropagation();
+            window.toggleCurrentWorkGroupExcluded?.(item.dataset.groupRef);
+        });
+
+        const snapshot = {};
+        SELECTION_KEYS.forEach(k => { snapshot[k] = clone(window[k]); });
+        open = { item, chip, bubble, area, placeholder, snapshot, undoLen: (window.workUndoStack || []).length };
+        chip.after(bubble);
+        refreshAll();
+        requestAnimationFrame(() => bubble.scrollIntoView({ block: 'nearest' }));
+    }
+
+    function refreshBubbleHead() {
+        const head = open.bubble.querySelector('.tag-chip-bubble-head');
+        const excluded = !!open.item.querySelector(':scope > .box-title.is-log-excluded');
+        const title = groupTitleOf(open.item);
+        const t = head.querySelector('.tag-chip-bubble-title');
+        const x = head.querySelector('.tag-chip-bubble-excl');
+        if (t.textContent !== title) t.textContent = title;
+        const xt = excluded ? '집계 제외됨 · 눌러서 포함' : '';
+        if (x.textContent !== xt) x.textContent = xt;
+        setClass(head, 'is-excluded', excluded);
+    }
+
+    // 말풍선 꼬리가 누른 상자 가운데를 가리키게
+    function positionArrow() {
+        const arrow = open.bubble.querySelector('.tag-chip-bubble-arrow');
+        const left = open.chip.offsetLeft + open.chip.offsetWidth / 2 - open.bubble.offsetLeft;
+        const px = `${Math.max(10, Math.min(left, open.bubble.offsetWidth - 10))}px`;
+        if (arrow.style.left !== px) arrow.style.left = px;
+    }
+
+    // mode: 'confirm'(선택 유지) | 'cancel'(말풍선 연 뒤 바꾼 선택 되돌리기)
+    function closeBubble(mode) {
+        if (!open) return false;
+        const state = open;
+        open = null;
+        if (mode === 'cancel') {
+            SELECTION_KEYS.forEach(k => { window[k] = state.snapshot[k]; });
+            if (Array.isArray(window.workUndoStack) && window.workUndoStack.length > state.undoLen) {
+                window.workUndoStack.length = state.undoLen;
+                window.updateWorkUndoButton?.();
+            }
+        }
+        // 태그 영역을 원래 그룹 상자로 돌려놓는다(그 사이 상자가 다시 만들어졌으면 버린다)
+        if (state.placeholder.isConnected) state.placeholder.replaceWith(state.area);
+        else state.area.remove();
+        state.placeholder.remove();
+        if (mode === 'cancel') window.renderAllWorkGroups?.();
+        state.bubble.remove();
+        refreshAll();
+        return true;
+    }
+    // Esc/Enter에서 사용: 열린 말풍선을 닫았으면 true (revert=true면 취소)
+    window.closeTagCompactPanel = (revert = false) => closeBubble(revert ? 'cancel' : 'confirm');
+
+    function onRowClick(e) {
+        const chip = e.target.closest('.tag-chip');
+        if (!chip || !isActive() || window.isWorkEditLocked || window.isWorkLayoutMode) return;
+        e.stopPropagation();
+        if (open?.chip === chip) closeBubble('confirm');
+        else openBubble(chip);
+    }
+
+    // 말풍선 바깥을 누르면 확인으로 보고 닫는다(설정이 '확인 버튼'이면 안 닫음).
+    // 누른 대상이 원래 동작을 먼저 끝내도록 살짝 늦게 닫는다.
+    let press = null;
+    document.addEventListener('pointerdown', (e) => { press = { x: e.clientX, y: e.clientY, target: e.target }; }, true);
+    document.addEventListener('pointerup', (e) => {
+        const p = press;
+        press = null;
+        if (!p || !open || window.getTagCompactCloseMode() === 'ok') return;
+        if (Math.abs(e.clientX - p.x) > 10 || Math.abs(e.clientY - p.y) > 10) return; // 스크롤
+        const modal = getModal();
+        if (!modal || !modal.contains(p.target)) return;
+        if (open.bubble.contains(p.target) || p.target.closest('.tag-chip')) return; // 상자 누름은 onRowClick이 처리
+        const state = open;
+        setTimeout(() => { if (open === state) closeBubble('confirm'); }, 350);
+    }, true);
+
+    window.addEventListener('resize', () => { if (open) positionArrow(); });
+
+    // 단일 선택 그룹은 하나 고르면 바로 닫는다
     const origHandleClick = window.handleClick;
     if (typeof origHandleClick === 'function') {
         window.handleClick = (type, index, ...rest) => {
             const result = origHandleClick(type, index, ...rest);
-            if (isActive() && isSingleSelect(type)) {
-                const open = expandedItem();
-                if (open) setTimeout(() => collapse(open), 180);
+            if (open && isSingleSelect(type)) {
+                const state = open;
+                setTimeout(() => { if (open === state) closeBubble('confirm'); }, 180);
             }
             return result;
         };
     }
 
-    // 작업일지를 새로 열 때는 항상 모두 닫힌 상태로 시작
+    // 작업일지를 새로 열 때는 항상 말풍선 없이 시작
     const origOpenWorkModal = window.openWorkModal;
     if (typeof origOpenWorkModal === 'function') {
         window.openWorkModal = (...args) => {
+            closeBubble('confirm');
             const result = origOpenWorkModal(...args);
             applyMode();
             return result;
         };
     }
 
-    // 잠금 상태가 바뀌면 빈 그룹 문구('눌러서 선택'/'선택 없음')를 바꾸고 열린 목록을 닫는다
+    // 레이아웃 변경에 들어가기 전에 태그 영역을 제자리로 돌려놓는다
+    const origSetLayoutMode = window.setWorkLayoutMode;
+    if (typeof origSetLayoutMode === 'function') {
+        window.setWorkLayoutMode = (...args) => {
+            closeBubble('confirm');
+            const result = origSetLayoutMode(...args);
+            refreshAll();
+            return result;
+        };
+    }
+
     const origSetLocked = window.setWorkEditLocked;
     if (typeof origSetLocked === 'function') {
         window.setWorkEditLocked = (...args) => {
             const result = origSetLocked(...args);
-            if (window.isWorkEditLocked) collapseAll();
-            queueRefresh();
+            if (window.isWorkEditLocked) closeBubble('confirm');
+            refreshAll();
             return result;
         };
     }

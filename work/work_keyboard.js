@@ -2,7 +2,7 @@
 // PC(마우스/키보드 환경)에서 작업일지 단축키: Enter = 저장, Esc = 취소.
 // - 한글 입력 조합 중의 Enter는 글자 확정이므로 무시한다.
 // - 여러 줄 칸(작업 내용 등)에서 줄바꿈은 Shift+Enter.
-// - 태그 드롭다운이 열려 있으면 Esc는 드롭다운만 닫는다.
+// - 태그 말풍선이 열려 있으면 Esc는 말풍선만 닫는다(취소 = 연 뒤 바꾼 선택 되돌림).
 // - 레이아웃 변경 모드에서는 Esc = 레이아웃 변경 끝내기, Enter는 동작 없음.
 // - 작업일지 위에 다른 창(지도 앱 선택, 태그 수정, 사진 보기 등)이 떠 있으면 그 창을 방해하지 않는다.
 
@@ -29,7 +29,7 @@
         if (e.key === 'Escape') {
             e.preventDefault();
             e.stopPropagation();
-            if (window.closeTagCompactPanel?.()) return;
+            if (window.closeTagCompactPanel?.(true)) return; // 말풍선만 닫기(취소)
             if (window.isWorkLayoutMode) { window.setWorkLayoutMode?.(false); return; }
             window.closeWorkModal?.();
             return;
