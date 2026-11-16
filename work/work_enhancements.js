@@ -1372,6 +1372,7 @@
         bar.innerHTML = `<b id="cardMultiCount">0개 선택</b>
             <button type="button" class="w95-btn" onclick="window.copySelectedCards()">복사</button>
             <button type="button" class="w95-btn" onclick="window.shareSelectedCards()">공유</button>
+            <button type="button" class="w95-btn card-multi-dup-btn" onclick="window.startCardDuplicate?.()">복제</button>
             <button type="button" class="w95-btn" onclick="window.closeCardSelectionMode()">취소</button>`;
         document.body.appendChild(bar);
         return bar;

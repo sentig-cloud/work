@@ -427,7 +427,8 @@ window.getUiSettingsPayload = function () {
             mode: localStorage.getItem('wm_tag_compact_mode') || '0',
             close: localStorage.getItem('wm_tag_compact_close') || 'outside'
         },
-        geoRouteMarks: readJson('wm_georoute_marks', [])
+        geoRouteMarks: readJson('wm_georoute_marks', []),
+        cardTools: readJson('wm_card_tools', {})
     };
 };
 window.applyUiSettingsPayload = function (uiSettings) {
@@ -444,9 +445,13 @@ window.applyUiSettingsPayload = function (uiSettings) {
     if (uiSettings.basicGroupTitle) localStorage.setItem('wm_basic_group_title', uiSettings.basicGroupTitle);
     // 아래 두 항목은 예전 버전이 보낸 설정에는 없으므로, 들어있을 때만 덮어쓴다.
     if (uiSettings.tagCompact && typeof uiSettings.tagCompact === 'object') {
-        localStorage.setItem('wm_tag_compact_mode', uiSettings.tagCompact.mode === '1' ? '1' : '0');
+        localStorage.setItem('wm_tag_compact_mode', ['1', '2'].includes(uiSettings.tagCompact.mode) ? uiSettings.tagCompact.mode : '0');
         localStorage.setItem('wm_tag_compact_close', uiSettings.tagCompact.close === 'ok' ? 'ok' : 'outside');
         window.applyTagCompactMode?.();
+    }
+    if (uiSettings.cardTools && typeof uiSettings.cardTools === 'object' && Object.keys(uiSettings.cardTools).length) {
+        setJson('wm_card_tools', uiSettings.cardTools);
+        window.applyCardToolsSettings?.();
     }
     if (Array.isArray(uiSettings.geoRouteMarks)) {
         setJson('wm_georoute_marks', uiSettings.geoRouteMarks);

@@ -15,12 +15,15 @@
     const CLOSE_KEY = 'wm_tag_compact_close';
     const BOX_CLASS = 'tag-compact-box';
 
+    // MODE_KEY: '0' 전부 펼침 | '1' 태그상자(말풍선) | '2' 세로 스와이프(work_card_tools.js)
     window.isTagCompactMode = () => localStorage.getItem(MODE_KEY) === '1';
+    window.isTagSwipeMode = () => localStorage.getItem(MODE_KEY) === '2';
     window.getTagCompactCloseMode = () => localStorage.getItem(CLOSE_KEY) === 'ok' ? 'ok' : 'outside';
 
     window.setTagCompactSettings = (compact, closeMode) => {
         const prev = `${localStorage.getItem(MODE_KEY)}|${localStorage.getItem(CLOSE_KEY)}`;
-        localStorage.setItem(MODE_KEY, compact ? '1' : '0');
+        // compact: true(태그상자) | false(전부 펼침) | 'swipe'(세로 스와이프)
+        localStorage.setItem(MODE_KEY, compact === 'swipe' ? '2' : compact ? '1' : '0');
         localStorage.setItem(CLOSE_KEY, closeMode === 'ok' ? 'ok' : 'outside');
         applyMode();
         // 다른 기기에도 같은 표시 방식이 적용되도록 화면 설정(uiSettings)과 함께 서버로 보낸다.
@@ -66,6 +69,12 @@
         const container = getContainer();
         if (!container) return;
         const row = getRow();
+        // 태그상자 방식이 아닐 때는 줄을 두지 않는다(세로 스와이프 줄과 자리 다툼 방지)
+        if (!window.isTagCompactMode()) {
+            if (row.parentNode) row.remove();
+            observer?.takeRecords();
+            return;
+        }
         const boxes = tagBoxes();
         boxes.forEach(item => { if (!item.classList.contains(BOX_CLASS)) item.classList.add(BOX_CLASS); });
         // 줄은 첫 그룹 상자 자리에 둔다(레이아웃 순서를 바꾸면 따라간다)
@@ -129,6 +138,7 @@
         modal.classList.toggle('tag-compact-mode', window.isTagCompactMode());
         observe();
         refreshAll();
+        window.applyTagSwipeMode?.();
     }
     window.applyTagCompactMode = applyMode;
 

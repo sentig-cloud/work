@@ -272,13 +272,41 @@
                         <div class="tt-settings-group-title"><i class="fa-solid fa-tags"></i> 작업일지 선택태그 상자 그룹</div>
                         <div class="tt-settings-section">
                             <div class="tt-settings-label">표시 방식</div>
-                            <label class="tt-settings-check"><input type="radio" name="ttTagBoxMode" id="ttOptTagBoxExpanded" value="expanded"> 펼침 (모든 태그 항상 표시)</label>
-                            <label class="tt-settings-check"><input type="radio" name="ttTagBoxMode" id="ttOptTagBoxCompact" value="compact"> 태그상자 (그룹 이름이 태그상자가 되고, 누르면 말풍선으로 펼쳐짐)</label>
+                            <label class="tt-settings-check"><input type="radio" name="ttTagBoxMode" id="ttOptTagBoxExpanded" value="expanded"> 전부 펼침 (작업유형·상태·작업구분 등 모든 그룹의 태그를 펼쳐서 선택)</label>
+                            <label class="tt-settings-check"><input type="radio" name="ttTagBoxMode" id="ttOptTagBoxCompact" value="compact"> 태그상자 순차 배열 (그룹 이름이 태그상자가 되고, 누르면 말풍선으로 펼쳐짐)</label>
+                            <label class="tt-settings-check"><input type="radio" name="ttTagBoxMode" id="ttOptTagBoxSwipe" value="swipe"> 세로 스와이프 (그룹이 세로로 서고, 그룹 이름을 누른 채 오른쪽으로 밀다가 멈추고 떼면 그 태그 선택)</label>
+                        </div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">세로 스와이프 방식에서 집계 제외</div>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptSwipeLongExclude"> 끝까지 길게 밀면 그 그룹 집계 제외/포함</label>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptSwipeTitleExclude"> 그룹 이름을 짧게 누르면 집계 제외/포함</label>
                         </div>
                         <div class="tt-settings-section">
                             <div class="tt-settings-label">태그상자 방식에서 중복 선택 그룹 닫기</div>
                             <label class="tt-settings-check"><input type="radio" name="ttTagBoxClose" id="ttOptTagBoxCloseOutside" value="outside"> 다른 곳을 누르면 선택 완료(확인)로 닫기</label>
                             <label class="tt-settings-check"><input type="radio" name="ttTagBoxClose" id="ttOptTagBoxCloseOk" value="ok"> 확인/취소 버튼을 눌러야만 닫기</label>
+                        </div>
+                    </div>
+                    <div class="tt-settings-group">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-id-card"></i> 카드 · 입력</div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">작업 카드 레이아웃</div>
+                            <label class="tt-settings-check"><input type="radio" name="ttCardLayout" id="ttOptCardLayoutDefault" value="default"> 기본 (카드 꾸미기 자유 배치)</label>
+                            <label class="tt-settings-check"><input type="radio" name="ttCardLayout" id="ttOptCardLayoutSummary" value="summary"> 요약형 (시간·상태·타스크 한 줄 + 고객/주소/내용)</label>
+                            <label class="tt-settings-check"><input type="radio" name="ttCardLayout" id="ttOptCardLayoutTimeline" value="timeline"> 타임라인형 (왼쪽 시간 줄기 + 오른쪽 내용)</label>
+                            <label class="tt-settings-check"><input type="radio" name="ttCardLayout" id="ttOptCardLayoutMini" value="mini"> 한 줄형 (가장 작게, 눌러서 열기)</label>
+                        </div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">카드 길게 눌러 선택했을 때</div>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptCardDuplicate"> 복제 버튼 표시 (날짜·시간을 골라 복제, 달력 날짜를 눌러도 복제)</label>
+                        </div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">같은 카드 묶기</div>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptCardGroupTaskNo"> 타스크 번호가 같은 카드를 한 묶음으로 표시</label>
+                        </div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">입력칸</div>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptDoubleTapPaste"> 커서를 둔 칸을 더블탭하면 클립보드 내용 붙여넣기</label>
                         </div>
                     </div>
                     <div class="tt-settings-group">
@@ -387,7 +415,15 @@
         }
         const geoScaleIds = { small: 'ttOptGeoRouteScaleSmall', medium: 'ttOptGeoRouteScaleMedium', large: 'ttOptGeoRouteScaleLarge' };
         document.getElementById(geoScaleIds[window.getGeoRouteFontScale?.() || 'medium']).checked = true;
-        document.getElementById(window.isTagCompactMode?.() ? 'ttOptTagBoxCompact' : 'ttOptTagBoxExpanded').checked = true;
+        document.getElementById(window.isTagSwipeMode?.() ? 'ttOptTagBoxSwipe' : window.isTagCompactMode?.() ? 'ttOptTagBoxCompact' : 'ttOptTagBoxExpanded').checked = true;
+        const cardTools = window.getCardToolsSettings?.() || {};
+        const layoutIds = { default:'ttOptCardLayoutDefault', summary:'ttOptCardLayoutSummary', timeline:'ttOptCardLayoutTimeline', mini:'ttOptCardLayoutMini' };
+        document.getElementById(layoutIds[cardTools.cardLayout] || layoutIds.default).checked = true;
+        document.getElementById('ttOptCardDuplicate').checked = cardTools.duplicate !== false;
+        document.getElementById('ttOptCardGroupTaskNo').checked = !!cardTools.groupByTaskNo;
+        document.getElementById('ttOptDoubleTapPaste').checked = cardTools.doubleTapPaste !== false;
+        document.getElementById('ttOptSwipeLongExclude').checked = cardTools.swipeLongExclude !== false;
+        document.getElementById('ttOptSwipeTitleExclude').checked = cardTools.swipeTitleExclude !== false;
         document.getElementById(window.getTagCompactCloseMode?.() === 'ok' ? 'ttOptTagBoxCloseOk' : 'ttOptTagBoxCloseOutside').checked = true;
         document.getElementById('ttSettingsModal').style.display = 'flex';
     }
@@ -422,7 +458,17 @@
         if (geoScaleEl) window.setGeoRouteFontScale?.(geoScaleEl.value);
         const tagBoxModeEl = document.querySelector('input[name="ttTagBoxMode"]:checked');
         const tagBoxCloseEl = document.querySelector('input[name="ttTagBoxClose"]:checked');
-        window.setTagCompactSettings?.(tagBoxModeEl?.value === 'compact', tagBoxCloseEl?.value === 'ok' ? 'ok' : 'outside');
+        const cardLayoutEl = document.querySelector('input[name="ttCardLayout"]:checked');
+        window.setCardToolsSettings?.({
+            cardLayout: cardLayoutEl ? cardLayoutEl.value : 'default',
+            duplicate: document.getElementById('ttOptCardDuplicate').checked,
+            groupByTaskNo: document.getElementById('ttOptCardGroupTaskNo').checked,
+            doubleTapPaste: document.getElementById('ttOptDoubleTapPaste').checked,
+            swipeLongExclude: document.getElementById('ttOptSwipeLongExclude').checked,
+            swipeTitleExclude: document.getElementById('ttOptSwipeTitleExclude').checked
+        });
+        const tagBoxMode = tagBoxModeEl?.value === 'swipe' ? 'swipe' : tagBoxModeEl?.value === 'compact';
+        window.setTagCompactSettings?.(tagBoxMode, tagBoxCloseEl?.value === 'ok' ? 'ok' : 'outside');
 
         closeSettingsModal();
         if (active) { applyScaleClass(); renderWeek(); }
