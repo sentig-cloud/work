@@ -232,11 +232,130 @@
         modal.className = 'modal-overlay';
         modal.style.zIndex = '2650';
         modal.innerHTML = `
-            <div class="modal-box w95-window" style="max-width:330px;">
-                <div class="w95-titlebar"><span>메인 설정</span><button type="button" class="w95-btn" id="ttSettingsCloseBtn">X</button></div>
-                <div class="tt-settings-body">
-                    <div class="tt-settings-group">
-                        <div class="tt-settings-group-title"><i class="fa-solid fa-table-cells"></i> 타임테이블</div>
+            <div class="modal-box w95-window ws-box">
+                <div class="w95-titlebar ws-titlebar">
+                    <button type="button" class="w95-btn ws-back" id="ttSettingsBackBtn" title="메뉴로" hidden><i class="fa-solid fa-chevron-left"></i></button>
+                    <span id="ttSettingsTitle">설정</span>
+                    <button type="button" class="w95-btn" id="ttSettingsCloseBtn">X</button>
+                </div>
+                <div class="ws-search-row">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="search" id="ttSettingsSearch" class="w95-in" placeholder="설정 검색 (예: 복제, 스와이프, 글자)" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="tt-settings-body ws-body" id="ttSettingsBody">
+                    <nav class="ws-menu" id="ttSettingsMenu">
+                        <button type="button" class="ws-menu-item" data-go="main"><i class="fa-solid fa-house"></i><span><b>메인 화면</b><small>월별 표시 형식 · 칸 배치 · 전체 누적</small></span><em>›</em></button>
+                        <button type="button" class="ws-menu-item" data-go="card"><i class="fa-solid fa-id-card"></i><span><b>작업 카드</b><small>카드 레이아웃 · 복제 · 같은 타스크 묶기</small></span><em>›</em></button>
+                        <button type="button" class="ws-menu-item" data-go="input"><i class="fa-solid fa-tags"></i><span><b>작업일지 입력</b><small>선택태그 상자 방식 · 스와이프 · 붙여넣기</small></span><em>›</em></button>
+                        <button type="button" class="ws-menu-item" data-go="look"><i class="fa-solid fa-palette"></i><span><b>화면 · 디자인</b><small>디자인 개선 · 글자 크기 · 글꼴</small></span><em>›</em></button>
+                        <button type="button" class="ws-menu-item" data-go="timetable"><i class="fa-solid fa-table-cells"></i><span><b>주간 시간표</b><small>표시 항목 · 기본 화면 · 크기 · 격자</small></span><em>›</em></button>
+                        <button type="button" class="ws-menu-item" data-go="map"><i class="fa-solid fa-route"></i><span><b>지도 · 동선</b><small>기본 지도 앱 · 동선 관리</small></span><em>›</em></button>
+                        <button type="button" class="ws-menu-item" data-go="auto"><i class="fa-solid fa-camera"></i><span><b>자동 인식</b><small>출퇴근 사진 OCR</small></span><em>›</em></button>
+                        <button type="button" class="ws-menu-item is-new" data-go="labs"><i class="fa-solid fa-flask"></i><span><b>신규 기능</b><small>직접 만든 편의 기능 · 하나씩 켜고 끄기</small></span><em>›</em></button>
+                        <button type="button" class="ws-menu-item" data-go="account"><i class="fa-solid fa-user-shield"></i><span><b>계정</b><small>접속 기록 · 계정 전환 · 로그아웃</small></span><em>›</em></button>
+                        <button type="button" class="ws-menu-item" data-go="reset"><i class="fa-solid fa-rotate-left"></i><span><b>되돌리기</b><small>이번에 추가된 화면 설정을 원래대로</small></span><em>›</em></button>
+                    </nav>
+
+                    <div class="tt-settings-group" data-page="main">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-house"></i> 메인 화면 (1~12월)</div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">표시 형식</div>
+                            <label class="tt-settings-check"><input type="radio" name="ttMainView" id="ttOptMainViewClassic" value="classic"> 기본 <small>지금까지의 모양</small></label>
+                            <label class="tt-settings-check"><input type="radio" name="ttMainView" id="ttOptMainViewDetail" value="detail"> 상세 <small>건수 · 완료율 막대 · 상태 · OT/당직/출근일</small></label>
+                            <label class="tt-settings-check"><input type="radio" name="ttMainView" id="ttOptMainViewSummary" value="summary"> 요약 <small>월마다 건수만 크게</small></label>
+                        </div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">한 줄에 놓을 달 수</div>
+                            <div class="ws-seg">
+                                <label><input type="radio" name="ttMainCols" id="ttOptMainColsAuto" value="auto"><span>자동</span></label>
+                                <label><input type="radio" name="ttMainCols" id="ttOptMainCols2" value="2"><span>2</span></label>
+                                <label><input type="radio" name="ttMainCols" id="ttOptMainCols3" value="3"><span>3</span></label>
+                                <label><input type="radio" name="ttMainCols" id="ttOptMainCols4" value="4"><span>4</span></label>
+                            </div>
+                            <div class="ws-desc">자동: 기본·상세는 3칸, 요약은 4칸</div>
+                        </div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">전체 누적</div>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptMainYearTotal"> 아래에 올해 전체 누적 표시</label>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptMainYearStatus"> 누적에 상태별 건수도 표시</label>
+                        </div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">이번 달</div>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptMainHighlight"> 이번 달 칸을 테두리로 강조</label>
+                        </div>
+                    </div>
+
+                    <div class="tt-settings-group" data-page="card">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-id-card"></i> 작업 카드</div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">카드 레이아웃</div>
+                            <label class="tt-settings-check"><input type="radio" name="ttCardLayout" id="ttOptCardLayoutDefault" value="default"> 기본 <small>카드 꾸미기 자유 배치</small></label>
+                            <label class="tt-settings-check"><input type="radio" name="ttCardLayout" id="ttOptCardLayoutSummary" value="summary"> 요약형 <small>시간·상태·타스크 한 줄 + 고객/주소/내용</small></label>
+                            <label class="tt-settings-check"><input type="radio" name="ttCardLayout" id="ttOptCardLayoutTimeline" value="timeline"> 타임라인형 <small>왼쪽 시간 줄기 + 오른쪽 내용</small></label>
+                            <label class="tt-settings-check"><input type="radio" name="ttCardLayout" id="ttOptCardLayoutMini" value="mini"> 한 줄형 <small>가장 작게, 눌러서 열기</small></label>
+                        </div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">카드를 길게 눌러 선택했을 때</div>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptCardDuplicate"> 복제 버튼 <small>날짜·시간을 골라 복제, 달력 날짜를 눌러도 복제</small></label>
+                        </div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">같은 카드 묶기</div>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptCardGroupTaskNo"> 타스크 번호가 같은 카드를 한 묶음으로</label>
+                        </div>
+                    </div>
+
+                    <div class="tt-settings-group" data-page="input">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-tags"></i> 선택태그 상자</div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">표시 방식</div>
+                            <label class="tt-settings-check"><input type="radio" name="ttTagBoxMode" id="ttOptTagBoxExpanded" value="expanded"> 전부 펼침 <small>모든 그룹의 태그를 펼쳐서 선택</small></label>
+                            <label class="tt-settings-check"><input type="radio" name="ttTagBoxMode" id="ttOptTagBoxCompact" value="compact"> 순차 배열 <small>그룹 이름 상자를 누르면 말풍선으로 펼침</small></label>
+                            <label class="tt-settings-check"><input type="radio" name="ttTagBoxMode" id="ttOptTagBoxSwipe" value="swipe"> 세로 스와이프 <small>그룹 이름을 누른 채 오른쪽으로 밀다가 떼면 선택</small></label>
+                        </div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">세로 스와이프</div>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptSwipePreview"> 밀고 있는 태그를 화면 가운데 위에 크게 표시</label>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptSwipeLongExclude"> 끝까지 길게 밀면 그 그룹 집계 제외/포함</label>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptSwipeTitleExclude"> 그룹 이름을 짧게 누르면 집계 제외/포함</label>
+                        </div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">순차 배열 · 중복 선택 그룹 닫기</div>
+                            <label class="tt-settings-check"><input type="radio" name="ttTagBoxClose" id="ttOptTagBoxCloseOutside" value="outside"> 다른 곳을 누르면 확인으로 닫기</label>
+                            <label class="tt-settings-check"><input type="radio" name="ttTagBoxClose" id="ttOptTagBoxCloseOk" value="ok"> 확인/취소 버튼으로만 닫기</label>
+                        </div>
+                    </div>
+                    <div class="tt-settings-group" data-page="input">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-keyboard"></i> 입력칸</div>
+                        <div class="tt-settings-section">
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptDoubleTapPaste"> 커서를 둔 칸을 더블탭하면 붙여넣기</label>
+                        </div>
+                    </div>
+
+                    <div class="tt-settings-group" data-page="look">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-palette"></i> 화면 · 디자인</div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">디자인</div>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptUiRefresh"> 개선된 디자인 <small>또렷한 글씨·여백·비율 정리 (끄면 예전 모양)</small></label>
+                        </div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">글자 크기 (앱 전체)</div>
+                            <div class="ws-seg">
+                                <label><input type="radio" name="ttFontScale" id="ttOptFontNormal" value="normal"><span>보통</span></label>
+                                <label><input type="radio" name="ttFontScale" id="ttOptFontLarge" value="large"><span>크게</span></label>
+                                <label><input type="radio" name="ttFontScale" id="ttOptFontXLarge" value="xlarge"><span>아주 크게</span></label>
+                            </div>
+                        </div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">글꼴</div>
+                            <div class="ws-seg">
+                                <label><input type="radio" name="ttFontFamily" id="ttOptFontClassic" value="classic"><span>윈도우95</span></label>
+                                <label><input type="radio" name="ttFontFamily" id="ttOptFontSystem" value="system"><span>읽기 쉬운 고딕</span></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tt-settings-group" data-page="timetable">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-table-cells"></i> 주간 시간표</div>
                         <div class="tt-settings-section">
                             <div class="tt-settings-label">표시할 항목</div>
                             <label class="tt-settings-check"><input type="checkbox" id="ttOptCatWork"> 작업</label>
@@ -244,84 +363,50 @@
                             <label class="tt-settings-check"><input type="checkbox" id="ttOptCatMemo"> 메모/사진</label>
                         </div>
                         <div class="tt-settings-section">
-                            <div class="tt-settings-label">기본 진입 뷰</div>
+                            <div class="tt-settings-label">달 화면을 열면 먼저 보일 화면</div>
                             <label class="tt-settings-check"><input type="radio" name="ttDefaultView" id="ttOptViewMonth" value="month"> 월간 달력</label>
                             <label class="tt-settings-check"><input type="radio" name="ttDefaultView" id="ttOptViewTimetable" value="timetable"> 주간 시간표</label>
                         </div>
                     </div>
-                    <div class="tt-settings-group">
-                        <div class="tt-settings-group-title"><i class="fa-solid fa-eye"></i> 시인성</div>
+                    <div class="tt-settings-group" data-page="timetable">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-eye"></i> 시간표 시인성</div>
                         <div class="tt-settings-section">
-                            <div class="tt-settings-label">표시 크기(시간/줄/글씨)</div>
-                            <label class="tt-settings-check"><input type="radio" name="ttScale" id="ttOptScaleSmall" value="small"> 작게</label>
-                            <label class="tt-settings-check"><input type="radio" name="ttScale" id="ttOptScaleMedium" value="medium"> 보통</label>
-                            <label class="tt-settings-check"><input type="radio" name="ttScale" id="ttOptScaleLarge" value="large"> 크게</label>
+                            <div class="tt-settings-label">표시 크기 (시간/줄/글씨)</div>
+                            <div class="ws-seg">
+                                <label><input type="radio" name="ttScale" id="ttOptScaleSmall" value="small"><span>작게</span></label>
+                                <label><input type="radio" name="ttScale" id="ttOptScaleMedium" value="medium"><span>보통</span></label>
+                                <label><input type="radio" name="ttScale" id="ttOptScaleLarge" value="large"><span>크게</span></label>
+                            </div>
                         </div>
                         <div class="tt-settings-section">
-                            <div class="tt-settings-label">긴 이름 표시</div>
-                            <label class="tt-settings-check"><input type="radio" name="ttLongName" id="ttOptLongNameWrap" value="wrap"> 줄바꿈(칸 높이 늘어남)</label>
-                            <label class="tt-settings-check"><input type="radio" name="ttLongName" id="ttOptLongNameEllipsis" value="ellipsis"> 말줄임(한 줄, ...)</label>
+                            <div class="tt-settings-label">긴 이름</div>
+                            <label class="tt-settings-check"><input type="radio" name="ttLongName" id="ttOptLongNameWrap" value="wrap"> 줄바꿈 <small>칸 높이가 늘어남</small></label>
+                            <label class="tt-settings-check"><input type="radio" name="ttLongName" id="ttOptLongNameEllipsis" value="ellipsis"> 말줄임 <small>한 줄, ...</small></label>
                         </div>
                         <div class="tt-settings-section">
-                            <div class="tt-settings-label">격자 무늬(칸 구분)</div>
-                            <label class="tt-settings-check"><input type="radio" name="ttGridPattern" id="ttOptGridPatternNone" value="none"> 없음</label>
-                            <label class="tt-settings-check"><input type="radio" name="ttGridPattern" id="ttOptGridPatternChecker" value="checker"> 바둑판 무늬</label>
-                        </div>
-                    </div>
-                    <div class="tt-settings-group">
-                        <div class="tt-settings-group-title"><i class="fa-solid fa-tags"></i> 작업일지 선택태그 상자 그룹</div>
-                        <div class="tt-settings-section">
-                            <div class="tt-settings-label">표시 방식</div>
-                            <label class="tt-settings-check"><input type="radio" name="ttTagBoxMode" id="ttOptTagBoxExpanded" value="expanded"> 전부 펼침 (작업유형·상태·작업구분 등 모든 그룹의 태그를 펼쳐서 선택)</label>
-                            <label class="tt-settings-check"><input type="radio" name="ttTagBoxMode" id="ttOptTagBoxCompact" value="compact"> 태그상자 순차 배열 (그룹 이름이 태그상자가 되고, 누르면 말풍선으로 펼쳐짐)</label>
-                            <label class="tt-settings-check"><input type="radio" name="ttTagBoxMode" id="ttOptTagBoxSwipe" value="swipe"> 세로 스와이프 (그룹이 세로로 서고, 그룹 이름을 누른 채 오른쪽으로 밀다가 멈추고 떼면 그 태그 선택)</label>
-                        </div>
-                        <div class="tt-settings-section">
-                            <div class="tt-settings-label">세로 스와이프 방식에서 집계 제외</div>
-                            <label class="tt-settings-check"><input type="checkbox" id="ttOptSwipeLongExclude"> 끝까지 길게 밀면 그 그룹 집계 제외/포함</label>
-                            <label class="tt-settings-check"><input type="checkbox" id="ttOptSwipeTitleExclude"> 그룹 이름을 짧게 누르면 집계 제외/포함</label>
-                        </div>
-                        <div class="tt-settings-section">
-                            <div class="tt-settings-label">태그상자 방식에서 중복 선택 그룹 닫기</div>
-                            <label class="tt-settings-check"><input type="radio" name="ttTagBoxClose" id="ttOptTagBoxCloseOutside" value="outside"> 다른 곳을 누르면 선택 완료(확인)로 닫기</label>
-                            <label class="tt-settings-check"><input type="radio" name="ttTagBoxClose" id="ttOptTagBoxCloseOk" value="ok"> 확인/취소 버튼을 눌러야만 닫기</label>
+                            <div class="tt-settings-label">격자 무늬</div>
+                            <div class="ws-seg">
+                                <label><input type="radio" name="ttGridPattern" id="ttOptGridPatternNone" value="none"><span>없음</span></label>
+                                <label><input type="radio" name="ttGridPattern" id="ttOptGridPatternChecker" value="checker"><span>바둑판</span></label>
+                            </div>
                         </div>
                     </div>
-                    <div class="tt-settings-group">
-                        <div class="tt-settings-group-title"><i class="fa-solid fa-id-card"></i> 카드 · 입력</div>
-                        <div class="tt-settings-section">
-                            <div class="tt-settings-label">작업 카드 레이아웃</div>
-                            <label class="tt-settings-check"><input type="radio" name="ttCardLayout" id="ttOptCardLayoutDefault" value="default"> 기본 (카드 꾸미기 자유 배치)</label>
-                            <label class="tt-settings-check"><input type="radio" name="ttCardLayout" id="ttOptCardLayoutSummary" value="summary"> 요약형 (시간·상태·타스크 한 줄 + 고객/주소/내용)</label>
-                            <label class="tt-settings-check"><input type="radio" name="ttCardLayout" id="ttOptCardLayoutTimeline" value="timeline"> 타임라인형 (왼쪽 시간 줄기 + 오른쪽 내용)</label>
-                            <label class="tt-settings-check"><input type="radio" name="ttCardLayout" id="ttOptCardLayoutMini" value="mini"> 한 줄형 (가장 작게, 눌러서 열기)</label>
-                        </div>
-                        <div class="tt-settings-section">
-                            <div class="tt-settings-label">카드 길게 눌러 선택했을 때</div>
-                            <label class="tt-settings-check"><input type="checkbox" id="ttOptCardDuplicate"> 복제 버튼 표시 (날짜·시간을 골라 복제, 달력 날짜를 눌러도 복제)</label>
-                        </div>
-                        <div class="tt-settings-section">
-                            <div class="tt-settings-label">같은 카드 묶기</div>
-                            <label class="tt-settings-check"><input type="checkbox" id="ttOptCardGroupTaskNo"> 타스크 번호가 같은 카드를 한 묶음으로 표시</label>
-                        </div>
-                        <div class="tt-settings-section">
-                            <div class="tt-settings-label">입력칸</div>
-                            <label class="tt-settings-check"><input type="checkbox" id="ttOptDoubleTapPaste"> 커서를 둔 칸을 더블탭하면 클립보드 내용 붙여넣기</label>
-                        </div>
-                    </div>
-                    <div class="tt-settings-group">
+
+                    <div class="tt-settings-group" data-page="map">
                         <div class="tt-settings-group-title"><i class="fa-solid fa-diamond-turn-right"></i> 지도 · 내비게이션</div>
                         <div class="tt-settings-section">
-                            <div class="tt-settings-label">기본 지도 앱 (길게 눌러 바로 이동할 때 사용)</div>
-                            <label class="tt-settings-check"><input type="radio" name="ttDefaultMap" id="ttOptMapTmap" value="tmap"> T맵</label>
-                            <label class="tt-settings-check"><input type="radio" name="ttDefaultMap" id="ttOptMapNaver" value="naver"> 네이버지도</label>
-                            <label class="tt-settings-check"><input type="radio" name="ttDefaultMap" id="ttOptMapKakao" value="kakaomap"> 카카오맵</label>
+                            <div class="tt-settings-label">기본 지도 앱 <small>길게 눌러 바로 이동할 때</small></div>
+                            <div class="ws-seg">
+                                <label><input type="radio" name="ttDefaultMap" id="ttOptMapTmap" value="tmap"><span>T맵</span></label>
+                                <label><input type="radio" name="ttDefaultMap" id="ttOptMapNaver" value="naver"><span>네이버</span></label>
+                                <label><input type="radio" name="ttDefaultMap" id="ttOptMapKakao" value="kakaomap"><span>카카오</span></label>
+                            </div>
                         </div>
                     </div>
-                    <div class="tt-settings-group">
+                    <div class="tt-settings-group" data-page="map">
                         <div class="tt-settings-group-title"><i class="fa-solid fa-route"></i> 동선 관리</div>
                         <div class="tt-settings-section">
-                            <label class="tt-settings-check"><input type="checkbox" id="ttOptGeoRouteEnabled"> 켜기 (날짜를 길게 누르면 동선 관리 팝업 열기)</label>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptGeoRouteEnabled"> 켜기 <small>날짜를 길게 누르면 동선 관리 팝업</small></label>
                         </div>
                         <div class="tt-settings-section">
                             <div class="tt-settings-label">지도에 표시할 내 위치 아이콘</div>
@@ -329,33 +414,65 @@
                         </div>
                         <div class="tt-settings-section">
                             <div class="tt-settings-label">글자 크기</div>
-                            <label class="tt-settings-check"><input type="radio" name="ttGeoRouteScale" id="ttOptGeoRouteScaleSmall" value="small"> 작게</label>
-                            <label class="tt-settings-check"><input type="radio" name="ttGeoRouteScale" id="ttOptGeoRouteScaleMedium" value="medium"> 보통</label>
-                            <label class="tt-settings-check"><input type="radio" name="ttGeoRouteScale" id="ttOptGeoRouteScaleLarge" value="large"> 크게</label>
-                        </div>
-                    </div>
-                    <div class="tt-settings-group">
-                        <div class="tt-settings-group-title"><i class="fa-solid fa-camera"></i> 자동 인식</div>
-                        <div class="tt-settings-section">
-                            <div class="tt-settings-label">구글 비전(OCR) — 출퇴근 사진에서 시간/거리 자동 인식</div>
-                            <label class="tt-settings-check"><input type="checkbox" id="ttOptVisionOcr"> 켜기(서버에 API 키 설정 필요)</label>
-                            <div id="ttVisionOcrUsage" class="tt-settings-usage"></div>
-                        </div>
-                    </div>
-                    <div class="tt-settings-group">
-                        <div class="tt-settings-group-title"><i class="fa-solid fa-user-shield"></i> 계정</div>
-                        <div class="tt-settings-section">
-                            <div class="tt-settings-label" id="ttAccountEmailLabel"></div>
-                            <button type="button" class="w95-btn" id="ttAccessLogBtn" style="width:100%; height:28px; margin-top:4px;">접속 기록 보기</button>
-                            <div style="display:flex; gap:6px; margin-top:6px;">
-                                <button type="button" class="w95-btn" id="ttSwitchAccountBtn" style="flex:1; height:28px;">계정 전환</button>
-                                <button type="button" class="w95-btn" id="ttLogoutBtn" style="flex:1; height:28px;">로그아웃</button>
+                            <div class="ws-seg">
+                                <label><input type="radio" name="ttGeoRouteScale" id="ttOptGeoRouteScaleSmall" value="small"><span>작게</span></label>
+                                <label><input type="radio" name="ttGeoRouteScale" id="ttOptGeoRouteScaleMedium" value="medium"><span>보통</span></label>
+                                <label><input type="radio" name="ttGeoRouteScale" id="ttOptGeoRouteScaleLarge" value="large"><span>크게</span></label>
                             </div>
                         </div>
                     </div>
+
+                    <div class="tt-settings-group" data-page="auto">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-camera"></i> 자동 인식</div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">구글 비전(OCR) — 출퇴근 사진에서 시간/거리 자동 인식</div>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptVisionOcr"> 켜기 <small>서버에 API 키 설정 필요</small></label>
+                            <div id="ttVisionOcrUsage" class="tt-settings-usage"></div>
+                        </div>
+                    </div>
+
+                    <div class="tt-settings-group" data-page="labs">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-flask"></i> 신규 기능</div>
+                        <div class="ws-desc ws-desc-box">직접 만든 편의 기능입니다. 마음에 들지 않으면 하나씩 끄면 원래대로 돌아갑니다.</div>
+                        <div class="tt-settings-section">
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptLabMainGear"> 메인 화면 설정 버튼</label>
+                            <div class="ws-desc">맨 위 오른쪽에 ⚙ 버튼을 둡니다. 지금은 주간 시간표에 들어가야만 설정을 열 수 있는데, 메인에서 바로 열 수 있습니다.</div>
+                        </div>
+                        <div class="tt-settings-section">
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptLabNextJob"> 다음 작업 표시</label>
+                            <div class="ws-desc">오늘 목록에서 지금 시각 이후 가장 가까운 작업(완료·취소 제외)에 "다음" 표시를 달고 그 카드로 스크롤합니다.</div>
+                        </div>
+                        <div class="tt-settings-section">
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptLabCalToday"> 달력에 오늘 표시</label>
+                            <div class="ws-desc">달력에서 오늘 날짜에 주황 테두리와 "오늘" 글씨를 붙여, 다른 날짜를 보고 있어도 오늘이 어딘지 바로 보입니다.</div>
+                        </div>
+                        <div class="tt-settings-section">
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptLabBigTouch"> 터치 영역 크게</label>
+                            <div class="ws-desc">버튼·태그·입력칸의 높이를 키워 장갑을 끼거나 이동 중에도 잘 눌리게 합니다.</div>
+                        </div>
+                    </div>
+
+                    <div class="tt-settings-group" data-page="account">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-user-shield"></i> 계정</div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label" id="ttAccountEmailLabel"></div>
+                            <button type="button" class="w95-btn ws-wide-btn" id="ttAccessLogBtn">접속 기록 보기</button>
+                            <div class="ws-btn-row">
+                                <button type="button" class="w95-btn" id="ttSwitchAccountBtn">계정 전환</button>
+                                <button type="button" class="w95-btn" id="ttLogoutBtn">로그아웃</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tt-settings-group" data-page="reset">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-rotate-left"></i> 되돌리기</div>
+                        <div class="ws-desc ws-desc-box">화면 모양 설정(메인 화면 표시 형식·전체 누적·작업 카드 레이아웃·디자인·글자 크기·글꼴·신규 기능)을 예전 상태로 돌립니다. 복제·묶기·붙여넣기·스와이프 같은 동작 기능과 선택태그 상자 방식, 주간 시간표, 지도 설정은 그대로 둡니다. (메인 설정 버튼은 남겨 둡니다)</div>
+                        <button type="button" class="w95-btn ws-wide-btn ws-danger" id="ttSettingsResetBtn">예전 모양으로 되돌리기</button>
+                    </div>
+                    <div class="ws-empty" id="ttSettingsEmpty" hidden>찾는 설정이 없습니다.</div>
                 </div>
-                <div class="modal-footer" style="padding:6px; background:var(--w-gray);">
-                    <button type="button" class="w95-btn" id="ttSettingsSaveBtn" style="width:100%; height:32px; font-weight:bold; color:var(--w-blue);">저장</button>
+                <div class="modal-footer ws-footer">
+                    <button type="button" class="w95-btn" id="ttSettingsSaveBtn">저장</button>
                 </div>
             </div>
         `;
@@ -369,6 +486,115 @@
         document.getElementById('ttLogoutBtn').addEventListener('click', () => {
             if (confirm('로그아웃할까요?')) window.wmLogout?.(false);
         });
+        setupSettingsMenu(modal);
+    }
+
+    // ─── 설정 메뉴: 첫 화면은 메뉴 목록, 누르면 그 메뉴의 설정만, 검색하면 전체에서 찾기 ───
+    const SETTINGS_PAGE_TITLES = { main:'메인 화면', card:'작업 카드', input:'작업일지 입력', look:'화면 · 디자인', timetable:'주간 시간표', map:'지도 · 동선', auto:'자동 인식', labs:'신규 기능', account:'계정', reset:'되돌리기' };
+    function showSettingsPage(page) {
+        const modal = document.getElementById('ttSettingsModal');
+        if (!modal) return;
+        const search = document.getElementById('ttSettingsSearch');
+        if (search) search.value = '';
+        modal.dataset.page = page || '';
+        modal.querySelectorAll('.tt-settings-section, .tt-settings-group').forEach(el => { el.hidden = false; });
+        modal.querySelectorAll('.tt-settings-group[data-page]').forEach(g => { g.hidden = !page || g.dataset.page !== page; });
+        document.getElementById('ttSettingsMenu').hidden = !!page;
+        document.getElementById('ttSettingsBackBtn').hidden = !page;
+        document.getElementById('ttSettingsEmpty').hidden = true;
+        document.getElementById('ttSettingsTitle').textContent = page ? SETTINGS_PAGE_TITLES[page] || '설정' : '설정';
+        document.getElementById('ttSettingsBody').scrollTop = 0;
+    }
+    function filterSettings(query) {
+        const modal = document.getElementById('ttSettingsModal');
+        const q = String(query || '').trim().toLowerCase().replace(/s+/g, '');
+        if (!q) { showSettingsPage(modal.dataset.page || ''); return; }
+        document.getElementById('ttSettingsMenu').hidden = true;
+        document.getElementById('ttSettingsBackBtn').hidden = false;
+        document.getElementById('ttSettingsTitle').textContent = '검색';
+        let any = false;
+        const norm = el => (el.textContent || '').toLowerCase().replace(/s+/g, '');
+        modal.querySelectorAll('.tt-settings-group[data-page]').forEach(g => {
+            const titleHit = norm(g.querySelector('.tt-settings-group-title') || g).includes(q);
+            let groupAny = false;
+            g.querySelectorAll('.tt-settings-section').forEach(sec => {
+                const hit = titleHit || norm(sec).includes(q);
+                sec.hidden = !hit; groupAny = groupAny || hit;
+            });
+            if (!g.querySelector('.tt-settings-section')) groupAny = titleHit;
+            g.hidden = !groupAny; any = any || groupAny;
+        });
+        document.getElementById('ttSettingsEmpty').hidden = any;
+    }
+    function setupSettingsMenu(modal) {
+        modal.querySelector('#ttSettingsMenu').addEventListener('click', e => {
+            const item = e.target.closest('[data-go]');
+            if (item) showSettingsPage(item.dataset.go);
+        });
+        document.getElementById('ttSettingsBackBtn').addEventListener('click', () => showSettingsPage(''));
+        document.getElementById('ttSettingsSearch').addEventListener('input', e => filterSettings(e.target.value));
+        document.getElementById('ttSettingsResetBtn').addEventListener('click', () => {
+            if (!confirm('화면 모양 설정을 예전 상태로 되돌릴까요?')) return;
+            window.resetCardToolsLook?.();
+            fillCardToolsFields();
+            alert('예전 모양으로 되돌렸습니다.');
+        });
+    }
+    window.openMainSettings = () => openSettingsModal();
+
+
+    // 카드·화면 설정(work_card_tools.js 저장소) ↔ 설정 화면 입력칸
+    function fillCardToolsFields() {
+        const c = window.getCardToolsSettings?.() || {};
+        const check = (id, on) => { const el = document.getElementById(id); if (el) el.checked = !!on; };
+        const radio = (name, value, fallback) => {
+            const el = document.querySelector(`input[name="${name}"][value="${value}"]`) || document.querySelector(`input[name="${name}"][value="${fallback}"]`);
+            if (el) el.checked = true;
+        };
+        radio('ttCardLayout', c.cardLayout, 'default');
+        radio('ttMainView', c.mainView, 'classic');
+        radio('ttMainCols', c.mainCols, 'auto');
+        radio('ttFontScale', c.fontScale, 'normal');
+        radio('ttFontFamily', c.fontFamily, 'classic');
+        check('ttOptCardDuplicate', c.duplicate !== false);
+        check('ttOptCardGroupTaskNo', c.groupByTaskNo);
+        check('ttOptDoubleTapPaste', c.doubleTapPaste !== false);
+        check('ttOptSwipeLongExclude', c.swipeLongExclude !== false);
+        check('ttOptSwipeTitleExclude', c.swipeTitleExclude !== false);
+        check('ttOptSwipePreview', c.swipePreview !== false);
+        check('ttOptMainYearTotal', c.mainYearTotal !== false);
+        check('ttOptMainYearStatus', c.mainYearStatus !== false);
+        check('ttOptMainHighlight', c.mainHighlight);
+        check('ttOptUiRefresh', c.uiRefresh);
+        check('ttOptLabMainGear', c.labMainGear !== false);
+        check('ttOptLabNextJob', c.labNextJob);
+        check('ttOptLabCalToday', c.labCalToday);
+        check('ttOptLabBigTouch', c.labBigTouch);
+    }
+    function readCardToolsFields() {
+        const val = (name, fallback) => document.querySelector(`input[name="${name}"]:checked`)?.value || fallback;
+        const on = id => !!document.getElementById(id)?.checked;
+        return {
+            cardLayout: val('ttCardLayout', 'default'),
+            mainView: val('ttMainView', 'classic'),
+            mainCols: val('ttMainCols', 'auto'),
+            fontScale: val('ttFontScale', 'normal'),
+            fontFamily: val('ttFontFamily', 'classic'),
+            duplicate: on('ttOptCardDuplicate'),
+            groupByTaskNo: on('ttOptCardGroupTaskNo'),
+            doubleTapPaste: on('ttOptDoubleTapPaste'),
+            swipeLongExclude: on('ttOptSwipeLongExclude'),
+            swipeTitleExclude: on('ttOptSwipeTitleExclude'),
+            swipePreview: on('ttOptSwipePreview'),
+            mainYearTotal: on('ttOptMainYearTotal'),
+            mainYearStatus: on('ttOptMainYearStatus'),
+            mainHighlight: on('ttOptMainHighlight'),
+            uiRefresh: on('ttOptUiRefresh'),
+            labMainGear: on('ttOptLabMainGear'),
+            labNextJob: on('ttOptLabNextJob'),
+            labCalToday: on('ttOptLabCalToday'),
+            labBigTouch: on('ttOptLabBigTouch')
+        };
     }
 
     function openSettingsModal() {
@@ -416,14 +642,8 @@
         const geoScaleIds = { small: 'ttOptGeoRouteScaleSmall', medium: 'ttOptGeoRouteScaleMedium', large: 'ttOptGeoRouteScaleLarge' };
         document.getElementById(geoScaleIds[window.getGeoRouteFontScale?.() || 'medium']).checked = true;
         document.getElementById(window.isTagSwipeMode?.() ? 'ttOptTagBoxSwipe' : window.isTagCompactMode?.() ? 'ttOptTagBoxCompact' : 'ttOptTagBoxExpanded').checked = true;
-        const cardTools = window.getCardToolsSettings?.() || {};
-        const layoutIds = { default:'ttOptCardLayoutDefault', summary:'ttOptCardLayoutSummary', timeline:'ttOptCardLayoutTimeline', mini:'ttOptCardLayoutMini' };
-        document.getElementById(layoutIds[cardTools.cardLayout] || layoutIds.default).checked = true;
-        document.getElementById('ttOptCardDuplicate').checked = cardTools.duplicate !== false;
-        document.getElementById('ttOptCardGroupTaskNo').checked = !!cardTools.groupByTaskNo;
-        document.getElementById('ttOptDoubleTapPaste').checked = cardTools.doubleTapPaste !== false;
-        document.getElementById('ttOptSwipeLongExclude').checked = cardTools.swipeLongExclude !== false;
-        document.getElementById('ttOptSwipeTitleExclude').checked = cardTools.swipeTitleExclude !== false;
+        fillCardToolsFields();
+        showSettingsPage('');
         document.getElementById(window.getTagCompactCloseMode?.() === 'ok' ? 'ttOptTagBoxCloseOk' : 'ttOptTagBoxCloseOutside').checked = true;
         document.getElementById('ttSettingsModal').style.display = 'flex';
     }
@@ -458,15 +678,7 @@
         if (geoScaleEl) window.setGeoRouteFontScale?.(geoScaleEl.value);
         const tagBoxModeEl = document.querySelector('input[name="ttTagBoxMode"]:checked');
         const tagBoxCloseEl = document.querySelector('input[name="ttTagBoxClose"]:checked');
-        const cardLayoutEl = document.querySelector('input[name="ttCardLayout"]:checked');
-        window.setCardToolsSettings?.({
-            cardLayout: cardLayoutEl ? cardLayoutEl.value : 'default',
-            duplicate: document.getElementById('ttOptCardDuplicate').checked,
-            groupByTaskNo: document.getElementById('ttOptCardGroupTaskNo').checked,
-            doubleTapPaste: document.getElementById('ttOptDoubleTapPaste').checked,
-            swipeLongExclude: document.getElementById('ttOptSwipeLongExclude').checked,
-            swipeTitleExclude: document.getElementById('ttOptSwipeTitleExclude').checked
-        });
+        window.setCardToolsSettings?.(readCardToolsFields());
         const tagBoxMode = tagBoxModeEl?.value === 'swipe' ? 'swipe' : tagBoxModeEl?.value === 'compact';
         window.setTagCompactSettings?.(tagBoxMode, tagBoxCloseEl?.value === 'ok' ? 'ok' : 'outside');
 

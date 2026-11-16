@@ -17,7 +17,29 @@
         groupByTaskNo: false,
         doubleTapPaste: true,
         swipeLongExclude: true,
-        swipeTitleExclude: true
+        swipeTitleExclude: true,
+        swipePreview: true,
+        // 메인 화면
+        mainView: 'classic',      // classic | detail | summary
+        mainCols: 'auto',         // auto | 2 | 3 | 4
+        mainYearTotal: true,
+        mainYearStatus: true,
+        mainHighlight: false,
+        // 화면 · 디자인
+        uiRefresh: true,
+        fontScale: 'normal',      // normal | large | xlarge
+        fontFamily: 'classic',    // classic | system
+        // 신규 기능
+        labMainGear: true,
+        labNextJob: false,
+        labCalToday: true,
+        labBigTouch: false
+    };
+    // "되돌리기"로 돌아갈 예전 모양(동작 기능은 건드리지 않는다)
+    const LEGACY_LOOK = {
+        mainView: 'classic', mainCols: 'auto', mainYearTotal: true, mainYearStatus: true, mainHighlight: false,
+        cardLayout: 'default', uiRefresh: false, fontScale: 'normal', fontFamily: 'classic',
+        labNextJob: false, labCalToday: false, labBigTouch: false, swipePreview: false
     };
     const readSettings = () => {
         try { return { ...DEFAULTS, ...(JSON.parse(localStorage.getItem(KEY) || '{}') || {}) }; }
@@ -53,8 +75,17 @@
         document.body.classList.toggle('wm-card-dup-off', !S.duplicate);
         if (!S.duplicate) hideDupBar();
         window.applyTagSwipeMode?.();
-        if (redraw) rerender();
+        const root = document.documentElement;
+        root.classList.toggle('wm-font-large', S.fontScale === 'large');
+        root.classList.toggle('wm-font-xlarge', S.fontScale === 'xlarge');
+        document.body.classList.toggle('wm-font-system', S.fontFamily === 'system');
+        document.body.classList.toggle('wm-ui-refresh', !!S.uiRefresh);
+        document.body.classList.toggle('wm-big-touch', !!S.labBigTouch);
+        document.body.classList.toggle('wm-main-gear', S.labMainGear !== false);
+        ensureMainGear();
+        if (redraw) { rerender(); if (Array.isArray(window.logs)) window.renderMain?.(); }
     }
+    window.resetCardToolsLook = () => window.setCardToolsSettings({ ...LEGACY_LOOK });
 
     // ═══════════════════════════════════════════
     // 1) 복제
@@ -225,6 +256,7 @@
         window.updateUI = (...args) => {
             const result = origUpdateUI(...args);
             groupCardsIn(document.getElementById('logList'));
+            markNextJob();
             return result;
         };
     }
@@ -489,6 +521,7 @@
         next?.classList.add('is-swipe-target');
         st.row.classList.toggle('is-exclude-target', !!next?.classList.contains('tag-swipe-exclude'));
         if (next) navigator.vibrate?.(8);
+        updatePreview(st);
     }
 
     // 손가락이 띠 오른쪽 끝에 머물면 띠를 자동으로 넘긴다
@@ -518,6 +551,7 @@
             if (dx > 12) {
                 st.swiping = true;
                 st.row.classList.add('is-swiping');
+                updatePreview(st);
                 st.raf = requestAnimationFrame(autoScroll);
             } else return;
         }
@@ -549,6 +583,7 @@
         st.title.removeEventListener('pointermove', onTitleMove);
         st.title.removeEventListener('pointerup', onTitleUp);
         st.title.removeEventListener('pointercancel', onTitleCancel);
+        hidePreview();
         swipeState = suppressClick ? { suppressClick: true } : null;
         if (suppressClick) setTimeout(() => { if (swipeState?.suppressClick) swipeState = null; }, 350);
     }
@@ -618,6 +653,184 @@
         el.dispatchEvent(new Event('change', { bubbles: true }));
         navigator.vibrate?.(15);
         toast('붙여넣었습니다');
+    }
+
+    // ─── 스와이프 중 선택될 태그를 화면 가운데 위에 크게 표시 ───
+    function ensurePreview() {
+        let el = document.getElementById('tagSwipePreview');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'tagSwipePreview';
+            el.setAttribute('aria-live', 'polite');
+            el.innerHTML = '<small></small><b></b><em></em>';
+            document.body.appendChild(el);
+        }
+        return el;
+    }
+    function updatePreview(st) {
+        if (!S.swipePreview || !st?.row || !st.swiping) { hidePreview(); return; }
+        const el = ensurePreview();
+        const group = st.row.querySelector('.tag-swipe-title > span')?.textContent || '';
+        const t = st.target;
+        let main, sub, kind;
+        if (!t) { main = '—'; sub = '여기서 놓으면 선택 안 함'; kind = 'none'; }
+        else if (t.classList.contains('tag-swipe-exclude')) {
+            main = t.textContent === '포함' ? '집계 포함' : '집계 제외';
+            sub = `놓으면 ${main}`; kind = 'exclude';
+        } else {
+            const active = t.classList.contains('is-active');
+            main = t.textContent; sub = active ? '놓으면 선택 해제' : '놓으면 선택'; kind = active ? 'off' : 'on';
+        }
+        el.querySelector('small').textContent = group;
+        el.querySelector('b').textContent = main;
+        el.querySelector('em').textContent = sub;
+        el.dataset.kind = kind;
+        el.classList.add('is-show');
+    }
+    function hidePreview() { document.getElementById('tagSwipePreview')?.classList.remove('is-show'); }
+
+    // ═══════════════════════════════════════════
+    // 6) 메인 화면(1~12월) 표시 형식 · 전체 누적
+    // ═══════════════════════════════════════════
+    // 기존 renderMain이 연도/상태 필터를 건 로그로 updateDashboardStats를 부르므로, 그 순간의 로그를 받아 쓴다.
+    let capturing = false, capturedYearLogs = null;
+    const origDash = window.updateDashboardStats;
+    window.updateDashboardStats = (...args) => {
+        if (capturing) capturedYearLogs = window.logs;
+        return origDash?.(...args);
+    };
+    const prevRenderMain = window.renderMain;
+    if (typeof prevRenderMain === 'function') {
+        window.renderMain = (...args) => {
+            capturing = true; capturedYearLogs = null;
+            let result;
+            try { result = prevRenderMain(...args); } finally { capturing = false; }
+            try { decorateMain(capturedYearLogs || (window.logs || []).filter(l => l && (l.y || 2026) === window.currentYear)); }
+            catch (error) { console.warn('메인 표시 형식 오류:', error); }
+            return result;
+        };
+    }
+
+    function monthStats(logs, m) {
+        const ml = logs.filter(l => l && Number(l.m) === m);
+        const work = ml.filter(l => l.cat === 'work');
+        const statuses = {};
+        work.forEach(l => { if (l.status && !window.isLogGroupExcluded?.(l, 'statuses')) statuses[l.status] = (statuses[l.status] || 0) + 1; });
+        return {
+            work: work.length,
+            done: statuses['완료'] || 0,
+            statuses,
+            ot: ml.reduce((s, c) => s + (Number(c.otCount) || 0), 0),
+            duty: new Set(ml.filter(l => l.isDutyLog || l.cat === 'duty' || l.isDuty).map(l => l.d)).size,
+            commute: new Set(ml.filter(l => l.cat === 'commute_in' && l.inTime).map(l => l.d)).size
+        };
+    }
+    const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+    const statusChip = (name, n) => `<span class="wm-st-chip" style="--st:${STATUS_COLORS[name] || '#1e40af'}">${esc(name)} ${n}</span>`;
+
+    function decorateMain(yearLogs) {
+        const grid = document.getElementById('mainGrid');
+        if (!grid) return;
+        const mode = ['detail', 'summary'].includes(S.mainView) ? S.mainView : 'classic';
+        const cols = ['2', '3', '4'].includes(String(S.mainCols)) ? Number(S.mainCols) : (mode === 'summary' ? 4 : 3);
+        grid.dataset.view = mode;
+        grid.style.setProperty('--main-cols', cols);
+        grid.classList.toggle('wm-main-cols', mode !== 'classic' || String(S.mainCols) !== 'auto');
+        const now = new Date();
+        const isThisYear = Number(window.currentYear) === now.getFullYear();
+        const stats = Array.from({ length: 12 }, (_, i) => monthStats(yearLogs, i + 1));
+
+        if (mode !== 'classic') {
+            grid.innerHTML = stats.map((st, i) => {
+                const m = i + 1;
+                const cls = `month-card wm-mc wm-mc-${mode}${st.work ? '' : ' is-empty'}`;
+                if (mode === 'summary') {
+                    return `<div class="${cls}" onclick="window.openPop(${m})"><b class="wm-mc-month">${m}월</b><span class="wm-mc-big">${st.work}</span><small>${st.work ? `완료 ${st.done}` : '&nbsp;'}</small></div>`;
+                }
+                if (!st.work) return `<div class="${cls}" onclick="window.openPop(${m})"><div class="wm-mc-top"><b class="wm-mc-month">${m}월</b><span class="wm-mc-count">0<small>건</small></span></div><div class="wm-mc-none">기록 없음</div></div>`;
+                const others = Object.entries(st.statuses).filter(([n]) => n !== '완료').sort((a, b) => b[1] - a[1]).slice(0, 3);
+                return `<div class="${cls}" onclick="window.openPop(${m})">
+                    <div class="wm-mc-top"><b class="wm-mc-month">${m}월</b><span class="wm-mc-count">${st.work}<small>건</small></span></div>
+                    <div class="wm-mc-bar" title="완료율"><i style="width:${pct(st.done, st.work)}%"></i></div>
+                    <div class="wm-mc-pct">완료 ${st.done} · ${pct(st.done, st.work)}%</div>
+                    <div class="wm-mc-st">${others.map(([n, c]) => statusChip(n, c)).join('')}</div>
+                    <div class="wm-mc-foot"><span>OT ${st.ot}</span><span>당직 ${st.duty}</span><span>출근 ${st.commute}</span></div>
+                </div>`;
+            }).join('');
+        }
+        if (S.mainHighlight && isThisYear) grid.children[now.getMonth()]?.classList.add('is-current-month');
+
+        const summary = document.getElementById('yearlySummary');
+        if (!summary) return;
+        summary.hidden = S.mainYearTotal === false;
+        if (S.mainYearTotal === false || (mode === 'classic' && S.mainYearStatus !== false)) return; // 기본 모양 그대로
+        const total = stats.reduce((a, s) => ({ work: a.work + s.work, done: a.done + s.done, ot: a.ot + s.ot, duty: a.duty + s.duty }), { work: 0, done: 0, ot: 0, duty: 0 });
+        const yearStatuses = {};
+        stats.forEach(s => Object.entries(s.statuses).forEach(([n, c]) => { yearStatuses[n] = (yearStatuses[n] || 0) + c; }));
+        const statusHtml = S.mainYearStatus !== false
+            ? Object.entries(yearStatuses).sort((a, b) => b[1] - a[1]).map(([n, c]) => statusChip(n, c)).join('') : '';
+        summary.innerHTML = `<div class="wm-year">
+            <b class="wm-year-title">${esc(window.currentYear)}년 누적</b>
+            <span class="wm-year-item"><em>작업</em>${total.work}건</span>
+            <span class="wm-year-item"><em>완료율</em>${pct(total.done, total.work)}%</span>
+            <span class="wm-year-item"><em>OT</em>${total.ot}회</span>
+            <span class="wm-year-item"><em>당직</em>${total.duty}일</span>
+            ${statusHtml ? `<div class="wm-year-status">${statusHtml}</div>` : ''}
+        </div>`;
+    }
+
+    // ═══════════════════════════════════════════
+    // 7) 신규 기능
+    // ═══════════════════════════════════════════
+    // 메인 화면 설정 버튼
+    function ensureMainGear() {
+        const tools = document.querySelector('#mainHeader .header-right-tools');
+        if (!tools || document.getElementById('wmMainGearBtn')) return;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.id = 'wmMainGearBtn';
+        btn.className = 'w95-btn icon-btn wm-main-gear-btn';
+        btn.title = '설정';
+        btn.innerHTML = '<i class="fa-solid fa-gear"></i>';
+        btn.addEventListener('click', () => window.openMainSettings ? window.openMainSettings() : alert('설정을 불러오지 못했습니다.'));
+        tools.appendChild(btn);
+    }
+
+    // 오늘 목록에서 다음 작업 표시
+    let lastNextJobKey = '';
+    function markNextJob() {
+        if (!S.labNextJob) return;
+        const now = new Date();
+        if (Number(window.currentYear) !== now.getFullYear() || Number(window.curMonth) !== now.getMonth() + 1 || Number(window.curDay) !== now.getDate()) return;
+        const hhmm = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+        const skip = ['완료', '취소', '불필요', '이관'];
+        const next = (window.logs || [])
+            .filter(l => l && l.cat === 'work' && Number(l.y) === now.getFullYear() && Number(l.m) === now.getMonth() + 1 && Number(l.d) === now.getDate())
+            .filter(l => /^\d{2}:\d{2}/.test(l.workTime || '') && l.workTime.slice(0, 5) >= hhmm && !skip.includes(l.status))
+            .sort((a, b) => a.workTime.localeCompare(b.workTime))[0];
+        if (!next) return;
+        const card = document.querySelector(`#logList .log-card[data-log-id="${CSS.escape(String(next.id))}"]`);
+        if (!card) return;
+        card.classList.add('wm-next-job');
+        if (!card.querySelector('.wm-next-badge')) card.insertAdjacentHTML('afterbegin', '<span class="wm-next-badge">다음</span>');
+        const key = `${hhmm.slice(0, 2)}|${next.id}`;
+        if (key !== lastNextJobKey) {
+            lastNextJobKey = key;
+            requestAnimationFrame(() => card.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+        }
+    }
+
+    // 달력에 오늘 표시
+    const origRenderCal = window.renderCal;
+    if (typeof origRenderCal === 'function') {
+        window.renderCal = (year, month, ...rest) => {
+            const result = origRenderCal(year, month, ...rest);
+            const now = new Date();
+            if (S.labCalToday && Number(year) === now.getFullYear() && Number(month) === now.getMonth()) {
+                document.querySelector(`#calBody td[data-day="${now.getDate()}"]`)?.classList.add('wm-cal-today');
+            }
+            return result;
+        };
     }
 
     // ─── 시작 ───

@@ -1846,3 +1846,153 @@ body.is-card-duplicating #calBody td[data-day]:active { background: #fde68a !imp
 .tag-swipe-row.is-excluded .tag-swipe-strip { opacity: .5; }
 .tag-swipe-panel.is-locked .tag-swipe-title { cursor: default; opacity: .85; }
 .tag-swipe-panel.no-long-exclude .tag-swipe-exclude { display: none !important; }
+
+/* ═══════════════════════════════════════════
+   설정 화면: 메뉴 → 메뉴별 설정, 검색 (work_timetable_ui.js)
+   ═══════════════════════════════════════════ */
+#ttSettingsModal [hidden] { display: none !important; }
+#ttSettingsModal .ws-box { max-width: 440px; height: min(88dvh, 760px); max-height: none; }
+.ws-titlebar { gap: 6px; padding: 4px 5px; }
+.ws-titlebar > span { flex: 1; font-size: 1.05rem; }
+.ws-titlebar .w95-btn { height: 28px; min-width: 30px; padding: 0 6px; color: #000; }
+.ws-search-row { display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: var(--w-gray); border-bottom: 1px solid var(--w-dark-gray); }
+.ws-search-row i { color: #334155; }
+.ws-search-row input { flex: 1; min-width: 0; height: 34px; padding: 0 8px; font-size: .95rem; font-family: inherit; }
+#ttSettingsModal .ws-body { flex: 1; max-height: none; min-height: 0; padding: 8px; gap: 8px; }
+.ws-menu { display: flex; flex-direction: column; gap: 4px; }
+.ws-menu-item {
+    display: flex; align-items: center; gap: 10px; width: 100%; min-height: 54px; padding: 6px 10px; text-align: left;
+    background: #fff; border: 2px solid; border-color: var(--w-white) var(--w-black) var(--w-black) var(--w-white);
+    box-shadow: inset -1px -1px var(--w-dark-gray); font-family: inherit; cursor: pointer; color: #0f172a;
+}
+.ws-menu-item:active { border-color: var(--w-black) var(--w-white) var(--w-white) var(--w-black); background: #eef2ff; }
+.ws-menu-item > i { flex: 0 0 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; background: var(--w-blue); color: #fff; font-size: .95rem; }
+.ws-menu-item > span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ws-menu-item b { font-size: 1rem; }
+.ws-menu-item small { font-size: .76rem; color: #475569; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ws-menu-item > em { font-style: normal; font-size: 1.4rem; color: #64748b; }
+.ws-menu-item.is-new > i { background: #b45309; }
+.ws-menu-item.is-new b::after { content: "NEW"; margin-left: 6px; padding: 0 4px; font-size: .62rem; vertical-align: 2px; background: #dc2626; color: #fff; }
+#ttSettingsModal .tt-settings-group { gap: 10px; }
+#ttSettingsModal .tt-settings-group-title { font-size: .95rem; padding: 8px 10px; }
+#ttSettingsModal .tt-settings-section + .tt-settings-section { border-top: 1px dashed #cbd5e1; padding-top: 10px; }
+#ttSettingsModal .tt-settings-label { font-size: .84rem; }
+#ttSettingsModal .tt-settings-label small { font-weight: normal; color: #64748b; margin-left: 4px; }
+#ttSettingsModal .tt-settings-check { font-size: .95rem; padding: 6px 2px; align-items: flex-start; line-height: 1.3; flex-wrap: wrap; column-gap: 8px; row-gap: 0; }
+#ttSettingsModal .tt-settings-check input { width: 18px; height: 18px; margin-top: 1px; flex: 0 0 auto; accent-color: var(--w-blue); }
+#ttSettingsModal .tt-settings-check small { flex-basis: 100%; padding-left: 26px; font-size: .76rem; color: #64748b; }
+/* 짧은 선택지는 가로 버튼 묶음 */
+.ws-seg { display: flex; gap: 0; border: 2px solid; border-color: var(--w-dark-gray) var(--w-white) var(--w-white) var(--w-dark-gray); }
+.ws-seg label { flex: 1; position: relative; }
+.ws-seg input { position: absolute; opacity: 0; pointer-events: none; }
+.ws-seg span {
+    display: flex; align-items: center; justify-content: center; height: 36px; padding: 0 4px; font-size: .9rem; cursor: pointer;
+    background: var(--w-gray); border: 2px solid; border-color: var(--w-white) var(--w-black) var(--w-black) var(--w-white); white-space: nowrap;
+}
+.ws-seg input:checked + span { background: var(--w-blue); color: #fff; font-weight: bold; border-color: var(--w-black) var(--w-white) var(--w-white) var(--w-black); }
+.ws-desc { font-size: .78rem; color: #475569; line-height: 1.45; padding-left: 26px; }
+.ws-seg + .ws-desc { padding-left: 2px; }
+.ws-desc-box { padding: 8px 10px; background: #fffbeb; border: 1px solid #f59e0b; color: #78350f; }
+.ws-wide-btn { width: 100%; height: 36px; font-weight: bold; }
+.ws-btn-row { display: flex; gap: 6px; margin-top: 6px; }
+.ws-btn-row .w95-btn { flex: 1; height: 34px; }
+.ws-danger { color: #b91c1c; }
+.ws-empty { padding: 30px 10px; text-align: center; color: #64748b; background: #fff; }
+.ws-footer { padding: 6px; background: var(--w-gray); margin-top: 0; }
+.ws-footer .w95-btn { width: 100%; height: 38px; font-weight: bold; font-size: 1rem; color: var(--w-blue); }
+
+/* ─── 스와이프 미리보기: 화면 가운데 위에 크게 ─── */
+#tagSwipePreview {
+    position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 72px); z-index: 6000;
+    transform: translate(-50%, -8px) scale(.96); opacity: 0; pointer-events: none;
+    min-width: 180px; max-width: calc(100vw - 32px); padding: 10px 22px 12px; box-sizing: border-box;
+    display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center;
+    background: #000080; color: #fff; border: 3px solid #fff; box-shadow: 0 0 0 2px #000, 0 10px 24px rgba(0,0,0,.45);
+    transition: opacity .1s, transform .1s;
+}
+#tagSwipePreview.is-show { opacity: 1; transform: translate(-50%, 0) scale(1); }
+#tagSwipePreview small { font-size: .8rem; color: #c7d2fe; font-weight: bold; }
+#tagSwipePreview b { font-size: 2rem; line-height: 1.15; font-weight: 900; overflow-wrap: anywhere; }
+#tagSwipePreview em { font-style: normal; font-size: .82rem; color: #fde68a; }
+#tagSwipePreview[data-kind="off"] { background: #475569; }
+#tagSwipePreview[data-kind="exclude"] { background: #b91c1c; }
+#tagSwipePreview[data-kind="none"] { background: #334155; }
+#tagSwipePreview[data-kind="none"] b { opacity: .6; }
+
+/* ─── 메인 화면 표시 형식 (상세 / 요약 / 칸 수) ─── */
+.month-grid.wm-main-cols { grid-template-columns: repeat(var(--main-cols, 3), minmax(0, 1fr)); }
+.month-card.is-current-month { outline: 3px solid #f59e0b; outline-offset: -1px; position: relative; }
+.month-card.is-current-month::before {
+    content: "이번 달"; position: absolute; top: -9px; left: 50%; transform: translateX(-50%);
+    padding: 0 5px; font-size: .62rem; font-weight: 900; background: #f59e0b; color: #000; white-space: nowrap;
+}
+.wm-mc { gap: 3px; padding: 8px 6px; text-align: left; min-width: 0; }
+.wm-mc.is-empty { opacity: .6; }
+.wm-mc-month { font-size: 1.05rem; font-weight: 900; }
+.wm-mc-top { display: flex; align-items: baseline; justify-content: space-between; gap: 4px; }
+.wm-mc-count { font-size: 1.25rem; font-weight: 900; color: var(--w-blue); font-variant-numeric: tabular-nums; }
+.wm-mc-count small { font-size: .7rem; margin-left: 1px; }
+.wm-mc-bar { height: 7px; background: #fff; border: 1px solid; border-color: var(--w-dark-gray) var(--w-white) var(--w-white) var(--w-dark-gray); }
+.wm-mc-bar i { display: block; height: 100%; background: #15803d; }
+.wm-mc-pct { font-size: .7rem; color: #14532d; font-weight: bold; }
+.wm-mc-st { display: flex; flex-wrap: wrap; gap: 2px; min-height: 16px; }
+.wm-st-chip { font-size: .64rem; font-weight: bold; padding: 0 4px; color: #fff; background: var(--st, #1e40af); white-space: nowrap; }
+.wm-mc-foot { display: flex; flex-wrap: wrap; gap: 0 6px; font-size: .66rem; color: #334155; }
+.wm-mc-summary { align-items: center; text-align: center; padding: 8px 2px; }
+.wm-mc-summary .wm-mc-month { font-size: .9rem; }
+.wm-mc-big { font-size: 1.7rem; font-weight: 900; color: var(--w-blue); line-height: 1.05; font-variant-numeric: tabular-nums; }
+.wm-mc-summary small { font-size: .66rem; color: #14532d; font-weight: bold; }
+#yearlySummary[hidden] { display: none !important; }
+.wm-year { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 8px; }
+.wm-year-title { color: var(--w-blue); }
+.wm-year-item { display: inline-flex; align-items: baseline; gap: 3px; font-variant-numeric: tabular-nums; }
+.wm-year-item em { font-style: normal; font-weight: normal; font-size: .75rem; color: #475569; }
+.wm-year-status { flex-basis: 100%; display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; }
+.wm-year-status .wm-st-chip { font-size: .72rem; padding: 1px 5px; }
+
+/* ─── 신규 기능 ─── */
+.wm-main-gear-btn { display: none; }
+body.wm-main-gear .wm-main-gear-btn { display: inline-flex; }
+.log-card.wm-next-job { box-shadow: 0 0 0 3px #f59e0b; }
+.wm-next-badge {
+    position: absolute; top: 0; right: 40px; z-index: 30; padding: 1px 7px;
+    background: #f59e0b; color: #000; font-size: .7rem; font-weight: 900; pointer-events: none;
+}
+#calBody td.wm-cal-today { box-shadow: inset 0 0 0 3px #f59e0b; }
+#calBody td.wm-cal-today::after {
+    content: "오늘"; position: absolute; left: 2px; bottom: 1px; font-size: .58rem; font-weight: 900; color: #b45309;
+}
+body.wm-big-touch .w95-btn { min-height: 40px; }
+body.wm-big-touch .layout-tag-button, body.wm-big-touch .tag-chip, body.wm-big-touch .tag-swipe-chip { min-height: 40px; font-size: .95rem; }
+body.wm-big-touch .tag-swipe-row { min-height: 48px; }
+body.wm-big-touch .m-input, body.wm-big-touch input[type="text"], body.wm-big-touch textarea { min-height: 40px; font-size: 1rem; }
+
+/* ─── 화면 · 디자인: 글자 크기 · 글꼴 ─── */
+html.wm-font-large { font-size: 112.5%; }
+html.wm-font-xlarge { font-size: 125%; }
+body.wm-font-system, body.wm-font-system button, body.wm-font-system input,
+body.wm-font-system textarea, body.wm-font-system select {
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+}
+body.wm-font-system { letter-spacing: -0.01em; }
+
+/* ─── 개선된 디자인 (설정 > 화면 · 디자인, 끄면 예전 모양) ─── */
+body.wm-ui-refresh .header { padding: 8px 10px; }
+body.wm-ui-refresh .icon-btn { width: 38px; height: 36px; }
+body.wm-ui-refresh .month-grid { gap: 8px; padding: 10px; }
+body.wm-ui-refresh .month-card { padding: 10px 6px; min-height: 84px; justify-content: flex-start; }
+body.wm-ui-refresh .month-card > b { font-size: 1.2rem !important; }
+body.wm-ui-refresh .m-stat { font-size: .76rem; letter-spacing: 0; line-height: 1.35; color: #1f2937; }
+body.wm-ui-refresh .yearly-summary { font-size: .92rem; line-height: 1.55; padding-top: 10px; }
+body.wm-ui-refresh .pop-nav { padding: 6px 8px; }
+body.wm-ui-refresh .pop-title { font-size: 1.35rem; margin-right: 10px; }
+body.wm-ui-refresh .cal-table td { height: 50px; }
+body.wm-ui-refresh #calBody td > div:first-child > span { font-size: 1.08rem !important; }
+body.wm-ui-refresh .work-count-badge { font-size: .8rem; padding: 1px 6px; }
+body.wm-ui-refresh .list-area { padding: 10px 8px 120px; }
+body.wm-ui-refresh .log-card { margin-bottom: 8px; }
+body.wm-ui-refresh .w95-titlebar { font-size: 1.05rem; padding: 5px 6px; }
+body.wm-ui-refresh .layout-tag-button { font-size: .9rem; }
+body.wm-ui-refresh .card-multi-select-bar .w95-btn, body.wm-ui-refresh .card-multi-select-bar b { font-size: .95rem; }
+body.wm-ui-refresh .card-multi-select-bar .w95-btn { height: 36px; padding: 0 12px; }
+.wm-mc-none { flex: 1; display: flex; align-items: center; justify-content: center; font-size: .72rem; color: #64748b; min-height: 48px; }
