@@ -33,7 +33,10 @@
         labMainGear: true,
         labNextJob: false,
         labCalToday: true,
-        labBigTouch: false
+        labBigTouch: false,
+        // 글 넣기
+        importJoinTarget: 'note',   // note | content | none
+        importSkipDup: true
     };
     // "되돌리기"로 돌아갈 예전 모양(동작 기능은 건드리지 않는다)
     const LEGACY_LOOK = {

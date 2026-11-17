@@ -246,7 +246,7 @@
                     <nav class="ws-menu" id="ttSettingsMenu">
                         <button type="button" class="ws-menu-item" data-go="main"><i class="fa-solid fa-house"></i><span><b>메인 화면</b><small>월별 표시 형식 · 칸 배치 · 전체 누적</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item" data-go="card"><i class="fa-solid fa-id-card"></i><span><b>작업 카드</b><small>카드 레이아웃 · 복제 · 같은 타스크 묶기</small></span><em>›</em></button>
-                        <button type="button" class="ws-menu-item" data-go="input"><i class="fa-solid fa-tags"></i><span><b>작업일지 입력</b><small>선택태그 상자 방식 · 스와이프 · 붙여넣기</small></span><em>›</em></button>
+                        <button type="button" class="ws-menu-item" data-go="input"><i class="fa-solid fa-tags"></i><span><b>작업일지 입력</b><small>선택태그 상자 방식 · 스와이프 · 붙여넣기 · 글 넣기</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item" data-go="look"><i class="fa-solid fa-palette"></i><span><b>화면 · 디자인</b><small>디자인 개선 · 글자 크기 · 글꼴</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item" data-go="timetable"><i class="fa-solid fa-table-cells"></i><span><b>주간 시간표</b><small>표시 항목 · 기본 화면 · 크기 · 격자</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item" data-go="map"><i class="fa-solid fa-route"></i><span><b>지도 · 동선</b><small>기본 지도 앱 · 동선 관리</small></span><em>›</em></button>
@@ -328,6 +328,21 @@
                         <div class="tt-settings-group-title"><i class="fa-solid fa-keyboard"></i> 입력칸</div>
                         <div class="tt-settings-section">
                             <label class="tt-settings-check"><input type="checkbox" id="ttOptDoubleTapPaste"> 커서를 둔 칸을 더블탭하면 붙여넣기</label>
+                        </div>
+                    </div>
+                    <div class="tt-settings-group" data-page="input">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-file-lines"></i> 글 넣기 (받은 작업 글 일괄 등록)</div>
+                        <div class="ws-desc ws-desc-box">달력 위 <b>글 넣기</b> 버튼 → 날짜 지정 → 받은 글 붙여넣기 → 넣기. 제목 줄은 빼고, 이름→고객명, 주소→주소, 타스크 번호→타스크 번호, TLI 번호→작업내용 맨 앞에 들어갑니다.</div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">가입번호를 넣을 칸</div>
+                            <div class="ws-seg">
+                                <label><input type="radio" name="ttImportJoin" id="ttOptImportJoinNote" value="note"><span>특이사항</span></label>
+                                <label><input type="radio" name="ttImportJoin" id="ttOptImportJoinContent" value="content"><span>작업내용</span></label>
+                                <label><input type="radio" name="ttImportJoin" id="ttOptImportJoinNone" value="none"><span>넣지 않음</span></label>
+                            </div>
+                        </div>
+                        <div class="tt-settings-section">
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptImportSkipDup"> 같은 날짜에 이미 있는 작업은 처음부터 선택 해제 <small>가입번호·TLI 번호, 또는 고객명+주소가 같으면 "이미 있음"</small></label>
                         </div>
                     </div>
 
@@ -556,6 +571,8 @@
         radio('ttMainCols', c.mainCols, 'auto');
         radio('ttFontScale', c.fontScale, 'normal');
         radio('ttFontFamily', c.fontFamily, 'classic');
+        radio('ttImportJoin', c.importJoinTarget, 'note');
+        check('ttOptImportSkipDup', c.importSkipDup !== false);
         check('ttOptCardDuplicate', c.duplicate !== false);
         check('ttOptCardGroupTaskNo', c.groupByTaskNo);
         check('ttOptDoubleTapPaste', c.doubleTapPaste !== false);
@@ -580,6 +597,8 @@
             mainCols: val('ttMainCols', 'auto'),
             fontScale: val('ttFontScale', 'normal'),
             fontFamily: val('ttFontFamily', 'classic'),
+            importJoinTarget: val('ttImportJoin', 'note'),
+            importSkipDup: on('ttOptImportSkipDup'),
             duplicate: on('ttOptCardDuplicate'),
             groupByTaskNo: on('ttOptCardGroupTaskNo'),
             doubleTapPaste: on('ttOptDoubleTapPaste'),
