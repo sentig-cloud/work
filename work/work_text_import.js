@@ -21,38 +21,54 @@
     const opt = () => window.getCardToolsSettings?.() || {};
 
     // ─── 파싱 ───
+    // 위에서부터 차례로 본다. 번호·주소·연락처를 먼저 걸러야 "가입자번호", "고객주소" 같은 것이 이름으로 가지 않는다.
     const KEY_MAP = [
-        // "이름", "가입자", "이름가입자", "이름(가입자)", "가입자명" 등 → 고객명
-        [/^(이름|고객명?|성명|성함|가입자(명|이름)?|이름가입자|가입자이름|고객이름)$/, 'name'],
-        [/^주소$/, 'address'],
+        [/tli/, 'tli'],
         // 받는 글의 "가입번호"는 실제로 타스크 번호(12자리)다
         [/^(가입|타스크|task)(번호|no)?$/, 'taskNo'],
-        [/^tli(번호|no)?$/, 'tli'],
-        [/^(연락처|전화|전화번호|휴대폰|핸드폰)$/, 'phone'],
+        [/주소/, 'address'],
+        [/(연락처|전화|휴대폰|핸드폰|폰번호)/, 'phone'],
+        [/(번호|no$|id$|코드)/, null],          // 그 밖의 번호류는 이름이 아니다(특이사항으로)
         [/^(작업내용|내용|메모)$/, 'content'],
-        [/^(시간|방문시간|작업시간)$/, 'time']
+        [/^(시간|방문시간|작업시간)$/, 'time'],
+        // 이름 계열 단어가 들어 있으면 고객명: 이름·성명·성함·고객(명)·계약자·가입자·상호·명의자·신청자·수령인·사용자·업체명
+        [/(이름|성명|성함|고객|계약자|가입자|상호|명의자?|신청자|신청인|수령인|사용자|업체명|대표자)/, 'name']
     ];
+    const normLabel = label => String(label).replace(/[\s()[\]{}<>/·・,._\-*#]+/g, '').toLowerCase();
     const keyOf = label => {
-        // 띄어쓰기·괄호·기호는 빼고 비교한다: "이름(가입자)" → "이름가입자"
-        const k = String(label).replace(/[\s()[\]{}<>/·・,._-]+/g, '').toLowerCase();
-        return KEY_MAP.find(([re]) => re.test(k))?.[1] || null;
+        // 띄어쓰기·괄호·기호는 빼고 비교한다: "이름(가입자)" → "이름가입자", "고객 명" → "고객명"
+        const hit = KEY_MAP.find(([re]) => re.test(normLabel(label)));
+        return hit ? hit[1] : null;
     };
+    // 콜론 없이 "이름 홍길동" / "상호 ○○상회" 처럼 온 줄
+    const NO_COLON_LABEL = /^(이름|성명|성함|고객명?|계약자명?|가입자명?|상호명?|명의자|신청자|수령인|업체명|주소|가입번호|타스크\s*번호|TLI\s*번호|연락처)\s+(\S.*)$/i;
     const isEmptyValue = v => /^\(?\s*(없음|미정|해당없음|-|n\/a)?\s*\)?$/i.test(String(v).trim());
 
     window.parseWorkImportText = text => {
         const entries = [];
         let cur = null;
-        const start = () => { cur = { name: '', address: '', taskNo: '', tli: '', phone: '', content: '', time: '', extra: [] }; entries.push(cur); };
+        const start = () => { cur = { name: '', address: '', taskNo: '', tli: '', phone: '', content: '', time: '', extra: [], nameLabels: [] }; entries.push(cur); };
         String(text || '').replace(/\r/g, '').split('\n').forEach(raw => {
-            const line = raw.replace(/ /g, ' ').trim();
+            // 메신저에서 복사하면 섞여 오는 보이지 않는 문자는 지우고, 특수 공백·다른 모양의 콜론은 보통 것으로 바꾼다
+            const line = raw
+                .replace(/[\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff\u00ad]/g, '')
+                .replace(/[\u00a0\u2000-\u200a\u202f\u205f\u3000]/g, ' ')
+                .replace(/[\u2236\ua789\ufe55\ufe13]/g, ':')
+                .trim();
             if (!line) return;
             if (/^\[\s*\d+\s*\]$/.test(line) || /^\d+\s*[.)]$/.test(line) || /^[-=━─]{3,}$/.test(line)) { cur = null; return; }
             if (/^\[[^\]]*[^\d\s\]][^\]]*\]/.test(line)) { cur = null; return; } // [업무보조] … 제목 줄
-            const m = line.match(/^([^:：]{1,15}?)\s*[:：]\s*(.*)$/);
+            // 글머리표(- • · * ▶ ■ ○ 등)는 떼고 본다
+            const body = line.replace(/^[-•·*▶▷►■□◆◇○●※]+\s*/, '');
+            const m = body.match(/^([^:：]{1,15}?)\s*[:：]\s*(.*)$/) || body.match(NO_COLON_LABEL);
             if (!m) { if (cur) cur.extra.push(line); return; }
             const key = keyOf(m[1]);
             const value = isEmptyValue(m[2]) ? '' : m[2].trim();
-            if (!cur || (key && key !== 'extra' && cur[key] && key === 'name')) start();
+            // [n] 없이 이어진 글: 같은 이름표(예: "이름")가 다시 나오면 새 건.
+            // "상호"와 "이름"처럼 다른 이름표는 한 건 안에서 합친다(○○상회 홍길동).
+            const label = normLabel(m[1]);
+            if (!cur || (key === 'name' && cur.nameLabels.includes(label))) start();
+            if (key === 'name') cur.nameLabels.push(label);
             if (key === 'taskNo') { if (!cur.taskNo) cur.taskNo = value; } // 가입번호·타스크 번호 중 먼저 나온 값
             else if (key) cur[key] = cur[key] ? `${cur[key]} ${value}`.trim() : value;
             else if (value) cur.extra.push(`${m[1].trim()}: ${value}`);
