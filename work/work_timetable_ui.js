@@ -247,7 +247,7 @@
                         <button type="button" class="ws-menu-item" data-go="main"><i class="fa-solid fa-house"></i><span><b>메인 화면</b><small>월별 표시 형식 · 칸 배치 · 전체 누적</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item" data-go="card"><i class="fa-solid fa-id-card"></i><span><b>작업 카드</b><small>카드 레이아웃 · 복제 · 같은 타스크 묶기</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item" data-go="input"><i class="fa-solid fa-tags"></i><span><b>작업일지 입력</b><small>선택태그 상자 방식 · 스와이프 · 붙여넣기 · 글 넣기</small></span><em>›</em></button>
-                        <button type="button" class="ws-menu-item" data-go="menu"><i class="fa-solid fa-grip"></i><span><b>메뉴 버튼</b><small>메인·달력 윗줄 버튼 고르기 · 순서 바꾸기</small></span><em>›</em></button>
+                        <button type="button" class="ws-menu-item" data-go="menu"><i class="fa-solid fa-grip"></i><span><b>메뉴 버튼</b><small>윗줄 버튼 고르기 · 순서 · 꾸미기(크기·모양·이름·색)</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item" data-go="look"><i class="fa-solid fa-palette"></i><span><b>화면 · 디자인</b><small>디자인 개선 · 글자 크기 · 글꼴</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item" data-go="timetable"><i class="fa-solid fa-table-cells"></i><span><b>주간 시간표</b><small>표시 항목 · 기본 화면 · 크기 · 격자</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item" data-go="map"><i class="fa-solid fa-route"></i><span><b>지도 · 동선</b><small>기본 지도 앱 · 동선 관리</small></span><em>›</em></button>

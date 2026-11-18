@@ -932,20 +932,63 @@
         return el;
     }
 
+    // ─── 메뉴 꾸미기: 표시 방식·크기·모양(줄마다) + 버튼별 이름·색 ───
+    const MENU_STYLE_DEFAULT = { display: 'icon', size: 'md', shape: 'classic' };
+    const MENU_STYLE_CHOICES = {
+        display: [['icon', '아이콘'], ['both', '아이콘+글자'], ['text', '글자']],
+        size: [['sm', '작게'], ['md', '보통'], ['lg', '크게']],
+        shape: [['classic', '기본'], ['round', '둥근'], ['flat', '납작']]
+    };
+    const MENU_COLORS = ['', '#000080', '#dc2626', '#16a34a', '#d97706', '#7c3aed', '#0891b2', '#db2777', '#111827'];
+    const menuStyleOf = bar => {
+        const s = { ...MENU_STYLE_DEFAULT, ...(S.menuStyle?.[bar] || {}) };
+        Object.keys(MENU_STYLE_CHOICES).forEach(k => { if (!MENU_STYLE_CHOICES[k].some(([v]) => v === s[k])) s[k] = MENU_STYLE_DEFAULT[k]; });
+        return s;
+    };
+    const menuCustomOf = bar => {
+        const raw = S.menuCustom?.[bar];
+        const out = {};
+        if (raw && typeof raw === 'object') Object.entries(raw).forEach(([id, v]) => {
+            if (!MENU_ITEMS[bar][id] || !v || typeof v !== 'object') return;
+            const label = String(v.label || '').trim().slice(0, 8);
+            const color = /^#[0-9a-f]{6}$/i.test(v.color || '') ? v.color : '';
+            if (label || color) out[id] = { label, color };
+        });
+        return out;
+    };
+    const labelOf = (bar, id, custom) => custom?.[id]?.label || MENU_ITEMS[bar][id].label;
+    const styleClasses = st => `wm-mb-d-${st.display} wm-mb-s-${st.size} wm-mb-sh-${st.shape}`;
+    const setStyleClasses = (el, st) => {
+        [...el.classList].filter(c => /^wm-mb-(d|s|sh)-/.test(c)).forEach(c => el.classList.remove(c));
+        styleClasses(st).split(' ').forEach(c => el.classList.add(c));
+    };
+    // 버튼에 글자(이름)와 색을 입힌다
+    function decorateButton(el, label, color) {
+        if (el.classList.contains('wm-menu-spacer')) return;
+        let span = el.querySelector(':scope > .wm-mb-label');
+        if (!span) { span = document.createElement('span'); span.className = 'wm-mb-label'; el.appendChild(span); }
+        if (span.textContent !== label) span.textContent = label;
+        el.classList.toggle('has-mb-color', !!color);
+        if (color) el.style.setProperty('--mb-color', color); else el.style.removeProperty('--mb-color');
+    }
+
     function applyMenuBar(bar) {
         const scope = bar === 'main' ? document.getElementById('mainHeader') : document.querySelector('#popupLayer .pop-nav');
         const holder = bar === 'main' ? scope?.querySelector('.toolbar-group') : scope?.querySelector('.pop-nav-tools');
         if (!scope || !holder) return;
         const list = menuListOf(bar);
+        const custom = menuCustomOf(bar);
         Object.keys(MENU_ITEMS[bar]).forEach(id => {
             const el = menuElement(bar, id, scope);
             if (!el) return;
             const shown = list.includes(id);
             el.classList.toggle('wm-menu-hidden', !shown);
             if (!shown && el.parentNode !== holder) holder.appendChild(el);
+            decorateButton(el, labelOf(bar, id, custom), custom[id]?.color || '');
         });
         list.forEach(id => { const el = menuElement(bar, id, scope); if (el) holder.appendChild(el); });
         scope.classList.add('wm-menu-custom');
+        setStyleClasses(scope, menuStyleOf(bar));
     }
 
     let menuReady = false;
@@ -960,38 +1003,106 @@
     window.addEventListener('load', () => setTimeout(() => { menuReady = true; applyMenus(); }, 60));
 
     // ─── 설정 화면의 메뉴 편집기 ───
-    // 위 줄(보이는 버튼): 두 개를 차례로 누르면 자리 바꿈 / 하나 고르고 [숨기기]
+    // 위 줄(보이는 버튼): 두 개를 차례로 누르면 자리 바꿈 / 하나 고르고 [숨기기] / 고른 버튼은 이름·색 꾸미기
     // 아래 줄(숨긴 버튼): 누르면 맨 뒤에 추가, 위에서 하나를 골라 둔 상태면 그 자리와 바꿈
     // [순서대로 다시 고르기]: 위 줄을 비우고, 아래에서 보일 순서대로 누른다
+    // 꾸미기: 표시 방식·크기·모양을 고르면 미리보기에 바로 보인다(저장해야 실제 반영)
     const editors = {};
-    function chipHtml(bar, id, cls = '') {
+    function chipHtml(bar, id, ed, cls = '') {
         const it = MENU_ITEMS[bar][id];
-        return `<button type="button" class="wm-me-chip ${cls}" data-id="${id}"><i class="fa-solid ${it.icon}"></i><span>${esc(it.label)}</span></button>`;
+        const color = ed.custom[id]?.color;
+        return `<button type="button" class="wm-me-chip ${cls}" data-id="${id}"${color ? ` style="--mb-color:${color}"` : ''}><i class="fa-solid ${it.icon}"></i><span>${esc(labelOf(bar, id, ed.custom))}</span></button>`;
     }
-    function paintEditor(bar) {
+    function previewHtml(bar, ed) {
+        return ed.list.map(id => {
+            const it = MENU_ITEMS[bar][id];
+            if (it.spacer) return '<span class="wm-menu-spacer"></span>';
+            const color = ed.custom[id]?.color;
+            return `<span class="w95-btn icon-btn${color ? ' has-mb-color' : ''}" data-menu-id="${id}"${color ? ` style="--mb-color:${color}"` : ''}><i class="fa-solid ${it.icon}"></i><span class="wm-mb-label">${esc(labelOf(bar, id, ed.custom))}</span></span>`;
+        }).join('') || '<span class="wm-me-empty">보이는 버튼이 없습니다</span>';
+    }
+    function ensureEditorExtras(root, bar) {
+        if (root.querySelector('.wm-me-deco')) return;
+        const segs = Object.entries(MENU_STYLE_CHOICES).map(([key, opts]) => `
+            <div class="wm-me-deco-row"><span>${{ display: '표시', size: '크기', shape: '모양' }[key]}</span>
+                <div class="ws-seg">${opts.map(([v, t]) => `<label><input type="radio" name="wmMenu_${bar}_${key}" value="${v}" data-mstyle="${key}"><span>${t}</span></label>`).join('')}</div>
+            </div>`).join('');
+        root.insertAdjacentHTML('afterbegin', `<div class="wm-me-label">미리보기</div><div class="wm-me-preview"></div>`);
+        root.insertAdjacentHTML('beforeend', `
+            <div class="wm-me-deco">
+                <div class="wm-me-label">꾸미기 (이 줄 전체)</div>
+                ${segs}
+                <div class="wm-me-item" hidden>
+                    <div class="wm-me-label wm-me-item-title"></div>
+                    <div class="wm-me-deco-row"><span>이름</span><input type="text" class="w95-in wm-me-name" maxlength="8" placeholder="기본 이름" autocomplete="off"></div>
+                    <div class="wm-me-deco-row"><span>색</span><div class="wm-me-colors">${MENU_COLORS.map(c => `<button type="button" class="wm-me-color${c ? '' : ' is-none'}" data-color="${c}" title="${c || '원래 색'}"${c ? ` style="background:${c}"` : ''}>${c ? '' : '원래'}</button>`).join('')}</div></div>
+                </div>
+            </div>`);
+        root.addEventListener('change', e => {
+            const key = e.target.dataset.mstyle;
+            if (!key) return;
+            editors[bar].style[key] = e.target.value;
+            paintEditor(bar);
+        });
+        root.querySelector('.wm-me-name').addEventListener('input', e => {
+            const ed = editors[bar];
+            if (ed.sel === null) return;
+            const id = ed.list[ed.sel];
+            ed.custom[id] = { ...(ed.custom[id] || {}), label: e.target.value.trim().slice(0, 8) };
+            paintEditor(bar, { keepName: true });
+        });
+    }
+    function paintEditor(bar, { keepName = false } = {}) {
         const ed = editors[bar];
         const root = ed?.root;
         if (!root) return;
         const hidden = Object.keys(MENU_ITEMS[bar]).filter(id => !ed.list.includes(id));
         root.querySelector('.wm-me-shown').innerHTML = ed.list.length
-            ? ed.list.map((id, i) => chipHtml(bar, id, ed.sel === i ? 'is-sel' : '').replace('<button', `<button data-pos="${i}"`)).join('')
+            ? ed.list.map((id, i) => chipHtml(bar, id, ed, ed.sel === i ? 'is-sel' : '').replace('<button', `<button data-pos="${i}"`)).join('')
             : '<span class="wm-me-empty">아래에서 보일 순서대로 누르세요</span>';
-        root.querySelector('.wm-me-pool').innerHTML = hidden.length ? hidden.map(id => chipHtml(bar, id)).join('') : '<span class="wm-me-empty">모두 보이는 중</span>';
+        root.querySelector('.wm-me-pool').innerHTML = hidden.length ? hidden.map(id => chipHtml(bar, id, ed)).join('') : '<span class="wm-me-empty">모두 보이는 중</span>';
         root.querySelector('[data-me="hide"]').disabled = ed.sel === null;
-        root.querySelector('.wm-me-hint').textContent = ed.sel !== null
-            ? `"${MENU_ITEMS[bar][ed.list[ed.sel]].label}" 선택됨 · 바꿀 자리를 누르거나, 아래 버튼을 누르면 그 자리에 들어갑니다`
-            : '버튼 두 개를 차례로 누르면 자리가 바뀝니다';
+        const selId = ed.sel !== null ? ed.list[ed.sel] : null;
+        root.querySelector('.wm-me-hint').textContent = selId
+            ? `"${labelOf(bar, selId, ed.custom)}" 선택됨 · 바꿀 자리를 누르거나, 아래 버튼을 누르면 그 자리에 들어갑니다`
+            : '버튼 두 개를 차례로 누르면 자리가 바뀝니다 · 하나를 누르면 이름·색을 바꿀 수 있습니다';
+        // 미리보기
+        const pv = root.querySelector('.wm-me-preview');
+        pv.className = `wm-me-preview ${styleClasses(ed.style)}`;
+        pv.innerHTML = previewHtml(bar, ed);
+        root.querySelectorAll('input[data-mstyle]').forEach(r => { r.checked = ed.style[r.dataset.mstyle] === r.value; });
+        // 고른 버튼 꾸미기
+        const item = root.querySelector('.wm-me-item');
+        const canDecorate = selId && !MENU_ITEMS[bar][selId].spacer;
+        item.hidden = !canDecorate;
+        if (canDecorate) {
+            item.querySelector('.wm-me-item-title').textContent = `"${MENU_ITEMS[bar][selId].label}" 버튼 꾸미기`;
+            const name = item.querySelector('.wm-me-name');
+            if (!keepName) name.value = ed.custom[selId]?.label || '';
+            name.placeholder = MENU_ITEMS[bar][selId].label;
+            const color = ed.custom[selId]?.color || '';
+            item.querySelectorAll('.wm-me-color').forEach(b => b.classList.toggle('is-on', b.dataset.color === color));
+        }
     }
     function setupEditor(root) {
         const bar = root.dataset.bar;
-        editors[bar] = { root, list: menuListOf(bar), sel: null };
+        editors[bar] = { root, list: menuListOf(bar), sel: null, style: menuStyleOf(bar), custom: menuCustomOf(bar) };
+        ensureEditorExtras(root, bar);
         root.addEventListener('click', e => {
             const ed = editors[bar];
             const act = e.target.closest('[data-me]')?.dataset.me;
+            const colorBtn = e.target.closest('.wm-me-color');
             const chip = e.target.closest('.wm-me-chip');
+            if (colorBtn) {
+                if (ed.sel === null) return;
+                const id = ed.list[ed.sel];
+                ed.custom[id] = { ...(ed.custom[id] || {}), color: colorBtn.dataset.color };
+                paintEditor(bar, { keepName: true });
+                return;
+            }
             if (act === 'hide' && ed.sel !== null) { ed.list.splice(ed.sel, 1); ed.sel = null; }
             else if (act === 'restart') { ed.list = []; ed.sel = null; }
-            else if (act === 'default') { ed.list = [...MENU_DEFAULTS[bar]]; ed.sel = null; }
+            else if (act === 'default') { ed.list = [...MENU_DEFAULTS[bar]]; ed.style = { ...MENU_STYLE_DEFAULT }; ed.custom = {}; ed.sel = null; }
             else if (chip && chip.dataset.pos !== undefined) {
                 const pos = Number(chip.dataset.pos);
                 if (ed.sel === null) ed.sel = pos;
@@ -1006,16 +1117,21 @@
     }
     window.loadMenuEditors = () => {
         document.querySelectorAll('#ttSettingsModal .wm-me[data-bar]').forEach(root => {
-            if (!editors[root.dataset.bar] || editors[root.dataset.bar].root !== root) setupEditor(root);
-            editors[root.dataset.bar].list = menuListOf(root.dataset.bar);
-            editors[root.dataset.bar].sel = null;
-            paintEditor(root.dataset.bar);
+            const bar = root.dataset.bar;
+            if (!editors[bar] || editors[bar].root !== root) setupEditor(root);
+            Object.assign(editors[bar], { list: menuListOf(bar), sel: null, style: menuStyleOf(bar), custom: menuCustomOf(bar) });
+            paintEditor(bar);
         });
     };
     window.readMenuEditors = () => {
         const out = {};
         if (editors.main) out.menuMain = [...editors.main.list];
         if (editors.cal) out.menuCal = [...editors.cal.list];
+        if (editors.main || editors.cal) {
+            const clean = c => Object.fromEntries(Object.entries(c || {}).filter(([, v]) => v && (v.label || v.color)));
+            out.menuStyle = { main: { ...(editors.main?.style || menuStyleOf('main')) }, cal: { ...(editors.cal?.style || menuStyleOf('cal')) } };
+            out.menuCustom = { main: clean(editors.main?.custom || menuCustomOf('main')), cal: clean(editors.cal?.custom || menuCustomOf('cal')) };
+        }
         return out;
     };
 

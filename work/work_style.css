@@ -2103,3 +2103,60 @@ body.wm-ui-refresh .m-stat { font-size: .72rem; letter-spacing: -0.02em; word-br
 .wm-me-actions { display: flex; gap: 4px; }
 .wm-me-actions .w95-btn { flex: 1; height: 34px; font-size: .8rem; padding: 0 4px; }
 .wm-me-actions .w95-btn:disabled { color: #94a3b8; }
+
+/* ─── 메뉴 꾸미기 (설정 > 메뉴 버튼): 표시 방식 · 크기 · 모양 · 버튼별 이름/색 ───
+   메인 윗줄(#mainHeader), 달력 윗줄(#popupLayer .pop-nav), 설정의 미리보기(.wm-me-preview)에 똑같이 적용 */
+.wm-mb-label { display: none; }
+:is(#mainHeader, #popupLayer .pop-nav, .wm-me-preview) .icon-btn[data-menu-id] { position: relative; }
+/* 크기 (아이콘만) */
+:is(#mainHeader, #popupLayer .pop-nav, .wm-me-preview).wm-mb-s-sm .icon-btn[data-menu-id] { width: 30px; height: 30px; font-size: .88rem; }
+:is(#mainHeader, #popupLayer .pop-nav, .wm-me-preview).wm-mb-s-md .icon-btn[data-menu-id] { width: 34px; height: 34px; font-size: 1.02rem; }
+:is(#mainHeader, #popupLayer .pop-nav, .wm-me-preview).wm-mb-s-lg .icon-btn[data-menu-id] { width: 42px; height: 40px; font-size: 1.2rem; }
+/* 아이콘+글자: 아이콘 아래에 이름 */
+:is(#mainHeader, #popupLayer .pop-nav, .wm-me-preview).wm-mb-d-both .icon-btn[data-menu-id] {
+    width: auto; min-width: 42px; flex-direction: column; gap: 2px; padding: 0 5px; line-height: 1;
+}
+:is(#mainHeader, #popupLayer .pop-nav, .wm-me-preview).wm-mb-d-both .wm-mb-label { display: block; font-size: .6rem; font-weight: bold; white-space: nowrap; }
+:is(#mainHeader, #popupLayer .pop-nav, .wm-me-preview).wm-mb-d-both.wm-mb-s-sm .icon-btn[data-menu-id] { height: 36px; min-width: 38px; font-size: .82rem; }
+:is(#mainHeader, #popupLayer .pop-nav, .wm-me-preview).wm-mb-d-both.wm-mb-s-md .icon-btn[data-menu-id] { height: 42px; }
+:is(#mainHeader, #popupLayer .pop-nav, .wm-me-preview).wm-mb-d-both.wm-mb-s-lg .icon-btn[data-menu-id] { height: 50px; min-width: 50px; font-size: 1.15rem; }
+:is(#mainHeader, #popupLayer .pop-nav, .wm-me-preview).wm-mb-d-both.wm-mb-s-lg .wm-mb-label { font-size: .7rem; }
+/* 글자만 */
+:is(#mainHeader, #popupLayer .pop-nav, .wm-me-preview).wm-mb-d-text .icon-btn[data-menu-id] { width: auto; padding: 0 8px; }
+:is(#mainHeader, #popupLayer .pop-nav, .wm-me-preview).wm-mb-d-text .icon-btn[data-menu-id] > i { display: none; }
+:is(#mainHeader, #popupLayer .pop-nav, .wm-me-preview).wm-mb-d-text .wm-mb-label { display: block; font-size: .8rem; font-weight: bold; white-space: nowrap; }
+:is(#mainHeader, #popupLayer .pop-nav, .wm-me-preview).wm-mb-d-text.wm-mb-s-sm .wm-mb-label { font-size: .72rem; }
+:is(#mainHeader, #popupLayer .pop-nav, .wm-me-preview).wm-mb-d-text.wm-mb-s-lg .wm-mb-label { font-size: .92rem; }
+/* 모양 */
+:is(#mainHeader, #popupLayer .pop-nav, .wm-me-preview).wm-mb-sh-round .icon-btn[data-menu-id] {
+    border: 1px solid #64748b; border-radius: 10px; background: #f1f5f9; box-shadow: 0 1px 0 rgba(0,0,0,.25);
+}
+:is(#mainHeader, #popupLayer .pop-nav, .wm-me-preview).wm-mb-sh-round .icon-btn[data-menu-id]:active { background: #e2e8f0; box-shadow: inset 0 1px 2px rgba(0,0,0,.25); }
+:is(#mainHeader, #popupLayer .pop-nav, .wm-me-preview).wm-mb-sh-flat .icon-btn[data-menu-id] {
+    border-color: transparent; background: transparent; box-shadow: none;
+}
+:is(#mainHeader, #popupLayer .pop-nav, .wm-me-preview).wm-mb-sh-flat .icon-btn[data-menu-id]:active { background: rgba(0,0,0,.1); }
+/* 버튼별 색: 아이콘·글자 색 */
+.icon-btn.has-mb-color > i, .icon-btn.has-mb-color > .wm-mb-label { color: var(--mb-color) !important; }
+
+/* 편집기: 미리보기 · 꾸미기 */
+.wm-me-preview {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-height: 48px; padding: 6px;
+    background: var(--w-gray); border: 2px solid; border-color: var(--w-white) var(--w-black) var(--w-black) var(--w-white);
+}
+.wm-me-preview .icon-btn { cursor: default; }
+.wm-me-deco { display: flex; flex-direction: column; gap: 6px; padding-top: 6px; border-top: 1px dashed #cbd5e1; }
+.wm-me-deco-row { display: flex; align-items: center; gap: 8px; }
+.wm-me-deco-row > span { flex: 0 0 34px; font-size: .78rem; font-weight: bold; color: #334155; }
+.wm-me-deco-row > .ws-seg, .wm-me-deco-row > input, .wm-me-deco-row > .wm-me-colors { flex: 1; min-width: 0; }
+.wm-me-deco-row .ws-seg span { height: 32px; font-size: .8rem; }
+.wm-me-name { height: 34px; padding: 0 8px; font-size: .9rem; font-family: inherit; }
+.wm-me-item { display: flex; flex-direction: column; gap: 6px; padding: 8px; background: #fffbeb; border: 1px solid #f59e0b; }
+.wm-me-item[hidden] { display: none; }
+.wm-me-colors { display: flex; flex-wrap: wrap; gap: 5px; }
+.wm-me-color { width: 30px; height: 30px; border: 2px solid #fff; box-shadow: 0 0 0 1px #64748b; cursor: pointer; padding: 0; font-size: .62rem; font-family: inherit; }
+.wm-me-color.is-none { background: #e5e7eb; color: #334155; width: 38px; }
+.wm-me-color.is-on { box-shadow: 0 0 0 3px #f59e0b; }
+.wm-me-chip[style*="--mb-color"] i, .wm-me-chip[style*="--mb-color"] span { color: var(--mb-color); }
+/* 달력 윗줄 "보통"은 지금까지처럼 32px(좁은 화면에서도 한 줄) */
+#popupLayer .pop-nav.wm-mb-s-md.wm-mb-d-icon .icon-btn[data-menu-id] { width: 32px; height: 32px; font-size: .95rem; }
