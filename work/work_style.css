@@ -2072,3 +2072,34 @@ body.wm-ui-refresh .card-multi-select-bar .w95-btn { height: 36px; padding: 0 12
 @media (max-width: 339px) { #mainHeader { column-gap: 4px; padding: 6px; } #mainHeader .toolbar-group { gap: 3px; } #mainHeader .icon-btn { width: 32px; height: 32px; font-size: .98rem; } }
 /* 월 칸 통계: 숫자와 단위(0일, 0회)가 따로 꺾이지 않게 */
 body.wm-ui-refresh .m-stat { font-size: .72rem; letter-spacing: -0.02em; word-break: keep-all; }
+
+/* ─── 메뉴 버튼 배치 (설정 > 메뉴 버튼, work_card_tools.js) ─── */
+.wm-menu-hidden { display: none !important; }
+.wm-menu-spacer { flex: 1 1 auto; min-width: 4px; }
+#mainHeader.wm-menu-custom > .toolbar-group:first-child { flex: 1 1 auto; min-width: 0; }
+#mainHeader.wm-menu-custom > .header-right-tools { display: none; }
+#popupLayer .pop-nav.wm-menu-custom { flex-wrap: wrap; row-gap: 4px; }
+#popupLayer .pop-nav.wm-menu-custom .pop-nav-tools { flex-wrap: wrap; }
+.wm-me { display: flex; flex-direction: column; gap: 6px; }
+.wm-me-label { font-size: .8rem; font-weight: bold; color: var(--w-blue); }
+.wm-me-shown, .wm-me-pool {
+    display: flex; flex-wrap: wrap; gap: 4px; min-height: 58px; padding: 5px; align-items: flex-start;
+    border: 2px solid; border-color: var(--w-dark-gray) var(--w-white) var(--w-white) var(--w-dark-gray);
+}
+.wm-me-shown { background: #fff; }
+.wm-me-pool { background: #e5e7eb; }
+.wm-me-chip {
+    width: 58px; height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    background: var(--w-gray); border: 2px solid; border-color: var(--w-white) var(--w-black) var(--w-black) var(--w-white);
+    font-family: inherit; font-size: .68rem; cursor: pointer; padding: 0; color: #0f172a;
+}
+.wm-me-chip i { font-size: 1rem; }
+.wm-me-chip span { white-space: nowrap; }
+.wm-me-pool .wm-me-chip { opacity: .75; }
+.wm-me-chip.is-sel { background: #fde68a; outline: 3px solid #f59e0b; outline-offset: -1px; }
+.wm-me-chip[data-id="spacer"] { border-style: dashed; background: #f8fafc; }
+.wm-me-empty { font-size: .78rem; color: #64748b; padding: 12px 4px; }
+.wm-me-hint { font-size: .76rem; color: #92400e; min-height: 1.2em; }
+.wm-me-actions { display: flex; gap: 4px; }
+.wm-me-actions .w95-btn { flex: 1; height: 34px; font-size: .8rem; padding: 0 4px; }
+.wm-me-actions .w95-btn:disabled { color: #94a3b8; }

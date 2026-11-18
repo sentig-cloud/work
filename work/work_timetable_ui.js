@@ -247,6 +247,7 @@
                         <button type="button" class="ws-menu-item" data-go="main"><i class="fa-solid fa-house"></i><span><b>메인 화면</b><small>월별 표시 형식 · 칸 배치 · 전체 누적</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item" data-go="card"><i class="fa-solid fa-id-card"></i><span><b>작업 카드</b><small>카드 레이아웃 · 복제 · 같은 타스크 묶기</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item" data-go="input"><i class="fa-solid fa-tags"></i><span><b>작업일지 입력</b><small>선택태그 상자 방식 · 스와이프 · 붙여넣기 · 글 넣기</small></span><em>›</em></button>
+                        <button type="button" class="ws-menu-item" data-go="menu"><i class="fa-solid fa-grip"></i><span><b>메뉴 버튼</b><small>메인·달력 윗줄 버튼 고르기 · 순서 바꾸기</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item" data-go="look"><i class="fa-solid fa-palette"></i><span><b>화면 · 디자인</b><small>디자인 개선 · 글자 크기 · 글꼴</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item" data-go="timetable"><i class="fa-solid fa-table-cells"></i><span><b>주간 시간표</b><small>표시 항목 · 기본 화면 · 크기 · 격자</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item" data-go="map"><i class="fa-solid fa-route"></i><span><b>지도 · 동선</b><small>기본 지도 앱 · 동선 관리</small></span><em>›</em></button>
@@ -339,6 +340,38 @@
                         </div>
                     </div>
 
+                    <div class="tt-settings-group" data-page="menu">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-grip"></i> 메인 윗줄</div>
+                        <div class="ws-desc ws-desc-box">1~12월 화면 맨 위 버튼입니다. <b>빈칸</b>을 넣으면 그 뒤 버튼들이 오른쪽 끝으로 붙습니다.</div>
+                        <div class="wm-me" data-bar="main">
+                            <div class="wm-me-label">보이는 버튼 (왼쪽부터 이 순서)</div>
+                            <div class="wm-me-shown"></div>
+                            <div class="wm-me-hint"></div>
+                            <div class="wm-me-actions">
+                                <button type="button" class="w95-btn" data-me="hide">숨기기</button>
+                                <button type="button" class="w95-btn" data-me="restart">순서대로 다시 고르기</button>
+                                <button type="button" class="w95-btn" data-me="default">기본값</button>
+                            </div>
+                            <div class="wm-me-label">숨긴 버튼 (누르면 맨 뒤에 추가)</div>
+                            <div class="wm-me-pool"></div>
+                        </div>
+                    </div>
+                    <div class="tt-settings-group" data-page="menu">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-grip"></i> 달력 윗줄</div>
+                        <div class="ws-desc ws-desc-box">달력 화면 맨 위 "11월" 오른쪽 버튼입니다. ("11월"은 누르면 뒤로가기라 항상 맨 앞)</div>
+                        <div class="wm-me" data-bar="cal">
+                            <div class="wm-me-label">보이는 버튼 (왼쪽부터 이 순서)</div>
+                            <div class="wm-me-shown"></div>
+                            <div class="wm-me-hint"></div>
+                            <div class="wm-me-actions">
+                                <button type="button" class="w95-btn" data-me="hide">숨기기</button>
+                                <button type="button" class="w95-btn" data-me="restart">순서대로 다시 고르기</button>
+                                <button type="button" class="w95-btn" data-me="default">기본값</button>
+                            </div>
+                            <div class="wm-me-label">숨긴 버튼 (누르면 맨 뒤에 추가)</div>
+                            <div class="wm-me-pool"></div>
+                        </div>
+                    </div>
                     <div class="tt-settings-group" data-page="look">
                         <div class="tt-settings-group-title"><i class="fa-solid fa-palette"></i> 화면 · 디자인</div>
                         <div class="tt-settings-section">
@@ -443,10 +476,6 @@
                         <div class="tt-settings-group-title"><i class="fa-solid fa-flask"></i> 신규 기능</div>
                         <div class="ws-desc ws-desc-box">직접 만든 편의 기능입니다. 마음에 들지 않으면 하나씩 끄면 원래대로 돌아갑니다.</div>
                         <div class="tt-settings-section">
-                            <label class="tt-settings-check"><input type="checkbox" id="ttOptLabMainGear"> 메인 화면 설정 버튼</label>
-                            <div class="ws-desc">맨 위 오른쪽에 ⚙ 버튼을 둡니다. 지금은 주간 시간표에 들어가야만 설정을 열 수 있는데, 메인에서 바로 열 수 있습니다.</div>
-                        </div>
-                        <div class="tt-settings-section">
                             <label class="tt-settings-check"><input type="checkbox" id="ttOptLabNextJob"> 다음 작업 표시</label>
                             <div class="ws-desc">오늘 목록에서 지금 시각 이후 가장 가까운 작업(완료·취소 제외)에 "다음" 표시를 달고 그 카드로 스크롤합니다.</div>
                         </div>
@@ -514,7 +543,7 @@
     }
 
     // ─── 설정 메뉴: 첫 화면은 메뉴 목록, 누르면 그 메뉴의 설정만, 검색하면 전체에서 찾기 ───
-    const SETTINGS_PAGE_TITLES = { data:'내보내기 · 백업', main:'메인 화면', card:'작업 카드', input:'작업일지 입력', look:'화면 · 디자인', timetable:'주간 시간표', map:'지도 · 동선', auto:'자동 인식', labs:'신규 기능', account:'계정', reset:'되돌리기' };
+    const SETTINGS_PAGE_TITLES = { menu:'메뉴 버튼', data:'내보내기 · 백업', main:'메인 화면', card:'작업 카드', input:'작업일지 입력', look:'화면 · 디자인', timetable:'주간 시간표', map:'지도 · 동선', auto:'자동 인식', labs:'신규 기능', account:'계정', reset:'되돌리기' };
     function showSettingsPage(page) {
         const modal = document.getElementById('ttSettingsModal');
         if (!modal) return;
@@ -600,7 +629,7 @@
         check('ttOptMainYearStatus', c.mainYearStatus !== false);
         check('ttOptMainHighlight', c.mainHighlight);
         check('ttOptUiRefresh', c.uiRefresh);
-        check('ttOptLabMainGear', c.labMainGear !== false);
+        window.loadMenuEditors?.();
         check('ttOptLabNextJob', c.labNextJob);
         check('ttOptLabCalToday', c.labCalToday);
         check('ttOptLabBigTouch', c.labBigTouch);
@@ -625,10 +654,10 @@
             mainYearStatus: on('ttOptMainYearStatus'),
             mainHighlight: on('ttOptMainHighlight'),
             uiRefresh: on('ttOptUiRefresh'),
-            labMainGear: on('ttOptLabMainGear'),
             labNextJob: on('ttOptLabNextJob'),
             labCalToday: on('ttOptLabCalToday'),
-            labBigTouch: on('ttOptLabBigTouch')
+            labBigTouch: on('ttOptLabBigTouch'),
+            ...(window.readMenuEditors?.() || {})
         };
     }
 

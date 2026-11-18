@@ -83,8 +83,9 @@
         document.body.classList.toggle('wm-font-system', S.fontFamily === 'system');
         document.body.classList.toggle('wm-ui-refresh', !!S.uiRefresh);
         document.body.classList.toggle('wm-big-touch', !!S.labBigTouch);
-        document.body.classList.toggle('wm-main-gear', S.labMainGear !== false);
+        document.body.classList.add('wm-main-gear'); // 보일지 말지는 메뉴 버튼 설정이 정한다
         ensureMainGear();
+        applyMenus();
         if (redraw) { rerender(); if (Array.isArray(window.logs)) window.renderMain?.(); }
     }
     window.resetCardToolsLook = () => window.setCardToolsSettings({ ...LEGACY_LOOK });
@@ -870,6 +871,153 @@
             return result;
         };
     }
+
+    // ═══════════════════════════════════════════
+    // 8) 메뉴 버튼 배치 (설정 > 메뉴 버튼)
+    // ═══════════════════════════════════════════
+    // 메인 윗줄과 달력 윗줄의 버튼을 "보일 것 + 순서"로 정한다. 기존 버튼 요소를 그대로 옮기므로 기능은 그대로다.
+    const MENU_ITEMS = {
+        main: {
+            search:     { label: '검색',     icon: 'fa-magnifying-glass', find: () => document.querySelector('#mainHeader button[onclick*="openSearch"]') },
+            trash:      { label: '휴지통',   icon: 'fa-trash-can',        find: () => document.querySelector('#mainHeader button[onclick*="openTrash"]') },
+            weekly:     { label: '주간',     icon: 'fa-table-cells',      find: () => document.querySelector('#mainHeader button[onclick*="goToWeeklyTimetable"]') },
+            photo:      { label: '사진 넣기', icon: 'fa-images',          find: () => document.querySelector('#mainHeader button[onclick*="openPhotoInsert"]') },
+            textImport: { label: '글 넣기',  icon: 'fa-file-lines',       make: () => window.openTextImport?.() },
+            spacer:     { label: '빈칸',     icon: 'fa-arrows-left-right', spacer: true },
+            zip:        { label: 'ZIP 백업', icon: 'fa-file-arrow-down',  find: () => document.getElementById('zipBackupBtn') },
+            import:     { label: '백업 복원', icon: 'fa-file-import',     find: () => document.querySelector('#mainHeader button[onclick*="triggerImport"]') },
+            export:     { label: '엑셀',     icon: 'fa-file-excel',       find: () => document.querySelector('#mainHeader button[onclick*="WorkExportUI"]') },
+            settings:   { label: '설정',     icon: 'fa-gear',             find: () => document.getElementById('wmMainGearBtn') }
+        },
+        cal: {
+            weekly:     { label: '주간',     icon: 'fa-table-cells',      find: () => document.getElementById('timetableToggleBtn') },
+            photo:      { label: '사진 넣기', icon: 'fa-images',          find: () => document.querySelector('#popupLayer .pop-nav button[onclick*="openPhotoInsert"]') },
+            textImport: { label: '글 넣기',  icon: 'fa-file-lines',       find: () => document.getElementById('textImportBtn') },
+            search:     { label: '검색',     icon: 'fa-magnifying-glass', find: () => document.querySelector('#popupLayer .pop-nav button[onclick*="openSearch"]') },
+            export:     { label: '엑셀',     icon: 'fa-file-excel',       make: () => window.WorkExportUI ? window.WorkExportUI.open() : alert('내보내기 모듈이 로드되지 않았습니다.') },
+            settings:   { label: '설정',     icon: 'fa-gear',             make: () => window.openMainSettings?.() }
+        }
+    };
+    // 지금까지의 배치를 기본값으로 둔다(설정 버튼은 예전 "메인 설정 버튼"을 껐으면 뺀다)
+    const MENU_DEFAULTS = {
+        main: ['search', 'trash', 'weekly', 'photo', 'spacer', 'zip', 'import', 'export', 'settings'],
+        cal: ['weekly', 'photo', 'textImport', 'search']
+    };
+    const menuListOf = bar => {
+        const saved = S[bar === 'main' ? 'menuMain' : 'menuCal'];
+        const valid = Array.isArray(saved) ? saved.filter(id => MENU_ITEMS[bar][id]) : null;
+        if (valid) return [...new Set(valid)];
+        const def = [...MENU_DEFAULTS[bar]];
+        return bar === 'main' && S.labMainGear === false ? def.filter(id => id !== 'settings') : def;
+    };
+    window.getMenuItems = bar => MENU_ITEMS[bar];
+    window.getMenuDefaults = bar => [...MENU_DEFAULTS[bar]];
+    window.getMenuList = bar => menuListOf(bar);
+
+    function menuElement(bar, id, scope) {
+        const item = MENU_ITEMS[bar][id];
+        let el = scope.querySelector(`[data-menu-id="${id}"]`) || item.find?.();
+        if (!el && (item.make || item.spacer)) {
+            el = document.createElement(item.spacer ? 'div' : 'button');
+            if (item.spacer) el.className = 'wm-menu-spacer';
+            else {
+                el.type = 'button';
+                el.className = 'w95-btn icon-btn';
+                el.title = item.label;
+                el.innerHTML = `<i class="fa-solid ${item.icon}"></i>`;
+                el.addEventListener('click', item.make);
+            }
+        }
+        if (el) el.dataset.menuId = id;
+        return el;
+    }
+
+    function applyMenuBar(bar) {
+        const scope = bar === 'main' ? document.getElementById('mainHeader') : document.querySelector('#popupLayer .pop-nav');
+        const holder = bar === 'main' ? scope?.querySelector('.toolbar-group') : scope?.querySelector('.pop-nav-tools');
+        if (!scope || !holder) return;
+        const list = menuListOf(bar);
+        Object.keys(MENU_ITEMS[bar]).forEach(id => {
+            const el = menuElement(bar, id, scope);
+            if (!el) return;
+            const shown = list.includes(id);
+            el.classList.toggle('wm-menu-hidden', !shown);
+            if (!shown && el.parentNode !== holder) holder.appendChild(el);
+        });
+        list.forEach(id => { const el = menuElement(bar, id, scope); if (el) holder.appendChild(el); });
+        scope.classList.add('wm-menu-custom');
+    }
+
+    let menuReady = false;
+    function applyMenus() {
+        if (!menuReady) return; // 페이지 로드 뒤(ZIP 백업 버튼이 생긴 뒤)부터 옮긴다
+        if (!document.getElementById('zipBackupBtn')) window.installBackupUI?.();
+        ensureMainGear();
+        applyMenuBar('main');
+        applyMenuBar('cal');
+    }
+    window.applyMenus = applyMenus;
+    window.addEventListener('load', () => setTimeout(() => { menuReady = true; applyMenus(); }, 60));
+
+    // ─── 설정 화면의 메뉴 편집기 ───
+    // 위 줄(보이는 버튼): 두 개를 차례로 누르면 자리 바꿈 / 하나 고르고 [숨기기]
+    // 아래 줄(숨긴 버튼): 누르면 맨 뒤에 추가, 위에서 하나를 골라 둔 상태면 그 자리와 바꿈
+    // [순서대로 다시 고르기]: 위 줄을 비우고, 아래에서 보일 순서대로 누른다
+    const editors = {};
+    function chipHtml(bar, id, cls = '') {
+        const it = MENU_ITEMS[bar][id];
+        return `<button type="button" class="wm-me-chip ${cls}" data-id="${id}"><i class="fa-solid ${it.icon}"></i><span>${esc(it.label)}</span></button>`;
+    }
+    function paintEditor(bar) {
+        const ed = editors[bar];
+        const root = ed?.root;
+        if (!root) return;
+        const hidden = Object.keys(MENU_ITEMS[bar]).filter(id => !ed.list.includes(id));
+        root.querySelector('.wm-me-shown').innerHTML = ed.list.length
+            ? ed.list.map((id, i) => chipHtml(bar, id, ed.sel === i ? 'is-sel' : '').replace('<button', `<button data-pos="${i}"`)).join('')
+            : '<span class="wm-me-empty">아래에서 보일 순서대로 누르세요</span>';
+        root.querySelector('.wm-me-pool').innerHTML = hidden.length ? hidden.map(id => chipHtml(bar, id)).join('') : '<span class="wm-me-empty">모두 보이는 중</span>';
+        root.querySelector('[data-me="hide"]').disabled = ed.sel === null;
+        root.querySelector('.wm-me-hint').textContent = ed.sel !== null
+            ? `"${MENU_ITEMS[bar][ed.list[ed.sel]].label}" 선택됨 · 바꿀 자리를 누르거나, 아래 버튼을 누르면 그 자리에 들어갑니다`
+            : '버튼 두 개를 차례로 누르면 자리가 바뀝니다';
+    }
+    function setupEditor(root) {
+        const bar = root.dataset.bar;
+        editors[bar] = { root, list: menuListOf(bar), sel: null };
+        root.addEventListener('click', e => {
+            const ed = editors[bar];
+            const act = e.target.closest('[data-me]')?.dataset.me;
+            const chip = e.target.closest('.wm-me-chip');
+            if (act === 'hide' && ed.sel !== null) { ed.list.splice(ed.sel, 1); ed.sel = null; }
+            else if (act === 'restart') { ed.list = []; ed.sel = null; }
+            else if (act === 'default') { ed.list = [...MENU_DEFAULTS[bar]]; ed.sel = null; }
+            else if (chip && chip.dataset.pos !== undefined) {
+                const pos = Number(chip.dataset.pos);
+                if (ed.sel === null) ed.sel = pos;
+                else if (ed.sel === pos) ed.sel = null;
+                else { [ed.list[ed.sel], ed.list[pos]] = [ed.list[pos], ed.list[ed.sel]]; ed.sel = null; }
+            } else if (chip) {
+                if (ed.sel !== null) { ed.list[ed.sel] = chip.dataset.id; ed.sel = null; }
+                else ed.list.push(chip.dataset.id);
+            } else return;
+            paintEditor(bar);
+        });
+    }
+    window.loadMenuEditors = () => {
+        document.querySelectorAll('#ttSettingsModal .wm-me[data-bar]').forEach(root => {
+            if (!editors[root.dataset.bar] || editors[root.dataset.bar].root !== root) setupEditor(root);
+            editors[root.dataset.bar].list = menuListOf(root.dataset.bar);
+            editors[root.dataset.bar].sel = null;
+            paintEditor(root.dataset.bar);
+        });
+    };
+    window.readMenuEditors = () => {
+        const out = {};
+        if (editors.main) out.menuMain = [...editors.main.list];
+        if (editors.cal) out.menuCal = [...editors.cal.list];
+        return out;
+    };
 
     // ─── 시작 ───
     const init = () => {
