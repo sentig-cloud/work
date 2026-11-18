@@ -2160,3 +2160,25 @@ body.wm-ui-refresh .m-stat { font-size: .72rem; letter-spacing: -0.02em; word-br
 .wm-me-chip[style*="--mb-color"] i, .wm-me-chip[style*="--mb-color"] span { color: var(--mb-color); }
 /* 달력 윗줄 "보통"은 지금까지처럼 32px(좁은 화면에서도 한 줄) */
 #popupLayer .pop-nav.wm-mb-s-md.wm-mb-d-icon .icon-btn[data-menu-id] { width: 32px; height: 32px; font-size: .95rem; }
+
+/* ─── 서버 기록에서 복구 (work_recovery.js) ─── */
+.rc-list { display: flex; flex-direction: column; gap: 6px; }
+.rc-item { padding: 8px; background: #f8fafc; border: 1px solid #cbd5e1; border-left: 5px solid #000080; display: flex; flex-direction: column; gap: 4px; }
+.rc-item.is-current { border-left-color: #64748b; background: #f1f5f9; }
+.rc-item-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rc-item-head b { font-size: .95rem; }
+.rc-src { font-size: .7rem; padding: 0 5px; background: #e2e8f0; color: #334155; }
+.rc-more { font-style: normal; font-size: .7rem; padding: 0 5px; background: #16a34a; color: #fff; font-weight: bold; }
+.rc-item-sum { font-size: .8rem; color: #334155; }
+.rc-item-actions { display: flex; gap: 4px; }
+.rc-item-actions .w95-btn { flex: 1; height: 32px; font-size: .8rem; }
+.rc-item-actions .rc-go { color: var(--w-blue); font-weight: bold; }
+.rc-detail { max-height: 220px; overflow-y: auto; background: #fff; border: 1px solid #e2e8f0; padding: 6px; font-size: .74rem; }
+.rc-detail[hidden] { display: none; }
+.rc-group { padding: 2px 0; border-bottom: 1px dashed #e2e8f0; }
+.rc-group span { display: block; color: #475569; overflow-wrap: anywhere; }
+.rc-empty { padding: 10px 4px; font-size: .8rem; color: #64748b; }
+.rc-scan-item { cursor: pointer; }
+.rc-scan-item.is-new { border-left-color: #b45309; background: #fffbeb; }
+.rc-scan-item input[type="checkbox"] { width: 20px; height: 20px; flex: 0 0 auto; accent-color: var(--w-blue); }
+.rc-title { flex: 1; min-width: 0; height: 30px; padding: 0 6px; font-size: .9rem; font-weight: bold; font-family: inherit; }

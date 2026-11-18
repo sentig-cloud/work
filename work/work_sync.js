@@ -458,17 +458,28 @@ window.applyUiSettingsPayload = function (uiSettings) {
         window.refreshGeoRouteMarks?.();
     }
 };
-window.getMasterPayload = function () {
-    return {
-        groups: window.groups || [],
-        uiSettings: window.getUiSettingsPayload(),
-        // v1 하위 호환 (구 서버가 읽을 경우 대비)
-        taskTypes: window.taskTypes || [],
-        coworkers: window.coworkers || [],
-        statuses: window.statuses || [],
-        equipments: window.equipments || [],
-        memoTags: window.memoTags || []
-    };
+// 화면 설정 쪽 변경 표시. 이것들만 바뀌었으면 groups(선택태그상자)는 서버로 보내지 않는다 —
+// 설정 하나 바꿨다고 이 기기의 groups 전체로 서버를 덮어쓰지 않게(오래된 기기에서 태그가 초기화되던 원인).
+const UI_ONLY_MASTER_IDS = ["uiSettings", "tagCompact", "cardTools", "geoRouteMarks"];
+window.masterDirtyHasGroups = function (dirtyMaster) {
+    if (!dirtyMaster) return true; // 알 수 없으면 예전처럼 함께 보낸다
+    return Object.keys(dirtyMaster).some(id => !UI_ONLY_MASTER_IDS.includes(id));
+};
+window.getMasterPayload = function (dirtyMaster = null) {
+    // clientVersion: 서버가 구버전 앱(화면 설정 덮어쓰기 버그)과 구분하는 표시
+    const payload = { clientVersion: 2, uiSettings: window.getUiSettingsPayload() };
+    if (window.masterDirtyHasGroups(dirtyMaster)) {
+        Object.assign(payload, {
+            groups: window.groups || [],
+            // v1 하위 호환 (구 서버가 읽을 경우 대비)
+            taskTypes: window.taskTypes || [],
+            coworkers: window.coworkers || [],
+            statuses: window.statuses || [],
+            equipments: window.equipments || [],
+            memoTags: window.memoTags || []
+        });
+    }
+    return payload;
 };
 
 window.getFullPayload = function () {
@@ -476,6 +487,7 @@ window.getFullPayload = function () {
     return {
         app: "work",
         version: 2,
+        clientVersion: 2,
         savedAt: stamp,
         syncUpdatedAt: stamp,
         data: {
@@ -494,6 +506,24 @@ window.getFullPayload = function () {
 };
 
 // ─── v2: 서버 데이터 적용 ───
+// 서버 값으로 덮어쓰기 직전, 이 기기의 선택태그상자가 서버 것보다 그룹·태그가 많으면 기기 안에 따로 보관한다.
+// (사고 뒤 아직 열지 않은 기기에 남아 있던 이전 선택태그상자를 복구 화면에서 되살릴 수 있게)
+window.backupLocalGroupsIfRicher = function (incomingGroups) {
+    try {
+        const local = (window.groups || []).filter(Boolean);
+        const count = groups => (groups || []).reduce((n, g) => n + ((g && Array.isArray(g.tags)) ? g.tags.filter(Boolean).length : 0), 0);
+        const custom = groups => (groups || []).filter(g => g && !["taskTypes", "coworkers", "statuses", "equipments", "memoTags", "duration"].includes(g.id)).length;
+        if (!Array.isArray(incomingGroups)) return;
+        if (count(local) <= count(incomingGroups) && custom(local) <= custom(incomingGroups)) return;
+        const list = JSON.parse(localStorage.getItem("wm_groups_local_backups") || "[]");
+        const json = JSON.stringify(local);
+        if (list.some(b => JSON.stringify(b.groups) === json)) return;
+        list.unshift({ at: new Date().toISOString(), groups: local, tags: count(local), customGroups: custom(local) });
+        localStorage.setItem("wm_groups_local_backups", JSON.stringify(list.slice(0, 5)));
+        console.warn("이 기기의 선택태그상자가 서버보다 많아 따로 보관함(설정 > 되돌리기 · 복구)");
+    } catch (e) { /* 보관 실패는 무시 */ }
+};
+
 window.applyServerData = function (data) {
     if (!data || !Array.isArray(data.logs)) return false;
 
@@ -504,6 +534,7 @@ window.applyServerData = function (data) {
 
         // v2: groups 우선, 없으면 v1 키에서 복원
         if (Array.isArray(data.groups) && data.groups.length > 0) {
+            window.backupLocalGroupsIfRicher(data.groups);
             window.groups = data.groups.filter(Boolean);
         } else {
             // v1 → 클라이언트 측 마이그레이션
@@ -514,6 +545,7 @@ window.applyServerData = function (data) {
         window.applyUiSettingsPayload(data.uiSettings);
 
         window.saveAllLocalOnly();
+        window.wmServerStampChecked = true;
     } finally {
         window.isApplyingServerData = false;
         window.isInitialLoad = false;
@@ -551,6 +583,7 @@ window.applyRemoteOperations = function (operations, master) {
         if (master) {
             // v2: groups 통합
             if (Array.isArray(master.groups) && master.groups.length > 0) {
+                window.backupLocalGroupsIfRicher(master.groups);
                 window.groups = master.groups.filter(Boolean);
                 window.ensureDefaultGroups && window.ensureDefaultGroups();
             } else {
@@ -662,6 +695,11 @@ window.saveFullSnapshot = async function () {
     );
 
     const text = await response.text();
+    if (response.status === 409) {
+        const err = new Error(`전체 저장 거부(서버 데이터 보호): ${text}`);
+        err.code = "shrink";
+        throw err;
+    }
     if (!response.ok) throw new Error(`전체 저장 실패: ${response.status} / ${text}`);
     const result = text ? JSON.parse(text) : {};
     console.log("전체 동기화 완료", { sizeMb: bodyMb.toFixed(2), uploadedImages });
@@ -679,7 +717,7 @@ window.saveDirtyPatch = async function (dirty) {
 
     const payload = {
         operations,
-        master: hasMasterChange ? window.getMasterPayload() : null
+        master: hasMasterChange ? window.getMasterPayload(dirty.master) : null
     };
 
     const response = await window.fetchWithTimeout(
@@ -695,6 +733,12 @@ window.saveDirtyPatch = async function (dirty) {
     const text = await response.text();
     if (!response.ok) throw new Error(`부분 저장 실패: ${response.status} / ${text}`);
     const result = text ? JSON.parse(text) : {};
+    if (result.groupsRejected) {
+        // 서버보다 태그가 크게 적은 groups라서 서버가 받지 않음 → 서버 값을 다시 받아온다
+        console.warn("서버가 선택태그상자 덮어쓰기를 거부함(이 기기 값이 오래됨) — 서버 값으로 맞춥니다");
+        window.needsFullPullAfterSync = true;
+        window.showWorkNavigationToast?.("이 기기의 선택태그상자가 오래돼서 서버 값으로 맞춥니다");
+    }
     console.log("부분 동기화 완료", { changedCards: operations.length, uploadedImages });
     return result;
 };
@@ -753,8 +797,18 @@ window.syncNow = async function (showError = false) {
     try {
         return await withSyncLock(async () => {
             // 잠금을 기다리는 동안 다른 탭이 이미 보냈을 수 있으니 다시 확인한다.
-            const dirty = window.getDirtyMap();
+            let dirty = window.getDirtyMap();
             if (Object.keys(dirty).length === 0) return null;
+            // 이번 실행에서 서버를 아직 확인하지 않았는데 설정·선택태그상자·전체 저장을 보내려 하면,
+            // 먼저 서버 마지막 저장 시각을 보고 그보다 오래된 표시는 버린다(오래된 기기가 덮어쓰는 사고 방지).
+            // 서버 확인이 실패하면(오프라인) 표시는 그대로 두고 이번 저장을 실패로 처리해 나중에 다시 시도한다.
+            if ((dirty.master || dirty.snapshot) && !window.wmServerStampChecked) {
+                const peek = await window.loadFromServer();
+                if (window.getServerData(peek)) window.dropStaleMasterDirty(window.getServerStamp(peek));
+                window.wmServerStampChecked = true;
+                dirty = window.getDirtyMap();
+                if (Object.keys(dirty).length === 0) return null;
+            }
             // 다른 탭이 저장한 카드가 이 탭 메모리에 없으면 전송에서 빠지거나(부분 저장),
             // 서버에서 지워질 수 있으므로(전체 저장) 보내기 직전에 합친다.
             if (window.mergeOtherTabsLocal()) window.refreshCurrentUI();
@@ -775,13 +829,26 @@ window.syncNow = async function (showError = false) {
             return result;
         });
     } catch (e) {
-        failed = true;
-        console.warn("서버 저장 실패, 로컬 변경사항 유지:", e);
-        if (showError) throw e;
+        if (e && e.code === "shrink") {
+            console.warn("서버가 이 기기의 오래된 전체 저장을 거부함 — 서버 값으로 맞춥니다", e);
+            const map = window.getDirtyMap();
+            delete map.snapshot;
+            delete map.master;
+            window.setDirtyMap(map);
+            window.needsFullPullAfterSync = true;
+            window.showWorkNavigationToast?.("이 기기 데이터가 서버보다 오래돼서 서버 값으로 맞춥니다");
+        } else {
+            failed = true;
+            console.warn("서버 저장 실패, 로컬 변경사항 유지:", e);
+        }
+        if (showError && failed) throw e;
         return null;
     } finally {
         window.syncInProgress = false;
-        if (failed) {
+        if (window.needsFullPullAfterSync && !window.hasDirtyChanges()) {
+            window.needsFullPullAfterSync = false;
+            window.reloadFromServerData?.();
+        } else if (failed) {
             // 실패하면 바로 반복하지 않고 잠시 뒤 다시 시도한다(새로 저장하거나 온라인이 되면 그때도 시도).
             window.pendingSyncAfterCurrent = false;
             clearTimeout(window.syncRetryTimer);
@@ -866,6 +933,42 @@ window.deleteFromLocalStore = function (collection, id) {
     }
     window.markDirty(collection, id, "delete");
     window.saveLocal(`${collection}:${id}:delete`, { skipSnapshotDirty: true });
+};
+
+// 이 기기에 남은 설정·선택태그상자(master)·전체 저장(snapshot) 변경 표시 중 서버 마지막 저장보다
+// 오래된 것은 버린다. 오래 안 쓴 기기를 열었을 때 그 기기의 낡은 값이 서버를 덮어쓰는 사고를 막는다.
+// (카드 하나하나의 변경 표시(logs/trash)는 항목별로 합쳐지므로 그대로 보낸다)
+window.dropStaleMasterDirty = function (serverStamp) {
+    if (!serverStamp) return 0;
+    const map = window.getDirtyMap();
+    let dropped = 0;
+    for (const col of ["master", "snapshot"]) {
+        const entries = map[col];
+        if (!entries) continue;
+        Object.keys(entries).forEach(id => {
+            if (String(entries[id]?.changedAt || "") < String(serverStamp)) { delete entries[id]; dropped++; }
+        });
+        if (!Object.keys(entries).length) delete map[col];
+    }
+    if (dropped) {
+        window.setDirtyMap(map);
+        console.warn(`서버가 더 최신이라 이 기기의 오래된 설정/전체 저장 표시 ${dropped}건을 버림`);
+    }
+    return dropped;
+};
+
+// 서버 전체 데이터를 다시 받아 그대로 적용(복구·거부 후 맞추기용)
+window.reloadFromServerData = async function () {
+    try {
+        const result = await window.loadFromServer();
+        const data = window.getServerData(result);
+        if (data && !window.hasDirtyChanges()) {
+            window.applyServerData(data);
+            window.setSyncStamp(window.getServerStamp(result));
+        }
+    } catch (e) {
+        console.warn("서버 데이터 다시 받기 실패:", e);
+    }
 };
 
 window.startSync = async function () {

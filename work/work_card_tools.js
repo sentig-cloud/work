@@ -1138,8 +1138,13 @@
     // ─── 시작 ───
     const init = () => {
         applySettings(false);
-        // 타스크 번호 묶기를 기본으로 켠다(한 번만 — 그 뒤 설정에서 끄면 그대로 유지)
-        if (!S.groupTaskNoOnV2) window.setCardToolsSettings({ groupByTaskNo: true, groupTaskNoOnV2: true });
+        // 주의: 여기(앱 시작)에서는 절대 서버로 보낼 변경 표시를 만들지 않는다.
+        // 예전에 여기서 설정을 저장했더니, 서버 데이터를 받기 전에 이 기기의 오래된 선택태그상자·레이아웃이
+        // 서버로 올라가 덮어쓰는 사고가 났다. 타스크 묶기 기본값은 DEFAULTS(groupByTaskNo: true)로 충분하다.
+        if (!S.groupTaskNoOnV2) {
+            S.groupByTaskNo = true; S.groupTaskNoOnV2 = true;
+            try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (_) {}
+        }
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();

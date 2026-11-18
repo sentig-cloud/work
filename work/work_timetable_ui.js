@@ -255,7 +255,7 @@
                         <button type="button" class="ws-menu-item is-new" data-go="labs"><i class="fa-solid fa-flask"></i><span><b>신규 기능</b><small>직접 만든 편의 기능 · 하나씩 켜고 끄기</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item" data-go="data"><i class="fa-solid fa-file-excel"></i><span><b>내보내기 · 백업</b><small>엑셀 내보내기 · ZIP 백업 · 백업 복원</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item" data-go="account"><i class="fa-solid fa-user-shield"></i><span><b>계정</b><small>접속 기록 · 계정 전환 · 로그아웃</small></span><em>›</em></button>
-                        <button type="button" class="ws-menu-item" data-go="reset"><i class="fa-solid fa-rotate-left"></i><span><b>되돌리기</b><small>이번에 추가된 화면 설정을 원래대로</small></span><em>›</em></button>
+                        <button type="button" class="ws-menu-item" data-go="reset"><i class="fa-solid fa-rotate-left"></i><span><b>되돌리기 · 복구</b><small>예전 모양 · 서버 기록에서 선택태그상자/카드 복구</small></span><em>›</em></button>
                     </nav>
 
                     <div class="tt-settings-group" data-page="main">
@@ -522,6 +522,10 @@
                         <div class="ws-desc ws-desc-box">화면 모양 설정(메인 화면 표시 형식·전체 누적·작업 카드 레이아웃·디자인·글자 크기·글꼴·신규 기능)을 예전 상태로 돌립니다. 복제·묶기·붙여넣기·스와이프 같은 동작 기능과 선택태그 상자 방식, 주간 시간표, 지도 설정은 그대로 둡니다. (메인 설정 버튼은 남겨 둡니다)</div>
                         <button type="button" class="w95-btn ws-wide-btn ws-danger" id="ttSettingsResetBtn">예전 모양으로 되돌리기</button>
                     </div>
+                    <div class="tt-settings-group" data-page="reset">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-life-ring"></i> 서버 기록에서 복구</div>
+                        <div id="wmRecoveryBox"></div>
+                    </div>
                     <div class="ws-empty" id="ttSettingsEmpty" hidden>찾는 설정이 없습니다.</div>
                 </div>
                 <div class="modal-footer ws-footer">
@@ -543,7 +547,7 @@
     }
 
     // ─── 설정 메뉴: 첫 화면은 메뉴 목록, 누르면 그 메뉴의 설정만, 검색하면 전체에서 찾기 ───
-    const SETTINGS_PAGE_TITLES = { menu:'메뉴 버튼', data:'내보내기 · 백업', main:'메인 화면', card:'작업 카드', input:'작업일지 입력', look:'화면 · 디자인', timetable:'주간 시간표', map:'지도 · 동선', auto:'자동 인식', labs:'신규 기능', account:'계정', reset:'되돌리기' };
+    const SETTINGS_PAGE_TITLES = { reset:'되돌리기 · 복구', menu:'메뉴 버튼', data:'내보내기 · 백업', main:'메인 화면', card:'작업 카드', input:'작업일지 입력', look:'화면 · 디자인', timetable:'주간 시간표', map:'지도 · 동선', auto:'자동 인식', labs:'신규 기능', account:'계정' };
     function showSettingsPage(page) {
         const modal = document.getElementById('ttSettingsModal');
         if (!modal) return;
@@ -595,6 +599,7 @@
             else if (act === 'import') window.triggerImport?.();
         });
         document.getElementById('ttSettingsSearch').addEventListener('input', e => filterSettings(e.target.value));
+        window.setupRecoveryBox?.();
         document.getElementById('ttSettingsResetBtn').addEventListener('click', () => {
             if (!confirm('화면 모양 설정을 예전 상태로 되돌릴까요?')) return;
             window.resetCardToolsLook?.();
@@ -748,6 +753,12 @@
 
         closeSettingsModal();
         if (active) { applyScaleClass(); renderWeek(); }
+        // 설정·레이아웃은 서버(uiSettings)가 기준이다 — 저장하면 바로 서버로 보내고 결과를 알려준다
+        if (window.hasDirtyChanges?.()) {
+            Promise.resolve(window.syncNow?.(true))
+                .then(() => window.showWorkNavigationToast?.('설정을 서버에 저장했습니다'))
+                .catch(() => window.showWorkNavigationToast?.('서버에 연결되지 않아, 연결되면 자동으로 저장합니다'));
+        }
     }
 
     // ─── 활성화/비활성화 ───
