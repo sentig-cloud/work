@@ -2063,3 +2063,12 @@ body.wm-ui-refresh .card-multi-select-bar .w95-btn { height: 36px; padding: 0 12
 .wm-task-group-head > b { white-space: nowrap; }
 .wm-task-group-count, .wm-task-group-other, .wm-task-group-toggle { white-space: nowrap; flex: 0 0 auto; }
 .wm-task-group-dates { white-space: normal; overflow: visible; }
+
+/* ─── 메인 윗줄: 버튼 8개(검색·휴지통·주간·사진 / ZIP 백업·복원·엑셀 내보내기·설정)가 화면 밖으로 밀려나지 않게 ─── */
+#mainHeader { flex-wrap: wrap; row-gap: 6px; column-gap: 6px; padding: 7px 8px; }
+#mainHeader .toolbar-group { gap: 4px; flex-wrap: wrap; }
+#mainHeader .icon-btn { width: 34px; height: 34px; font-size: 1.05rem; }
+.ws-data-btn { gap: 8px; justify-content: flex-start; padding: 0 12px; }
+@media (max-width: 339px) { #mainHeader { column-gap: 4px; padding: 6px; } #mainHeader .toolbar-group { gap: 3px; } #mainHeader .icon-btn { width: 32px; height: 32px; font-size: .98rem; } }
+/* 월 칸 통계: 숫자와 단위(0일, 0회)가 따로 꺾이지 않게 */
+body.wm-ui-refresh .m-stat { font-size: .72rem; letter-spacing: -0.02em; word-break: keep-all; }

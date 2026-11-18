@@ -252,6 +252,7 @@
                         <button type="button" class="ws-menu-item" data-go="map"><i class="fa-solid fa-route"></i><span><b>지도 · 동선</b><small>기본 지도 앱 · 동선 관리</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item" data-go="auto"><i class="fa-solid fa-camera"></i><span><b>자동 인식</b><small>출퇴근 사진 OCR</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item is-new" data-go="labs"><i class="fa-solid fa-flask"></i><span><b>신규 기능</b><small>직접 만든 편의 기능 · 하나씩 켜고 끄기</small></span><em>›</em></button>
+                        <button type="button" class="ws-menu-item" data-go="data"><i class="fa-solid fa-file-excel"></i><span><b>내보내기 · 백업</b><small>엑셀 내보내기 · ZIP 백업 · 백업 복원</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item" data-go="account"><i class="fa-solid fa-user-shield"></i><span><b>계정</b><small>접속 기록 · 계정 전환 · 로그아웃</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item" data-go="reset"><i class="fa-solid fa-rotate-left"></i><span><b>되돌리기</b><small>이번에 추가된 화면 설정을 원래대로</small></span><em>›</em></button>
                     </nav>
@@ -459,6 +460,22 @@
                         </div>
                     </div>
 
+                    <div class="tt-settings-group" data-page="data">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-file-excel"></i> 내보내기 · 백업</div>
+                        <div class="tt-settings-section">
+                            <button type="button" class="w95-btn ws-wide-btn ws-data-btn" data-data-act="export"><i class="fa-solid fa-file-excel" style="color:#10b981;"></i> 엑셀 내보내기</button>
+                            <div class="ws-desc">작업일지·출퇴근을 엑셀 파일로 내보냅니다. (메인 윗줄 초록 엑셀 버튼과 같음)</div>
+                        </div>
+                        <div class="tt-settings-section">
+                            <button type="button" class="w95-btn ws-wide-btn ws-data-btn" data-data-act="backup"><i class="fa-solid fa-file-arrow-down" style="color:#2563eb;"></i> ZIP 백업</button>
+                            <div class="ws-desc">기간을 골라 사진까지 ZIP으로 백업합니다.</div>
+                        </div>
+                        <div class="tt-settings-section">
+                            <button type="button" class="w95-btn ws-wide-btn ws-data-btn" data-data-act="import"><i class="fa-solid fa-file-import" style="color:#dc2626;"></i> 백업 복원</button>
+                            <div class="ws-desc">백업 파일(.json/.txt/.zip)을 불러와 복원합니다.</div>
+                        </div>
+                    </div>
+
                     <div class="tt-settings-group" data-page="account">
                         <div class="tt-settings-group-title"><i class="fa-solid fa-user-shield"></i> 계정</div>
                         <div class="tt-settings-section">
@@ -497,7 +514,7 @@
     }
 
     // ─── 설정 메뉴: 첫 화면은 메뉴 목록, 누르면 그 메뉴의 설정만, 검색하면 전체에서 찾기 ───
-    const SETTINGS_PAGE_TITLES = { main:'메인 화면', card:'작업 카드', input:'작업일지 입력', look:'화면 · 디자인', timetable:'주간 시간표', map:'지도 · 동선', auto:'자동 인식', labs:'신규 기능', account:'계정', reset:'되돌리기' };
+    const SETTINGS_PAGE_TITLES = { data:'내보내기 · 백업', main:'메인 화면', card:'작업 카드', input:'작업일지 입력', look:'화면 · 디자인', timetable:'주간 시간표', map:'지도 · 동선', auto:'자동 인식', labs:'신규 기능', account:'계정', reset:'되돌리기' };
     function showSettingsPage(page) {
         const modal = document.getElementById('ttSettingsModal');
         if (!modal) return;
@@ -539,6 +556,15 @@
             if (item) showSettingsPage(item.dataset.go);
         });
         document.getElementById('ttSettingsBackBtn').addEventListener('click', () => showSettingsPage(''));
+        // 내보내기 · 백업: 설정 창을 닫고 기존 기능을 그대로 연다
+        modal.addEventListener('click', e => {
+            const act = e.target.closest('[data-data-act]')?.dataset.dataAct;
+            if (!act) return;
+            closeSettingsModal();
+            if (act === 'export') { if (window.WorkExportUI) window.WorkExportUI.open(); else alert('내보내기 모듈이 로드되지 않았습니다.'); }
+            else if (act === 'backup') { if (window.openBackupDialog) window.openBackupDialog(); else alert('백업 기능을 불러오지 못했습니다.'); }
+            else if (act === 'import') window.triggerImport?.();
+        });
         document.getElementById('ttSettingsSearch').addEventListener('input', e => filterSettings(e.target.value));
         document.getElementById('ttSettingsResetBtn').addEventListener('click', () => {
             if (!confirm('화면 모양 설정을 예전 상태로 되돌릴까요?')) return;
