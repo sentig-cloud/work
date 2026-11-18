@@ -253,7 +253,7 @@
                         <button type="button" class="ws-menu-item" data-go="map"><i class="fa-solid fa-route"></i><span><b>지도 · 동선</b><small>기본 지도 앱 · 동선 관리</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item" data-go="auto"><i class="fa-solid fa-camera"></i><span><b>자동 인식</b><small>출퇴근 사진 OCR</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item is-new" data-go="labs"><i class="fa-solid fa-flask"></i><span><b>신규 기능</b><small>직접 만든 편의 기능 · 하나씩 켜고 끄기</small></span><em>›</em></button>
-                        <button type="button" class="ws-menu-item" data-go="data"><i class="fa-solid fa-file-excel"></i><span><b>내보내기 · 백업</b><small>엑셀 내보내기 · ZIP 백업 · 백업 복원</small></span><em>›</em></button>
+                        <button type="button" class="ws-menu-item" data-go="data"><i class="fa-solid fa-file-excel"></i><span><b>내보내기 · 백업</b><small>서버 백업(전체·설정) · 백업 보기 · 엑셀 · ZIP</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item" data-go="account"><i class="fa-solid fa-user-shield"></i><span><b>계정</b><small>접속 기록 · 계정 전환 · 로그아웃</small></span><em>›</em></button>
                         <button type="button" class="ws-menu-item" data-go="reset"><i class="fa-solid fa-rotate-left"></i><span><b>되돌리기 · 복구</b><small>예전 모양 · 서버 기록에서 선택태그상자/카드 복구</small></span><em>›</em></button>
                     </nav>
@@ -490,6 +490,10 @@
                     </div>
 
                     <div class="tt-settings-group" data-page="data">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-server"></i> 서버 백업 (전체 · 설정)</div>
+                        <div id="wmBackupBox"></div>
+                    </div>
+                    <div class="tt-settings-group" data-page="data">
                         <div class="tt-settings-group-title"><i class="fa-solid fa-file-excel"></i> 내보내기 · 백업</div>
                         <div class="tt-settings-section">
                             <button type="button" class="w95-btn ws-wide-btn ws-data-btn" data-data-act="export"><i class="fa-solid fa-file-excel" style="color:#10b981;"></i> 엑셀 내보내기</button>
@@ -600,6 +604,7 @@
         });
         document.getElementById('ttSettingsSearch').addEventListener('input', e => filterSettings(e.target.value));
         window.setupRecoveryBox?.();
+        window.setupBackupBox?.();
         document.getElementById('ttSettingsResetBtn').addEventListener('click', () => {
             if (!confirm('화면 모양 설정을 예전 상태로 되돌릴까요?')) return;
             window.resetCardToolsLook?.();
