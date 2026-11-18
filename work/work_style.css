@@ -1732,8 +1732,8 @@ body.is-card-duplicating #calBody td[data-day]:active { background: #fde68a !imp
 .wm-task-group-count { background: #000080; color: #fff; padding: 0 6px; font-weight: bold; }
 .wm-task-group-dates { color: #475569; font-size: .72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .wm-task-group-toggle { margin-left: auto; font-size: .72rem; color: #334155; white-space: nowrap; }
-.wm-task-group:not(.is-open) > .log-card:not(:nth-child(2)) { display: none; }
-.wm-task-group:not(.is-open) > .log-card:nth-child(2) {
+.wm-task-group:not(.is-open) > :not(.wm-task-group-head):not(.wm-task-group-first) { display: none; }
+.wm-task-group:not(.is-open) > .log-card.wm-task-group-first {
     box-shadow: 4px 4px 0 -1px #f8fafc, 4px 4px 0 1px #808080, 8px 8px 0 -1px #f8fafc, 8px 8px 0 1px #808080;
     margin-right: 8px;
 }
@@ -1960,7 +1960,7 @@ body.wm-main-gear .wm-main-gear-btn { display: inline-flex; }
 }
 #calBody td.wm-cal-today { outline: 3px solid #f59e0b; outline-offset: -3px; }
 #calBody td.wm-cal-today::after {
-    content: "오늘"; position: absolute; left: 2px; bottom: 1px; font-size: .58rem; font-weight: 900; color: #b45309;
+    content: "오늘"; position: absolute; right: 4px; top: 3px; font-size: .58rem; font-weight: 900; color: #b45309;
 }
 body.wm-big-touch .w95-btn { min-height: 40px; }
 body.wm-big-touch .layout-tag-button, body.wm-big-touch .tag-chip, body.wm-big-touch .tag-swipe-chip { min-height: 40px; font-size: .95rem; }
@@ -1999,13 +1999,12 @@ body.wm-ui-refresh .card-multi-select-bar .w95-btn { height: 36px; padding: 0 12
 
 /* ─── 달력 위 버튼 줄: [월(뒤로)] [주간] [사진 넣기] [글 넣기] ─── */
 .pop-nav-tools { display: flex; align-items: center; gap: 6px; }
-.pop-title.pop-title-back {
-    margin: 0 4px 0 0; padding: 0 8px 0 4px; height: 34px; display: inline-flex; align-items: center;
-    touch-action: manipulation; user-select: none; -webkit-user-select: none;
-    border: 2px solid; border-color: var(--w-white) var(--w-black) var(--w-black) var(--w-white); background: var(--w-gray);
+/* "11월"은 버튼이 아니라 글자만: 누르면 월 목록으로, 길게 누르면 강제 동기화 */
+#popupLayer .pop-title.pop-title-back {
+    flex: 0 0 auto; margin: 0 2px 0 0; padding: 0 4px; height: 32px; display: inline-flex; align-items: center;
+    font-size: 1.3rem; font-weight: 900; touch-action: manipulation; user-select: none; -webkit-user-select: none;
 }
-.pop-title.pop-title-back::before { content: "\2039"; font-size: 1.5rem; line-height: 1; margin-right: 4px; color: #334155; }
-.pop-title.pop-title-back:active { border-color: var(--w-black) var(--w-white) var(--w-white) var(--w-black); }
+#popupLayer .pop-title.pop-title-back:active { opacity: .6; }
 
 /* ─── 글 넣기 창 ─── */
 #textImportModal .ti-box { max-width: 460px; height: min(90dvh, 820px); max-height: none; }
@@ -2035,3 +2034,32 @@ body.wm-ui-refresh .card-multi-select-bar .w95-btn { height: 36px; padding: 0 12
 .ti-footer .w95-btn { flex: 1; height: 40px; font-weight: bold; font-size: 1rem; }
 .ti-footer .ti-go { flex: 2; color: var(--w-blue); }
 .ti-footer .ti-go:disabled { color: #94a3b8; }
+
+/* ─── 달력 위 줄: 겹치거나 잘리는 글 없이 한 줄에 (간격·버튼을 줄이고, 통계 글씨는 줄이지 않고 다 보이게) ─── */
+#popupLayer .pop-nav { gap: 4px; overflow: hidden; padding: 5px 6px; justify-content: space-between; }
+#popupLayer .pop-nav-tools { flex: 0 1 auto; min-width: 0; gap: 3px; }
+#popupLayer .pop-nav .icon-btn { flex: 0 0 auto; width: 32px; height: 32px; font-size: .95rem; margin: 0 !important; padding: 0; }
+#popupLayer .pop-title.pop-title-back { font-size: 1.2rem; padding: 0 3px; margin: 0 1px 0 0; }
+#popupLayer .pop-nav-stats { flex: 0 0 auto; justify-content: flex-end; gap: 3px; }
+#popupLayer .pop-month-summary { flex: 0 0 auto; overflow: visible; align-items: flex-end; max-height: none; line-height: 1.1; }
+#popupLayer .pop-month-summary > span { white-space: nowrap; }
+#popupLayer .pop-month-summary > span:first-child { font-size: .72rem; }
+#popupLayer .pop-nav-stats b { font-size: .84rem; margin-left: 1px; }
+#popupLayer .pop-commute-ot { font-size: .62rem; letter-spacing: -0.02em; }
+/* 아주 좁은 화면(340px 미만)에서는 버튼을 조금 더 줄인다 */
+@media (max-width: 339px) {
+    #popupLayer .pop-nav .icon-btn { width: 29px; height: 30px; font-size: .88rem; }
+    #popupLayer .pop-title.pop-title-back { font-size: 1.08rem; }
+    #popupLayer .pop-month-summary > span:first-child { font-size: .68rem; }
+}
+
+/* 묶음 안 다른 날짜 카드: 날짜 띠 + 살짝 흐리게 */
+.wm-task-group-other { background: #b45309; color: #fff; padding: 0 5px; font-size: .7rem; font-weight: bold; white-space: nowrap; }
+.wm-task-other-date { margin: 6px 0 2px; padding: 1px 8px; display: inline-block; font-size: .74rem; font-weight: 900; color: #fff; background: #475569; }
+.wm-task-group.is-open > .log-card.wm-task-other-card { border-left-color: #94a3b8; opacity: .88; }
+
+/* 묶음 머리줄: 글자가 꺾이거나 잘리지 않게 */
+.wm-task-group-head { gap: 5px; height: auto; min-height: 30px; flex-wrap: wrap; row-gap: 2px; padding: 3px 8px; }
+.wm-task-group-head > b { white-space: nowrap; }
+.wm-task-group-count, .wm-task-group-other, .wm-task-group-toggle { white-space: nowrap; flex: 0 0 auto; }
+.wm-task-group-dates { white-space: normal; overflow: visible; }

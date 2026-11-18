@@ -14,7 +14,7 @@
     const DEFAULTS = {
         cardLayout: 'default',
         duplicate: true,
-        groupByTaskNo: false,
+        groupByTaskNo: true,
         doubleTapPaste: true,
         swipeLongExclude: true,
         swipeTitleExclude: true,
@@ -35,7 +35,6 @@
         labCalToday: true,
         labBigTouch: false,
         // 글 넣기
-        importJoinTarget: 'note',   // note | content | none
         importSkipDup: true
     };
     // "되돌리기"로 돌아갈 예전 모양(동작 기능은 건드리지 않는다)
@@ -218,7 +217,20 @@
     const openTaskGroups = new Set();
     const normTaskNo = v => String(v || '').replace(/\s+/g, '');
 
-    function groupCardsIn(list) {
+    const dateKeyOf = l => `${l.y}-${String(l.m).padStart(2, '0')}-${String(l.d).padStart(2, '0')}`;
+    const currentDateKey = () => dateKeyOf({ y: window.currentYear, m: window.curMonth, d: window.curDay });
+    const dateLabelOf = l => `${Number(l.y) !== Number(window.currentYear) ? `${l.y}년 ` : ''}${l.m}/${l.d}(${'일월화수목금토'[new Date(l.y, l.m - 1, l.d).getDay()]})`;
+    // 그 날짜 안에서의 작업 순번(카드의 No.)
+    const dayIndexOf = l => {
+        const same = (window.logs || []).filter(x => x && x.cat === 'work' && x.y === l.y && x.m === l.m && x.d === l.d)
+            .sort((a, b) => String(a.workTime || a.time || '').localeCompare(String(b.workTime || b.time || '')));
+        return same.findIndex(x => String(x.id) === String(l.id)) + 1 || '';
+    };
+
+    // 타스크 번호(=받는 글의 가입번호)가 같은 작업 카드를 한 묶음으로.
+    // - 보고 있는 날짜의 카드가 맨 앞, 그 뒤로 다른 날짜 카드(최근 날짜부터)
+    // - otherDays: 목록에 없는 다른 날짜의 같은 타스크 카드도 묶음 안에 불러온다(날짜 목록용)
+    function groupCardsIn(list, { otherDays = false } = {}) {
         if (!list || !S.groupByTaskNo) return;
         const groups = new Map();
         list.querySelectorAll(':scope > .log-card[data-log-cat="work"]').forEach(card => {
@@ -227,20 +239,36 @@
             if (!groups.has(key)) groups.set(key, []);
             groups.get(key).push(card);
         });
+        const today = currentDateKey();
+        const byRecent = (a, b) => dateKeyOf(b).localeCompare(dateKeyOf(a)) || String(a.workTime || '').localeCompare(String(b.workTime || ''));
         groups.forEach((cards, key) => {
-            if (cards.length < 2) return;
+            const shown = new Set(cards.map(c => String(c.dataset.logId)));
+            const extra = otherDays
+                ? (window.logs || []).filter(l => l && l.cat === 'work' && normTaskNo(l.taskNo) === key && !shown.has(String(l.id))).sort(byRecent)
+                : [];
+            const total = cards.length + extra.length;
+            if (total < 2) return;
+            // 보고 있는 날짜 먼저, 나머지는 최근 날짜부터
+            cards.sort((a, b) => {
+                const la = logById(a.dataset.logId), lb = logById(b.dataset.logId);
+                const ca = la && dateKeyOf(la) === today ? 1 : 0, cb = lb && dateKeyOf(lb) === today ? 1 : 0;
+                return (cb - ca) || (la && lb ? byRecent(la, lb) : 0);
+            });
             const wrap = document.createElement('div');
             wrap.className = 'wm-task-group';
             wrap.dataset.taskNo = key;
             const head = document.createElement('button');
             head.type = 'button';
             head.className = 'w95-btn wm-task-group-head';
-            const dates = [...new Set(cards.map(c => { const l = logById(c.dataset.logId); return l ? `${l.m}/${l.d}` : ''; }).filter(Boolean))];
+            const allLogs = [...cards.map(c => logById(c.dataset.logId)).filter(Boolean), ...extra];
+            const dates = [...new Set(allLogs.map(l => `${l.m}/${l.d}`))];
             const paint = () => {
                 const isOpen = openTaskGroups.has(key);
                 wrap.classList.toggle('is-open', isOpen);
-                head.innerHTML = `<i class="fa-solid fa-layer-group"></i><b>${esc(key)}</b><span class="wm-task-group-count">${cards.length}건</span>`
-                    + (dates.length > 1 ? `<span class="wm-task-group-dates">${esc(dates.join(' · '))}</span>` : '')
+                head.innerHTML = `<i class="fa-solid fa-layer-group"></i><b>${esc(key)}</b><span class="wm-task-group-count">${total}건</span>`
+                    + (extra.length ? `<span class="wm-task-group-other">다른 날 ${extra.length}</span>` : '')
+                    // 다른 날짜는 묶음 안의 날짜 띠로 보여주므로, 다른 날짜를 불러오지 않는 목록(검색)에서만 날짜를 나열한다
+                    + (!extra.length && dates.length > 1 ? `<span class="wm-task-group-dates">${esc(dates.join(' · '))}</span>` : '')
                     + `<span class="wm-task-group-toggle">${isOpen ? '접기 ▴' : '펼치기 ▾'}</span>`;
             };
             head.addEventListener('click', e => {
@@ -250,7 +278,14 @@
             });
             paint();
             cards[0].before(wrap);
+            cards[0].classList.add('wm-task-group-first');
             wrap.append(head, ...cards);
+            if (extra.length) {
+                const holder = document.createElement('div');
+                holder.innerHTML = extra.map(l => `<div class="wm-task-other-date">${esc(dateLabelOf(l))}</div>${window.getLogCardHtml(l, dayIndexOf(l))}`).join('');
+                holder.querySelectorAll(':scope > .log-card').forEach(c => c.classList.add('wm-task-other-card'));
+                wrap.append(...holder.childNodes);
+            }
         });
     }
 
@@ -258,7 +293,7 @@
     if (typeof origUpdateUI === 'function') {
         window.updateUI = (...args) => {
             const result = origUpdateUI(...args);
-            groupCardsIn(document.getElementById('logList'));
+            groupCardsIn(document.getElementById('logList'), { otherDays: true });
             markNextJob();
             return result;
         };
@@ -837,7 +872,11 @@
     }
 
     // ─── 시작 ───
-    const init = () => { applySettings(false); };
+    const init = () => {
+        applySettings(false);
+        // 타스크 번호 묶기를 기본으로 켠다(한 번만 — 그 뒤 설정에서 끄면 그대로 유지)
+        if (!S.groupTaskNoOnV2) window.setCardToolsSettings({ groupByTaskNo: true, groupTaskNoOnV2: true });
+    };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
 })();

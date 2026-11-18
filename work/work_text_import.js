@@ -6,12 +6,11 @@
 //   [1]                                  ← 건 구분
 //   이름: 김태훈
 //   주소: 경상남도 통영시 무전동 1034-3 로운빌딩 1층
-//   가입번호: 530068007941
+//   가입번호: 530068007941              ← 실제로는 타스크 번호(12자리)
 //   타스크 번호: (없음)
 //   TLI 번호: TLI-261113-003857
 // - 여러 글을 이어 붙여도 되고, [n] 없이 "이름:"이 다시 나오면 새 건으로 본다.
-// - TLI 번호는 작업내용 맨 앞, 이름→고객명, 주소→주소, 타스크 번호→타스크 번호.
-// - 가입번호는 설정(작업일지 입력 > 글 넣기)에 따라 특이사항/작업내용/넣지 않음.
+// - 이름→고객명, 주소→주소, 가입번호/타스크 번호→타스크 번호(먼저 나온 값), TLI 번호→작업내용 맨 앞.
 // - 그 밖의 "항목: 값" 줄과 형식 밖 줄은 특이사항에 붙인다.
 // - 추출앱 연동: 주소 뒤에 #import=<글을 encodeURIComponent 한 값> 을 붙여 열면 이 창이 그 글로 열린다.
 
@@ -23,17 +22,19 @@
 
     // ─── 파싱 ───
     const KEY_MAP = [
-        [/^(이름|고객명|고객|성명|성함)$/, 'name'],
+        // "이름", "가입자", "이름가입자", "이름(가입자)", "가입자명" 등 → 고객명
+        [/^(이름|고객명?|성명|성함|가입자(명|이름)?|이름가입자|가입자이름|고객이름)$/, 'name'],
         [/^주소$/, 'address'],
-        [/^가입(번호|no)?$/, 'join'],
-        [/^(타스크|task)(번호|no)?$/, 'taskNo'],
+        // 받는 글의 "가입번호"는 실제로 타스크 번호(12자리)다
+        [/^(가입|타스크|task)(번호|no)?$/, 'taskNo'],
         [/^tli(번호|no)?$/, 'tli'],
         [/^(연락처|전화|전화번호|휴대폰|핸드폰)$/, 'phone'],
         [/^(작업내용|내용|메모)$/, 'content'],
         [/^(시간|방문시간|작업시간)$/, 'time']
     ];
     const keyOf = label => {
-        const k = String(label).replace(/\s+/g, '').toLowerCase();
+        // 띄어쓰기·괄호·기호는 빼고 비교한다: "이름(가입자)" → "이름가입자"
+        const k = String(label).replace(/[\s()[\]{}<>/·・,._-]+/g, '').toLowerCase();
         return KEY_MAP.find(([re]) => re.test(k))?.[1] || null;
     };
     const isEmptyValue = v => /^\(?\s*(없음|미정|해당없음|-|n\/a)?\s*\)?$/i.test(String(v).trim());
@@ -41,7 +42,7 @@
     window.parseWorkImportText = text => {
         const entries = [];
         let cur = null;
-        const start = () => { cur = { name: '', address: '', join: '', taskNo: '', tli: '', phone: '', content: '', time: '', extra: [] }; entries.push(cur); };
+        const start = () => { cur = { name: '', address: '', taskNo: '', tli: '', phone: '', content: '', time: '', extra: [] }; entries.push(cur); };
         String(text || '').replace(/\r/g, '').split('\n').forEach(raw => {
             const line = raw.replace(/ /g, ' ').trim();
             if (!line) return;
@@ -52,19 +53,18 @@
             const key = keyOf(m[1]);
             const value = isEmptyValue(m[2]) ? '' : m[2].trim();
             if (!cur || (key && key !== 'extra' && cur[key] && key === 'name')) start();
-            if (key) cur[key] = cur[key] ? `${cur[key]} ${value}`.trim() : value;
+            if (key === 'taskNo') { if (!cur.taskNo) cur.taskNo = value; } // 가입번호·타스크 번호 중 먼저 나온 값
+            else if (key) cur[key] = cur[key] ? `${cur[key]} ${value}`.trim() : value;
             else if (value) cur.extra.push(`${m[1].trim()}: ${value}`);
         });
-        return entries.filter(e => e.name || e.address || e.join || e.tli || e.taskNo);
+        return entries.filter(e => e.name || e.address || e.tli || e.taskNo);
     };
 
     // ─── 작업일지로 바꾸기 ───
     function toLog(e, y, m, d, fallbackTime, id) {
-        const target = opt().importJoinTarget || 'note';
-        const joinText = e.join ? `가입번호 ${e.join}` : '';
         const tli = (e.tli || '').replace(/\s+/g, '');
-        const contentParts = [tli, target === 'content' ? joinText : '', e.content].filter(Boolean);
-        const noteParts = [target === 'note' ? joinText : '', e.phone ? `연락처 ${e.phone}` : '', ...e.extra].filter(Boolean);
+        const contentParts = [tli, e.content].filter(Boolean);
+        const noteParts = [e.phone ? `연락처 ${e.phone}` : '', ...e.extra].filter(Boolean);
         const time = /^\d{1,2}:\d{2}/.test(e.time) ? e.time.replace(/^(\d):/, '0$1:').slice(0, 5) : fallbackTime;
         const sameDayDuty = (window.logs || []).some(l => l && l.cat === 'work' && l.y === y && l.m === m && l.d === d && l.isDuty);
         return {
@@ -92,13 +92,13 @@
         };
     }
 
-    // 같은 날짜에 이미 같은 작업이 있는지(가입번호·TLI 또는 고객명+주소)
+    // 같은 날짜에 이미 같은 작업이 있는지(타스크 번호·TLI 또는 고객명+주소)
     function findDuplicate(e, y, m, d) {
         const norm = v => String(v || '').replace(/\s+/g, '');
         return (window.logs || []).find(l => {
             if (!l || l.cat !== 'work' || l.y !== y || l.m !== m || l.d !== d) return false;
             const text = norm(`${l.content || ''} ${l.note || ''}`);
-            if (e.join && text.includes(norm(e.join))) return true;
+            if (e.taskNo && norm(l.taskNo) === norm(e.taskNo)) return true;
             if (e.tli && text.includes(norm(e.tli))) return true;
             return !!e.name && !!e.address && norm(l.customerName) === norm(e.name) && norm(l.address) === norm(e.address);
         });
@@ -126,7 +126,7 @@
                         <button type="button" class="w95-btn" data-act="clip"><i class="fa-solid fa-paste"></i> 클립보드에서</button>
                         <button type="button" class="w95-btn" data-act="clear">지우기</button>
                     </div>
-                    <textarea id="tiText" class="w95-in" spellcheck="false" placeholder="[업무보조] 11/17 · 2건&#10;&#10;[1]&#10;이름: 홍길동&#10;주소: 경남 통영시 ...&#10;가입번호: 5300...&#10;타스크 번호: (없음)&#10;TLI 번호: TLI-261113-003857&#10;&#10;여러 글을 이어 붙여도 됩니다."></textarea>
+                    <textarea id="tiText" class="w95-in" spellcheck="false" placeholder="[업무보조] 11/17 · 2건&#10;&#10;[1]&#10;이름: 홍길동&#10;주소: 경남 통영시 ...&#10;가입번호(타스크): 5300...&#10;타스크 번호: (없음)&#10;TLI 번호: TLI-261113-003857&#10;&#10;여러 글을 이어 붙여도 됩니다."></textarea>
                     <div class="ti-list-head"><b id="tiCount">인식된 작업 0건</b><label><input type="checkbox" id="tiAll" checked> 전체 선택</label></div>
                     <div id="tiList" class="ti-list"></div>
                 </div>
@@ -178,7 +178,7 @@
             const dup = date ? findDuplicate(e, date.y, date.m, date.d) : null;
             const lines = [
                 e.address ? `<span class="ti-addr">${esc(e.address)}</span>` : '',
-                [e.tli ? `<span class="ti-tli">${esc(e.tli)}</span>` : '', e.join ? `가입 ${esc(e.join)}` : '', e.taskNo ? `타스크 ${esc(e.taskNo)}` : ''].filter(Boolean).join(' · '),
+                [e.tli ? `<span class="ti-tli">${esc(e.tli)}</span>` : '', e.taskNo ? `타스크 ${esc(e.taskNo)}` : ''].filter(Boolean).join(' · '),
                 e.extra.length ? `<span class="ti-extra">+ ${esc(e.extra.join(' / '))}</span>` : ''
             ].filter(Boolean).map(t => `<div>${t}</div>`).join('');
             return `<label class="ti-item${dup ? ' is-dup' : ''}"><input type="checkbox" data-idx="${i}" ${dup && skipDup ? '' : 'checked'}>

@@ -300,7 +300,7 @@
                         </div>
                         <div class="tt-settings-section">
                             <div class="tt-settings-label">같은 카드 묶기</div>
-                            <label class="tt-settings-check"><input type="checkbox" id="ttOptCardGroupTaskNo"> 타스크 번호가 같은 카드를 한 묶음으로</label>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptCardGroupTaskNo"> 타스크 번호(가입번호)가 같은 카드를 한 묶음으로 <small>다른 날짜 카드도 함께 묶고, 보고 있는 날짜 카드를 맨 앞에</small></label>
                         </div>
                     </div>
 
@@ -332,17 +332,9 @@
                     </div>
                     <div class="tt-settings-group" data-page="input">
                         <div class="tt-settings-group-title"><i class="fa-solid fa-file-lines"></i> 글 넣기 (받은 작업 글 일괄 등록)</div>
-                        <div class="ws-desc ws-desc-box">달력 위 <b>글 넣기</b> 버튼 → 날짜 지정 → 받은 글 붙여넣기 → 넣기. 제목 줄은 빼고, 이름→고객명, 주소→주소, 타스크 번호→타스크 번호, TLI 번호→작업내용 맨 앞에 들어갑니다.</div>
+                        <div class="ws-desc ws-desc-box">달력 위 <b>글 넣기</b> 버튼 → 날짜 지정 → 받은 글 붙여넣기 → 넣기. 제목 줄은 빼고, 이름→고객명, 주소→주소, 가입번호(12자리)·타스크 번호→타스크 번호, TLI 번호→작업내용 맨 앞에 들어갑니다.</div>
                         <div class="tt-settings-section">
-                            <div class="tt-settings-label">가입번호를 넣을 칸</div>
-                            <div class="ws-seg">
-                                <label><input type="radio" name="ttImportJoin" id="ttOptImportJoinNote" value="note"><span>특이사항</span></label>
-                                <label><input type="radio" name="ttImportJoin" id="ttOptImportJoinContent" value="content"><span>작업내용</span></label>
-                                <label><input type="radio" name="ttImportJoin" id="ttOptImportJoinNone" value="none"><span>넣지 않음</span></label>
-                            </div>
-                        </div>
-                        <div class="tt-settings-section">
-                            <label class="tt-settings-check"><input type="checkbox" id="ttOptImportSkipDup"> 같은 날짜에 이미 있는 작업은 처음부터 선택 해제 <small>가입번호·TLI 번호, 또는 고객명+주소가 같으면 "이미 있음"</small></label>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptImportSkipDup"> 같은 날짜에 이미 있는 작업은 처음부터 선택 해제 <small>타스크 번호·TLI 번호, 또는 고객명+주소가 같으면 "이미 있음"</small></label>
                         </div>
                     </div>
 
@@ -571,7 +563,6 @@
         radio('ttMainCols', c.mainCols, 'auto');
         radio('ttFontScale', c.fontScale, 'normal');
         radio('ttFontFamily', c.fontFamily, 'classic');
-        radio('ttImportJoin', c.importJoinTarget, 'note');
         check('ttOptImportSkipDup', c.importSkipDup !== false);
         check('ttOptCardDuplicate', c.duplicate !== false);
         check('ttOptCardGroupTaskNo', c.groupByTaskNo);
@@ -597,7 +588,6 @@
             mainCols: val('ttMainCols', 'auto'),
             fontScale: val('ttFontScale', 'normal'),
             fontFamily: val('ttFontFamily', 'classic'),
-            importJoinTarget: val('ttImportJoin', 'note'),
             importSkipDup: on('ttOptImportSkipDup'),
             duplicate: on('ttOptCardDuplicate'),
             groupByTaskNo: on('ttOptCardGroupTaskNo'),
