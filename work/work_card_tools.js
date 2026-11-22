@@ -61,6 +61,27 @@
     };
 
     window.getCardToolsSettings = () => ({ ...S });
+    window.copyCardField = async (event, id, field) => {
+        const names = { address: ['copyAddress', '주소'], note: ['copyNote', '특이사항'], content: ['copyContent', '작업내용'], customerName: ['copyCustomer', '고객명'] };
+        const entry = names[field];
+        const value = logById(id)?.[field];
+        if (!entry || !S[entry[0]] || !value) return;
+        event.stopPropagation();
+        const holder = document.createElement('div');
+        holder.innerHTML = String(value).replace(/<br\s*\/?\s*>/gi, '\n');
+        const text = holder.textContent || '';
+        try {
+            if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text);
+            else {
+                const input = document.createElement('textarea');
+                input.value = text; input.style.position = 'fixed'; input.style.opacity = '0';
+                document.body.appendChild(input); input.select();
+                const ok = document.execCommand('copy'); input.remove();
+                if (!ok) throw new Error('copy failed');
+            }
+            toast(`${entry[1]}을(를) 복사했습니다.`);
+        } catch (_) { alert('복사하지 못했습니다. 클립보드 권한을 확인하세요.'); }
+    };
     window.setCardToolsSettings = (next = {}) => {
         const prev = JSON.stringify(S);
         S = { ...S, ...next };
@@ -338,10 +359,10 @@
         const types = ex('taskTypes') ? [] : withQty('taskTypes', String(l.taskType || '').split(', ').filter(Boolean));
         const typeHtml = types.map(t => `<span class="wmc-type">${esc(t)}</span>`).join('');
         // 고객명/주소/내용/특이사항은 기존 카드와 같이 저장된 그대로 넣는다(기존 기록의 줄바꿈 태그 유지)
-        const customer = l.customerName ? `<span class="wmc-customer"><i class="fa-solid fa-user"></i>${l.customerName}</span>` : '';
-        const addr = l.address ? `<div class="wmc-addr"><i class="fa-solid fa-location-dot"></i><span>${l.address}</span></div>` : '';
-        const content = l.content ? `<div class="wmc-content">${l.content}</div>` : '';
-        const note = l.note ? `<div class="wmc-note"><i class="fa-solid fa-triangle-exclamation"></i> ${l.note}</div>` : '';
+        const customer = l.customerName ? `<span class="wmc-customer" onclick="window.copyCardField(event, '${id}', 'customerName')"><i class="fa-solid fa-user"></i>${l.customerName}</span>` : '';
+        const addr = l.address ? `<div class="wmc-addr" onclick="window.copyCardField(event, '${id}', 'address')"><i class="fa-solid fa-location-dot"></i><span>${l.address}</span></div>` : '';
+        const content = l.content ? `<div class="wmc-content" onclick="window.copyCardField(event, '${id}', 'content')">${l.content}</div>` : '';
+        const note = l.note ? `<div class="wmc-note" onclick="window.copyCardField(event, '${id}', 'note')"><i class="fa-solid fa-triangle-exclamation"></i> ${l.note}</div>` : '';
 
         const meta = [];
         if (!ex('coworkers') && (l.coworkers || []).length) meta.push(['fa-user-group', withQty('coworkers', l.coworkers).join(', ')]);
@@ -373,7 +394,7 @@
         if (mode === 'mini') {
             const title = [types.join(', '), l.customerName ? String(l.customerName).replace(/<[^>]*>/g, '') : ''].filter(Boolean).join(' · ');
             const sub = l.address ? String(l.address).replace(/<[^>]*>/g, '') : '';
-            return `${open}<div class="wmc-head">${no}${time}${status}${alerts}<span class="wmc-mini-text"><b>${esc(title || '작업')}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</span>${taskNo}${del}</div></div>`;
+            return `${open}<div class="wmc-head">${no}${time}${status}${alerts}<span class="wmc-mini-text"><b>${esc(title || '작업')}</b>${sub ? `<small onclick="window.copyCardField(event, '${id}', 'address')">${esc(sub)}</small>` : ''}</span>${taskNo}${del}</div></div>`;
         }
         if (mode === 'timeline') {
             return `${open}<div class="wmc-rail">${time}${no}${date}</div>

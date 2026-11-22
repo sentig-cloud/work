@@ -304,6 +304,13 @@
                             <div class="tt-settings-label">같은 카드 묶기</div>
                             <label class="tt-settings-check"><input type="checkbox" id="ttOptCardGroupTaskNo"> 타스크 번호(가입번호)가 같은 카드를 한 묶음으로 <small>다른 날짜 카드도 함께 묶고, 보고 있는 날짜 카드를 맨 앞에</small></label>
                         </div>
+                        <div class="tt-settings-section">
+                            <div class="tt-settings-label">카드에서 눌러 복사할 영역</div>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptCopyAddress"> 주소</label>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptCopyNote"> 특이사항</label>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptCopyContent"> 작업내용</label>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptCopyCustomer"> 고객명</label>
+                        </div>
                     </div>
 
                     <div class="tt-settings-group" data-page="input">
@@ -631,6 +638,10 @@
         check('ttOptImportSkipDup', c.importSkipDup !== false);
         check('ttOptCardDuplicate', c.duplicate !== false);
         check('ttOptCardGroupTaskNo', c.groupByTaskNo);
+        check('ttOptCopyAddress', c.copyAddress);
+        check('ttOptCopyNote', c.copyNote);
+        check('ttOptCopyContent', c.copyContent);
+        check('ttOptCopyCustomer', c.copyCustomer);
         check('ttOptDoubleTapPaste', c.doubleTapPaste !== false);
         check('ttOptSwipeLongExclude', c.swipeLongExclude !== false);
         check('ttOptSwipeTitleExclude', c.swipeTitleExclude !== false);
@@ -656,6 +667,10 @@
             importSkipDup: on('ttOptImportSkipDup'),
             duplicate: on('ttOptCardDuplicate'),
             groupByTaskNo: on('ttOptCardGroupTaskNo'),
+            copyAddress: on('ttOptCopyAddress'),
+            copyNote: on('ttOptCopyNote'),
+            copyContent: on('ttOptCopyContent'),
+            copyCustomer: on('ttOptCopyCustomer'),
             doubleTapPaste: on('ttOptDoubleTapPaste'),
             swipeLongExclude: on('ttOptSwipeLongExclude'),
             swipeTitleExclude: on('ttOptSwipeTitleExclude'),

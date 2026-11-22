@@ -24,6 +24,7 @@
     // 위에서부터 차례로 본다. 번호·주소·연락처를 먼저 걸러야 "가입자번호", "고객주소" 같은 것이 이름으로 가지 않는다.
     const KEY_MAP = [
         [/tli/, 'tli'],
+        [/^(신청구분|타스크구분|task구분)$/, 'classification'],
         // 받는 글의 "가입번호"는 실제로 타스크 번호(12자리)다
         [/^(가입|타스크|task)(번호|no)?$/, 'taskNo'],
         [/주소/, 'address'],
@@ -47,7 +48,7 @@
     window.parseWorkImportText = text => {
         const entries = [];
         let cur = null;
-        const start = () => { cur = { name: '', address: '', taskNo: '', tli: '', phone: '', content: '', time: '', extra: [], nameLabels: [] }; entries.push(cur); };
+        const start = () => { cur = { name: '', address: '', taskNo: '', tli: '', phone: '', content: '', time: '', classification: [], extra: [], nameLabels: [] }; entries.push(cur); };
         String(text || '').replace(/\r/g, '').split('\n').forEach(raw => {
             // 메신저에서 복사하면 섞여 오는 보이지 않는 문자는 지우고, 특수 공백·다른 모양의 콜론은 보통 것으로 바꾼다
             const line = raw
@@ -69,18 +70,30 @@
             const label = normLabel(m[1]);
             if (!cur || (key === 'name' && cur.nameLabels.includes(label))) start();
             if (key === 'name') cur.nameLabels.push(label);
-            if (key === 'taskNo') { if (!cur.taskNo) cur.taskNo = value; } // 가입번호·타스크 번호 중 먼저 나온 값
+            if (key === 'classification') { if (value) cur.classification.push(value); }
+            else if (key === 'taskNo') { if (!cur.taskNo) cur.taskNo = value; } // 가입번호·타스크 번호 중 먼저 나온 값
             else if (key) cur[key] = cur[key] ? `${cur[key]} ${value}`.trim() : value;
             else if (value) cur.extra.push(`${m[1].trim()}: ${value}`);
         });
         return entries.filter(e => e.name || e.address || e.tli || e.taskNo);
     };
 
+    window.classifyWorkImport = e => {
+        const values = Array.isArray(e.classification) ? e.classification : [];
+        const text = values.join(' ').replace(/\s+/g, '');
+        if (/해지/.test(text)) return '해지';
+        if (/설변/.test(text)) return /댁내/.test(text) ? '설변(댁내)' : '설변';
+        if (/신규/.test(text)) return '신규';
+        if (/변경/.test(text)) return '변경';
+        if (!text && e.tli) return 'AS';
+        return '';
+    };
+
     // ─── 작업일지로 바꾸기 ───
     function toLog(e, y, m, d, fallbackTime, id) {
         const tli = (e.tli || '').replace(/\s+/g, '');
         const contentParts = [tli, e.content].filter(Boolean);
-        const noteParts = [e.phone ? `연락처 ${e.phone}` : '', ...e.extra].filter(Boolean);
+        const noteParts = [e.phone ? `연락처 ${e.phone}` : '', ...(e.classification || []).map(v => `구분: ${v}`), ...e.extra].filter(Boolean);
         const time = /^\d{1,2}:\d{2}/.test(e.time) ? e.time.replace(/^(\d):/, '0$1:').slice(0, 5) : fallbackTime;
         const sameDayDuty = (window.logs || []).some(l => l && l.cat === 'work' && l.y === y && l.m === m && l.d === d && l.isDuty);
         return {
@@ -89,7 +102,7 @@
             taskNo: (e.taskNo || '').replace(/\s+/g, ''),
             customerName: e.name,
             address: e.address,
-            taskType: '',
+            taskType: window.classifyWorkImport(e),
             content: contentParts.join('\n'),
             note: noteParts.join('\n'),
             otCount: 0,
