@@ -280,6 +280,7 @@ window.WorkExportUI = {
                     oncontextmenu="event.preventDefault(); window.WorkExportUI.openEditModal('${col.id}');">
                     <span class="exp-col-num">${ordNum}</span>
                     <span style="flex:1; line-height:1.1; ${labelStyle}">${col.customName || col.name}${disabledNote}</span>
+                    ${isSelected ? `<button type="button" class="w95-btn" aria-label="${col.name} 이름과 순서 변경" onclick="event.stopPropagation(); window.WorkExportUI.openEditModal('${col.id}')">✎</button>` : ''}
                 </div>
             `;
 

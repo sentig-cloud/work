@@ -18,23 +18,27 @@ window.WorkExportHTML = `
 <div id="exportConfigLayer" class="layer" style="z-index: 5000; background: rgba(0,0,0,0.55); justify-content: center; padding: 10px;">
     <div class="modal-box w95-window" style="max-height: 95vh; display: flex; flex-direction: column; border-radius: 8px; overflow: hidden; border: 2px solid #94a3b8;">
         <div class="w95-titlebar" style="background: #1e293b; padding: 6px 10px; font-size: 0.9rem;">
-            <span>내보내기 설정</span>
+            <span>엑셀 · CSV 내보내기</span>
             <button type="button" class="w95-btn" style="padding:0 8px; font-size: 0.8rem;" onclick="window.WorkExportUI.close()">X</button>
         </div>
         <div class="modal-content-scroll" style="background:#f8fafc; padding:8px; display:flex; flex-direction:column; gap:6px;">
 
             <div class="exp-section">
+                <b>기간 · 월 선택</b>
                 <div class="exp-tag-row" id="expMonthArea"></div>
             </div>
 
             <div class="exp-section exp-grid-2col">
+                <b>정렬 순서</b><b>파일 형식</b>
                 <div class="exp-tag-row col-left" id="expSortArea"></div>
                 <div class="exp-tag-row col-right" id="expFormatArea"></div>
+                <b>열 너비</b><b>사진 표시</b>
                 <div class="exp-tag-row col-left" id="expWidthArea"></div>
                 <div class="exp-tag-row col-right" id="expOptionsArea"></div>
             </div>
 
             <div class="exp-section">
+                <div style="font-size:0.72rem;color:#475569">내보낼 열을 선택하고, 연필 버튼으로 열 이름과 순서를 변경합니다.</div>
                 <div style="font-size:0.72rem; color:#1d4ed8; font-weight:900; margin-bottom:2px;"><i class="fa-solid fa-screwdriver-wrench"></i> 작업정보</div>
                 <div class="exp-tag-grid" id="expColGridWork"></div>
             </div>

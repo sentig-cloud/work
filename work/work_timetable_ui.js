@@ -503,23 +503,27 @@
                     </div>
 
                     <div class="tt-settings-group" data-page="data">
-                        <div class="tt-settings-group-title"><i class="fa-solid fa-server"></i> 서버 백업 (전체 · 설정)</div>
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-shield"></i> 백업 검사</div>
+                        <div class="tt-settings-section"><label class="tt-settings-check"><input type="checkbox" id="ttBackupIntegrity"> 백업 무결성 검사 <small>켜면 파일과 사진을 검사하고, 오류가 있으면 완료로 처리하지 않습니다.</small></label></div>
+                    </div>
+                    <div class="tt-settings-group" data-page="data">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-server"></i> 서버에 보관</div>
                         <div id="wmBackupBox"></div>
                     </div>
                     <div class="tt-settings-group" data-page="data">
-                        <div class="tt-settings-group-title"><i class="fa-solid fa-file-excel"></i> 내보내기 · 백업</div>
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-folder-open"></i> 이 기기에 백업 · 복원</div>
                         <div class="tt-settings-section">
-                            <button type="button" class="w95-btn ws-wide-btn ws-data-btn" data-data-act="export"><i class="fa-solid fa-file-excel" style="color:#10b981;"></i> 엑셀 내보내기</button>
-                            <div class="ws-desc">작업일지·출퇴근을 엑셀 파일로 내보냅니다. (메인 윗줄 초록 엑셀 버튼과 같음)</div>
-                        </div>
-                        <div class="tt-settings-section">
-                            <button type="button" class="w95-btn ws-wide-btn ws-data-btn" data-data-act="backup"><i class="fa-solid fa-file-arrow-down" style="color:#2563eb;"></i> ZIP 백업</button>
-                            <div class="ws-desc">기간을 골라 사진까지 ZIP으로 백업합니다.</div>
+                            <button type="button" class="w95-btn ws-wide-btn ws-data-btn" data-data-act="backup"><i class="fa-solid fa-file-arrow-down" style="color:#2563eb;"></i> 사진 포함 ZIP 내보내기</button>
+                            <div class="ws-desc">전체 또는 기간을 골라 사진 파일과 함께 이 기기에 저장합니다.</div>
                         </div>
                         <div class="tt-settings-section">
                             <button type="button" class="w95-btn ws-wide-btn ws-data-btn" data-data-act="import"><i class="fa-solid fa-file-import" style="color:#dc2626;"></i> 백업 복원</button>
                             <div class="ws-desc">백업 파일(.json/.txt/.zip)을 불러와 복원합니다.</div>
                         </div>
+                    </div>
+                    <div class="tt-settings-group" data-page="data">
+                        <div class="tt-settings-group-title"><i class="fa-solid fa-file-excel"></i> 엑셀 · CSV 내보내기</div>
+                        <div class="tt-settings-section"><button type="button" class="w95-btn ws-wide-btn ws-data-btn" data-data-act="export"><i class="fa-solid fa-file-excel" style="color:#10b981;"></i> 엑셀 · CSV 설정 및 내보내기</button><div class="ws-desc">기간, 정렬, 열 순서와 서식, 사진 표시를 설정합니다.</div></div>
                     </div>
 
                     <div class="tt-settings-group" data-page="account">
@@ -616,6 +620,9 @@
             else if (act === 'import') window.triggerImport?.();
         });
         document.getElementById('ttSettingsSearch').addEventListener('input', e => filterSettings(e.target.value));
+        const integrity = document.getElementById('ttBackupIntegrity');
+        integrity.checked = localStorage.getItem('wm_backup_integrity_check') !== '0';
+        integrity.addEventListener('change', () => localStorage.setItem('wm_backup_integrity_check', integrity.checked ? '1' : '0'));
         window.setupRecoveryBox?.();
         window.setupBackupBox?.();
         document.getElementById('ttSettingsResetBtn').addEventListener('click', () => {

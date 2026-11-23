@@ -50,7 +50,14 @@
     // 서버로 아직 안 보낸 변경이 있으면 먼저 보낸다(백업·복원이 최신 상태를 기준으로 하도록)
     async function flushPending() {
         if (window.hasDirtyChanges?.()) await window.syncNow?.(true);
+        if (window.hasDirtyChanges?.()) throw new Error('동기화가 아직 끝나지 않아 백업을 시작할 수 없습니다.');
     }
+    window.verifyServerBackupResult = (meta, backup, kind) => {
+        window.verifyBackupStructure(backup?.data, kind === 'full');
+        if (backup.kind !== kind || (kind === 'full' && (backup.data.logs.length !== meta.logs || backup.data.trash.length !== meta.trash)) || backup.data.groups.length !== meta.groups) {
+            throw new Error('서버에 백업이 생성됐지만 저장된 항목 수가 응답과 달라 확인이 필요합니다.');
+        }
+    };
 
     // ─── 백업 파일 받기 ───
     function download(backup) {
@@ -260,8 +267,7 @@
                     <button type="button" class="w95-btn bk-make" data-bk="make:full"><i class="fa-solid fa-database"></i> 전체 백업</button>
                     <button type="button" class="w95-btn bk-make" data-bk="make:settings"><i class="fa-solid fa-sliders"></i> 설정 백업</button>
                 </div>
-                <button type="button" class="w95-btn ws-wide-btn" data-bk="zip">사진 포함 전체 ZIP 내보내기</button>
-                <div class="ws-desc"><b>서버 전체 백업</b>: 작업일지·휴지통·선택태그·설정과 사진 주소를 서버에 보관합니다.<br><b>전체 ZIP</b>: 사진 파일을 포함해 이 기기에 저장합니다. 사진 누락 여부를 반드시 확인하세요.</div>
+                <div class="ws-desc"><b>서버 전체 백업</b>: 작업일지·휴지통·선택태그·설정과 사진 주소를 서버에 보관합니다. 사진 파일은 서버 사진 저장소에 있습니다.</div>
             </div>
             <div class="tt-settings-section">
                 <div class="tt-settings-label">서버에 있는 백업</div>
@@ -280,15 +286,27 @@
             const itemEl = e.target.closest('.bk-item');
             const item = itemEl ? box.querySelector('.bk-list')._items?.[Number(itemEl.dataset.i)] : null;
             const btn = e.target.closest('button');
+            let createdBackup = false;
             try {
-                if (act === 'zip') { window.openBackupDialog?.(); }
-                else if (act.startsWith('make:')) {
+                if (act.startsWith('make:')) {
                     const kind = act.slice(5);
                     btn.disabled = true;
                     await flushPending();
+                    const verify = window.isBackupIntegrityEnabled?.();
+                    if (verify) {
+                        const current = window.getServerData(await window.loadFromServer());
+                        if (!current) throw new Error('서버 데이터를 읽을 수 없어 백업을 시작하지 않았습니다.');
+                        window.verifyBackupStructure(current, kind === 'full');
+                    }
                     const r = await call('POST', '/api/manual-backup', { kind, label: box.querySelector('.bk-label').value.trim(), localSettings: window.getLocalSettingsSnapshot() });
+                    createdBackup = true;
+                    if (verify) {
+                        if (!r.backup?.id) throw new Error('서버가 백업을 만들었지만 식별자를 받지 못해 검사할 수 없습니다.');
+                        const saved = await fetchBackup({ id: r.backup.id });
+                        window.verifyServerBackupResult(r.backup, saved, kind);
+                    }
                     box.querySelector('.bk-label').value = '';
-                    toast(`${kind === 'settings' ? '설정' : '전체'} 백업을 서버에 만들었습니다${r.backup?.logs != null ? ` (카드 ${r.backup.logs}개)` : ''}`);
+                    toast(`${kind === 'settings' ? '설정' : '전체'} 백업을 서버에 만들었습니다${verify ? ' · 구조 및 항목 수 확인' : ''}${r.backup?.logs != null ? ` (카드 ${r.backup.logs}개)` : ''}`);
                     await refreshList(box);
                 } else if (act === 'refresh') await refreshList(box);
                 else if (act === 'openFile') box.querySelector('.bk-file').click();
@@ -302,7 +320,10 @@
                     await refreshList(box);
                 }
             } catch (err) {
-                alert(errText(err));
+                const advice = createdBackup
+                    ? '서버에 백업이 이미 만들어졌을 수 있습니다. 목록을 다시 불러와 확인하고, 네트워크를 확인한 뒤 다시 시도하세요.'
+                    : '서버 연결과 동기화 상태를 확인하고 다시 시도하세요. 데이터 구조 오류가 계속되면 기존 데이터를 삭제하지 말고 복구 화면의 백업을 확인하세요.';
+                alert(`${errText(err)}\n\n${advice}`);
             } finally {
                 if (btn) btn.disabled = false;
             }

@@ -119,9 +119,10 @@ window.downloadBlob = async function (blob, fileName) {
       const writable = await handle.createWritable();
       await writable.write(blob);
       await writable.close();
-      return;
+      return true;
     } catch (e) {
-      if (e.name === "AbortError") return;
+      if (e.name === "AbortError") return false;
+      throw e;
     }
   }
 
@@ -135,7 +136,8 @@ window.downloadBlob = async function (blob, fileName) {
   link.click();
   document.body.removeChild(link);
 
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  return true;
 };
 
 window.downloadTextLog = async function (title, lines) {
@@ -225,9 +227,54 @@ window.fetchBackupImage = async function (src) {
   return await response.blob();
 };
 
+window.isBackupIntegrityEnabled = () => localStorage.getItem('wm_backup_integrity_check') !== '0';
+window.showZipBackupFailure = function (message) {
+  const panel = document.getElementById('zipBackupFailure');
+  if (!panel) return;
+  const failures = window.lastBackupFailures || [];
+  const details = failures.map((f, i) => `${i + 1}. 기록 ${f.logId || '-'} / 사진 ${f.imageId || '-'} / ${f.error || '오류'}`).join('\n');
+  panel.querySelector('[data-backup-error]').textContent = message;
+  panel.querySelector('[data-backup-failures]').textContent = details;
+  panel.querySelector('[data-backup-save-failures]').hidden = !failures.length;
+  panel.hidden = false;
+};
+window.downloadZipFailureList = async function () {
+  const lines = (window.lastBackupFailures || []).map((f, i) => `${i + 1}. 기록=${f.logId || '-'}, 사진=${f.imageId || '-'}, 날짜=${f.date || '-'}, 주소=${f.sourceUrl || '-'}, 오류=${f.error || '-'}`);
+  if (lines.length) await window.downloadTextLog('누락사진', lines);
+};
+window.verifyBackupStructure = function (data, full = true) {
+  if (!data || !Array.isArray(data.groups) || (full && (!Array.isArray(data.logs) || !Array.isArray(data.trash)))) {
+    throw new Error('백업에 필요한 기록, 휴지통 또는 선택태그 목록이 없습니다.');
+  }
+  for (const key of full ? ['logs', 'trash', 'groups'] : ['groups']) {
+    const ids = new Set();
+    for (const item of data[key]) {
+      if (!item || item.id === undefined || item.id === null || String(item.id) === '') throw new Error(`${key}에 식별자가 없는 항목이 있습니다.`);
+      const id = String(item.id);
+      if (ids.has(id)) throw new Error(`${key}에 중복 식별자가 있습니다: ${id}`);
+      ids.add(id);
+      if (key !== 'groups' && item.imgs !== undefined && !Array.isArray(item.imgs)) throw new Error(`${key}의 사진 목록 형식이 잘못되었습니다: ${id}`);
+      if (key === 'groups' && !Array.isArray(item.tags)) throw new Error(`선택태그 목록 형식이 잘못되었습니다: ${id}`);
+    }
+  }
+};
+
 window.startZipBackup = async function () {
+  if (window.zipBackupRunning) return;
+  const failurePanel = document.getElementById('zipBackupFailure');
+  if (failurePanel) failurePanel.hidden = true;
+  window.lastBackupFailures = [];
+  const scopeMode = document.getElementById('backupScope').value;
+  const year = Number(document.getElementById('backupYear').value);
+  const month = Number(document.getElementById('backupMonth').value);
+  if (!['all', 'year', 'month'].includes(scopeMode) || (scopeMode !== 'all' && (!Number.isInteger(year) || year < 2000 || year > 2100)) || (scopeMode === 'month' && (!Number.isInteger(month) || month < 1 || month > 12))) {
+    const message = '백업 범위와 연도·월을 확인한 뒤 다시 시도하세요.';
+    window.showZipBackupFailure(message);
+    if (!failurePanel) alert(message);
+    return;
+  }
   const logs = window.getSelectedBackupLogs();
-  const isFull = document.getElementById('backupScope').value === 'all';
+  const isFull = scopeMode === 'all';
   const trash = isFull ? (window.trash || []).filter(Boolean) : [];
 
   if (logs.length === 0 && trash.length === 0 && !isFull) {
@@ -235,9 +282,8 @@ window.startZipBackup = async function () {
     return;
   }
 
+  window.zipBackupRunning = true;
   window.syncPaused = true;
-  window.lastBackupFailures = [];
-
   try {
     const JSZip = await window.loadJSZip();
     const zip = new JSZip();
@@ -250,7 +296,10 @@ window.startZipBackup = async function () {
 
     for (const log of [...clonedLogs, ...clonedTrash]) {
       for (const image of log.imgs || []) {
-        if (!image?.src) continue;
+        if (!image?.src) {
+          window.lastBackupFailures.push({ logId: log.id, imageId: image?.id || '', error: '사진 주소가 없습니다.' });
+          continue;
+        }
 
         if (!sourceEntries.has(image.src)) {
           sourceEntries.set(image.src, {
@@ -274,6 +323,8 @@ window.startZipBackup = async function () {
 
       try {
         const blob = await window.fetchBackupImage(entry.sourceUrl);
+        if (!blob.size) throw new Error('사진 파일이 비어 있습니다.');
+        if (blob.type && !/^image\//i.test(blob.type) && blob.type !== 'application/octet-stream') throw new Error(`사진 대신 ${blob.type} 응답을 받았습니다.`);
         let zipPath = window.createImageBackupPath(
           entry.log,
           entry.image,
@@ -333,6 +384,12 @@ window.startZipBackup = async function () {
       ...(isFull ? { localSettings } : {}),
     };
 
+    const verify = window.isBackupIntegrityEnabled();
+    if (verify) {
+      window.verifyBackupStructure({ ...backup.data, trash: isFull ? backup.data.trash : [] }, true);
+      if (window.lastBackupFailures.length) throw new Error(`사진 ${window.lastBackupFailures.length}개를 읽지 못해 백업을 중단했습니다.`);
+    }
+
     const logLines = [
       `백업 범위: ${scope}`,
       `활성 기록: ${clonedLogs.length}`,
@@ -363,10 +420,25 @@ window.startZipBackup = async function () {
       },
     });
 
-    await window.downloadBlob(
+    if (verify) {
+      window.showBackupProgress('ZIP 무결성 검사 중...');
+      const checked = await JSZip.loadAsync(blob, { checkCRC32: true });
+      const jsonEntry = checked.file('backup.json');
+      if (!jsonEntry) throw new Error('ZIP에 백업 데이터가 없습니다.');
+      const decoded = JSON.parse(await jsonEntry.async('string'));
+      if (JSON.stringify(decoded) !== JSON.stringify(backup)) throw new Error('ZIP의 백업 데이터가 원본과 다릅니다.');
+      for (const photo of manifest) {
+        const entry = checked.file(photo.zipPath);
+        if (!entry || (await entry.async('uint8array')).length !== photo.size) throw new Error(`ZIP 사진이 없거나 크기가 다릅니다: ${photo.zipPath}`);
+      }
+    }
+
+    const saved = await window.downloadBlob(
       blob,
       `WorkMaster_Backup_${scope}_${window.formatBackupDate()}.zip`
     );
+
+    if (!saved) return;
 
     window.closeBackupDialog();
 
@@ -385,8 +457,17 @@ window.startZipBackup = async function () {
     }
   } catch (e) {
     console.error("ZIP 백업 실패:", e);
-    alert("ZIP 백업 실패: " + e.message);
+    const message = String(e?.message || e);
+    const help = /사진/.test(message)
+      ? '인터넷 연결과 해당 사진이 앱에서 열리는지 확인한 뒤 다시 시도하세요. 원본 사진이 없다면 복구 가능한 백업에서 확인하세요.'
+      : /식별자|목록|기록/.test(message)
+        ? '기존 데이터를 삭제하지 말고 서버 동기화와 복구 화면의 백업을 확인한 뒤 다시 시도하세요.'
+        : '저장 공간과 인터넷 연결을 확인한 뒤 다시 시도하세요. 계속 실패하면 오류 내용을 기록해 주세요.';
+    const explanation = `${message}\n\n${help}`;
+    window.showZipBackupFailure(explanation);
+    if (!document.getElementById('zipBackupFailure')) alert(`ZIP 백업 실패: ${explanation}`);
   } finally {
+    window.zipBackupRunning = false;
     window.syncPaused = false;
     window.hideBackupProgress();
 
@@ -616,7 +697,7 @@ window.createRestoreLogLines = function (failures, conflictCount) {
 
 window.restoreZipFile = async function (file) {
   const JSZip = await window.loadJSZip();
-  const zip = await JSZip.loadAsync(file);
+  const zip = await JSZip.loadAsync(file, { checkCRC32: window.isBackupIntegrityEnabled() });
   const backupEntry = zip.file("backup.json");
 
   if (!backupEntry) {
@@ -628,6 +709,7 @@ window.restoreZipFile = async function (file) {
   if (!backup?.data || !Array.isArray(backup.data.logs)) {
     throw new Error("backup.json에서 logs 데이터를 찾을 수 없습니다.");
   }
+  if (window.isBackupIntegrityEnabled() && Array.isArray(backup.data.groups)) window.verifyBackupStructure({ ...backup.data, trash: Array.isArray(backup.data.trash) ? backup.data.trash : [] }, true);
 
   const mergeMode = confirm(
     `ZIP 백업을 불러옵니다.\n\n` +
@@ -1018,9 +1100,14 @@ window.installBackupUI = function () {
           <div style="font-size:0.8rem; color:#475569;">
             전체 범위에는 휴지통과 설정도 포함합니다. 사진은 ZIP 내부 images 폴더에 저장합니다.
           </div>
+          <div id="zipBackupFailure" class="w95-in" hidden style="padding:8px;color:#991b1b;white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto;">
+            <strong>백업을 완료하지 못했습니다</strong>
+            <div data-backup-error></div><div data-backup-failures></div>
+            <button type="button" class="w95-btn" data-backup-save-failures onclick="window.downloadZipFailureList()">누락 사진 목록 저장</button>
+          </div>
           <div style="display:flex; gap:6px; justify-content:flex-end;">
             <button type="button" class="w95-btn" onclick="window.closeBackupDialog()">취소</button>
-            <button type="button" class="w95-btn" onclick="window.startZipBackup()">백업 시작</button>
+            <button type="button" class="w95-btn" onclick="window.startZipBackup()">백업 시작 · 다시 시도</button>
           </div>
         </div>
       </div>
