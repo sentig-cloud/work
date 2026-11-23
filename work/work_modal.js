@@ -193,11 +193,12 @@ window.updateWorkDateLabel = () => {
     } else { labelEl.innerText = ''; }
 };
 
+window.getGroupDisplayTitle = title => /^복구\s*그룹(?:\s*\(|$)/.test(String(title || '')) ? '\u00a0' : String(title || '');
 window.applyCustomTitles = () => {
     // v2: groups에서 타이틀 적용
     window.getAllGroupsSorted().forEach(g => {
         const el = document.getElementById('boxTitle_' + g.id);
-        if (el) el.innerText = g.title;
+        if (el) el.innerText = window.getGroupDisplayTitle(g.title);
         window.applyGroupActiveStyle(g.id);
     });
 
@@ -375,7 +376,8 @@ window.renderCustomGroupSections = () => {
         });
 
         customGroups.forEach(g => {
-            const safeTitle = window.escapeHtml ? window.escapeHtml(g.title) : String(g.title || '')
+            const displayTitle = window.getGroupDisplayTitle(g.title);
+            const safeTitle = window.escapeHtml ? window.escapeHtml(displayTitle) : String(displayTitle)
                 .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
             let groupEl = dragContainer.querySelector(`:scope > .drag-item[data-group-ref="${g.id}"]`);
@@ -420,7 +422,7 @@ window.renderCustomGroupSections = () => {
                 <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 8px; background:var(--w-gray); border-bottom:1px solid var(--w-border);">
                     <b id="boxTitle_${g.id}" class="box-title" style="font-size:0.8rem; color:#7c3aed;"
                         onmousedown="window.startTitlePress(event, '${g.id}')" onmouseup="window.endTitlePress()"
-                        ontouchstart="window.startTitlePress(event, '${g.id}')" ontouchend="window.endTitlePress()">${g.title}</b>
+                        ontouchstart="window.startTitlePress(event, '${g.id}')" ontouchend="window.endTitlePress()">${String(window.getGroupDisplayTitle(g.title)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</b>
                     <span class="drag-handle" style="cursor:grab; padding:0 6px; color:#94a3b8; font-size:1.1rem;">⠿</span>
                 </div>
                 <div id="customGroupArea_${g.id}" style="padding:6px 8px; display:flex; flex-wrap:wrap; gap:4px;"></div>

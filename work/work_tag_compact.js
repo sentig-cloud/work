@@ -49,7 +49,10 @@
     let open = null; // { item, chip, bubble, area, placeholder, snapshot, undoLen }
 
     const areaOf = (item) => item.querySelector(':scope > .btn-tag-area') || (open?.item === item ? open.area : null);
-    const groupTitleOf = (item) => (item.querySelector(':scope > .box-title')?.textContent || '').trim() || '그룹';
+    const groupTitleOf = (item) => {
+        const title = item.querySelector(':scope > .box-title')?.textContent || '';
+        return title === '\u00a0' ? '' : title.trim() || '그룹';
+    };
 
     // ─── 태그상자 줄 ───
     let observer = null;

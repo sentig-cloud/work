@@ -227,8 +227,10 @@ window.fetchBackupImage = async function (src) {
 
 window.startZipBackup = async function () {
   const logs = window.getSelectedBackupLogs();
+  const isFull = document.getElementById('backupScope').value === 'all';
+  const trash = isFull ? (window.trash || []).filter(Boolean) : [];
 
-  if (logs.length === 0) {
+  if (logs.length === 0 && trash.length === 0 && !isFull) {
     alert("선택한 범위에 백업할 기록이 없습니다.");
     return;
   }
@@ -240,9 +242,13 @@ window.startZipBackup = async function () {
     const JSZip = await window.loadJSZip();
     const zip = new JSZip();
     const clonedLogs = JSON.parse(JSON.stringify(logs));
+    const clonedTrash = JSON.parse(JSON.stringify(trash));
+    const masterData = JSON.parse(JSON.stringify(window.getMasterBackupData()));
+    const uiSettings = isFull ? JSON.parse(JSON.stringify(window.getUiSettingsPayload?.() || {})) : undefined;
+    const localSettings = isFull ? window.getLocalSettingsSnapshot?.() || {} : undefined;
     const sourceEntries = new Map();
 
-    for (const log of clonedLogs) {
+    for (const log of [...clonedLogs, ...clonedTrash]) {
       for (const image of log.imgs || []) {
         if (!image?.src) continue;
 
@@ -268,11 +274,12 @@ window.startZipBackup = async function () {
 
       try {
         const blob = await window.fetchBackupImage(entry.sourceUrl);
-        const zipPath = window.createImageBackupPath(
+        let zipPath = window.createImageBackupPath(
           entry.log,
           entry.image,
           blob
         );
+        if (zip.file(zipPath)) zipPath = zipPath.replace(/(\.[^.]+)$/, `_${index}$1`);
 
         zip.file(zipPath, blob);
 
@@ -320,13 +327,16 @@ window.startZipBackup = async function () {
       failures: window.lastBackupFailures,
       data: {
         logs: clonedLogs,
-        ...window.getMasterBackupData(),
+        ...(isFull ? { trash: clonedTrash, uiSettings } : {}),
+        ...masterData,
       },
+      ...(isFull ? { localSettings } : {}),
     };
 
     const logLines = [
       `백업 범위: ${scope}`,
       `활성 기록: ${clonedLogs.length}`,
+      `휴지통: ${clonedTrash.length}`,
       `사진 참조: ${entries.length}`,
       `사진 포함 성공: ${manifest.length}`,
       `사진 누락: ${window.lastBackupFailures.length}`,
@@ -361,7 +371,7 @@ window.startZipBackup = async function () {
     window.closeBackupDialog();
 
     alert(
-      `ZIP 백업 완료\n\n` +
+      `${window.lastBackupFailures.length ? 'ZIP 백업에 누락된 사진이 있습니다' : 'ZIP 백업 완료'}\n\n` +
       `기록: ${clonedLogs.length}개\n` +
       `사진 성공: ${manifest.length}개\n` +
       `사진 누락: ${window.lastBackupFailures.length}개`
@@ -632,7 +642,7 @@ window.restoreZipFile = async function (file) {
   if (!mergeMode) {
     const replaceConfirmed = confirm(
       "현재 활성 기록을 ZIP 내용으로 교체하시겠습니까?\n\n" +
-      "휴지통은 유지됩니다.\n" +
+      (Array.isArray(backup.data.trash) ? "백업의 휴지통과 설정도 적용됩니다.\n" : "휴지통은 유지됩니다.\n") +
       "월별 ZIP이라면 다른 월 기록이 사라질 수 있습니다."
     );
 
@@ -682,7 +692,7 @@ window.restoreZipFile = async function (file) {
 
   const restoredData = JSON.parse(JSON.stringify(backup.data));
 
-  for (const log of restoredData.logs || []) {
+  for (const log of [...(restoredData.logs || []), ...(restoredData.trash || [])]) {
     for (const image of log.imgs || []) {
       if (urlMap.has(image.src)) {
         if (!image.originalName) image.originalName = originalNameMap.get(image.src) || "";
@@ -691,7 +701,11 @@ window.restoreZipFile = async function (file) {
     }
   }
 
+  if (failures.length) throw new Error(`사진 ${failures.length}개를 복원하지 못해 기록을 변경하지 않았습니다.`);
+  if (mode === 'replace' && Array.isArray(restoredData.trash)) window.trash = restoredData.trash.filter(Boolean);
   const conflictCount = window.applyRestoredData(restoredData, mode);
+  if (mode === 'replace' && restoredData.uiSettings) window.applyUiSettingsPayload?.(restoredData.uiSettings);
+  if (mode === 'replace' && backup.localSettings) window.applyLocalSettingsSnapshot?.(backup.localSettings);
 
   window.pendingRestoreFailures = failures;
 
@@ -937,7 +951,7 @@ window.openBackupDialog = function () {
   document.getElementById("backupDialog").style.display = "flex";
   document.getElementById("backupYear").value = window.currentYear;
   document.getElementById("backupMonth").value = window.curMonth;
-  document.getElementById("backupScope").value = "month";
+  document.getElementById("backupScope").value = "all";
   window.updateBackupScopeControls();
 };
 
@@ -1002,7 +1016,7 @@ window.installBackupUI = function () {
             </select>
           </label>
           <div style="font-size:0.8rem; color:#475569;">
-            휴지통은 포함하지 않습니다. 사진은 ZIP 내부 images 폴더에 저장합니다.
+            전체 범위에는 휴지통과 설정도 포함합니다. 사진은 ZIP 내부 images 폴더에 저장합니다.
           </div>
           <div style="display:flex; gap:6px; justify-content:flex-end;">
             <button type="button" class="w95-btn" onclick="window.closeBackupDialog()">취소</button>

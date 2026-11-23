@@ -29,6 +29,11 @@
         }
         return out;
     };
+    window.applyLocalSettingsSnapshot = snapshot => {
+        Object.entries(snapshot || {}).forEach(([key, value]) => {
+            if (key.startsWith('wm_') && !LOCAL_EXCLUDE.includes(key) && typeof value === 'string') localStorage.setItem(key, value);
+        });
+    };
 
     async function call(method, path, body) {
         const res = await window.fetchWithTimeout(`${API}${path}`, {
@@ -255,7 +260,8 @@
                     <button type="button" class="w95-btn bk-make" data-bk="make:full"><i class="fa-solid fa-database"></i> 전체 백업</button>
                     <button type="button" class="w95-btn bk-make" data-bk="make:settings"><i class="fa-solid fa-sliders"></i> 설정 백업</button>
                 </div>
-                <div class="ws-desc"><b>전체</b>: 작업일지(카드)·휴지통·선택태그상자·화면 설정·이 기기 설정 전부<br><b>설정</b>: 선택태그상자·화면 설정·이 기기 설정 (카드 제외)<br>사진 파일은 서버 사진 저장소에 따로 있어 백업에는 주소만 들어갑니다.</div>
+                <button type="button" class="w95-btn ws-wide-btn" data-bk="zip">사진 포함 전체 ZIP 내보내기</button>
+                <div class="ws-desc"><b>서버 전체 백업</b>: 작업일지·휴지통·선택태그·설정과 사진 주소를 서버에 보관합니다.<br><b>전체 ZIP</b>: 사진 파일을 포함해 이 기기에 저장합니다. 사진 누락 여부를 반드시 확인하세요.</div>
             </div>
             <div class="tt-settings-section">
                 <div class="tt-settings-label">서버에 있는 백업</div>
@@ -275,7 +281,8 @@
             const item = itemEl ? box.querySelector('.bk-list')._items?.[Number(itemEl.dataset.i)] : null;
             const btn = e.target.closest('button');
             try {
-                if (act.startsWith('make:')) {
+                if (act === 'zip') { window.openBackupDialog?.(); }
+                else if (act.startsWith('make:')) {
                     const kind = act.slice(5);
                     btn.disabled = true;
                     await flushPending();
