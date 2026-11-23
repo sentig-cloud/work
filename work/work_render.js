@@ -456,7 +456,7 @@ window.getLogCardHtml = (l, indexStr = '') => {
                 const valStr = Array.isArray(val) ? val.map(name => formatCardTagValue(g.id, name, Number(quantities[name] || 1))).join(', ') : (val ? formatCardTagValue(g.id, String(val)) : '');
                 const safeGroupTitle = String(g.title || '선택태그').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 const palette = customCardPalette[groupIndex % customCardPalette.length];
-                const customTitleVisible = !!customWidgetSetting.titleVisible;
+                const customTitleVisible = !!customWidgetSetting.titleVisible && !/^복구\s*그룹(?:\s*\(|$)/.test(g.title || '');
                 const customTitlePosition = customWidgetSetting.titlePosition === 'top' ? 'top' : 'inline';
                 const customTitleMarker = customWidgetSetting.titleMarker ? '<span class="work-card-title-marker" aria-hidden="true"></span>' : '';
                 customDetails.push({

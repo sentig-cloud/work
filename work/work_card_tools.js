@@ -380,7 +380,8 @@
             const val = l.customGroups?.[g.id];
             const names = Array.isArray(val) ? val : (val ? [String(val)] : []);
             if (!names.length || ex(g.id)) return;
-            meta.push(['fa-tag', `${g.title || '선택태그'}: ${withQty(g.id, names).join(', ')}`]);
+            const heading = /^복구\s*그룹(?:\s*\(|$)/.test(g.title || '') ? '' : `${g.title || '선택태그'}: `;
+            meta.push(['fa-tag', `${heading}${withQty(g.id, names).join(', ')}`]);
         });
         const metaHtml = meta.length ? `<div class="wmc-meta">${meta.map(([ic, t]) => `<span><i class="fa-solid ${ic}"></i>${esc(t)}</span>`).join('')}</div>` : '';
         const imgs = (l.imgs || []).length

@@ -301,6 +301,10 @@
                             <label class="tt-settings-check"><input type="checkbox" id="ttOptCardDuplicate"> 복제 버튼 <small>날짜·시간을 골라 복제, 달력 날짜를 눌러도 복제</small></label>
                         </div>
                         <div class="tt-settings-section">
+                            <div class="tt-settings-label">작업일지 수정</div>
+                            <label class="tt-settings-check"><input type="checkbox" id="ttOptEditLock"> 수정 버튼을 눌러 선택태그 편집 <small>끄면 기존 작업을 바로 수정</small></label>
+                        </div>
+                        <div class="tt-settings-section">
                             <div class="tt-settings-label">같은 카드 묶기</div>
                             <label class="tt-settings-check"><input type="checkbox" id="ttOptCardGroupTaskNo"> 타스크 번호(가입번호)가 같은 카드를 한 묶음으로 <small>다른 날짜 카드도 함께 묶고, 보고 있는 날짜 카드를 맨 앞에</small></label>
                         </div>
@@ -344,6 +348,8 @@
                         <div class="ws-desc ws-desc-box">달력 위 <b>글 넣기</b> 버튼 → 날짜 지정 → 받은 글 붙여넣기 → 넣기. 제목 줄은 빼고, 이름→고객명, 주소→주소, 가입번호(12자리)·타스크 번호→타스크 번호, TLI 번호→작업내용 맨 앞에 들어갑니다.</div>
                         <div class="tt-settings-section">
                             <label class="tt-settings-check"><input type="checkbox" id="ttOptImportSkipDup"> 같은 날짜에 이미 있는 작업은 처음부터 선택 해제 <small>타스크 번호·TLI 번호, 또는 고객명+주소가 같으면 "이미 있음"</small></label>
+                            <div class="tt-settings-label">붙여넣은 글에서 자동 선택할 태그 상자</div>
+                            <div id="ttImportGroups"></div>
                         </div>
                     </div>
 
@@ -636,8 +642,19 @@
         radio('ttFontScale', c.fontScale, 'normal');
         radio('ttFontFamily', c.fontFamily, 'classic');
         check('ttOptImportSkipDup', c.importSkipDup !== false);
+        const importGroupsEl = document.getElementById('ttImportGroups');
+        if (importGroupsEl) {
+            importGroupsEl.replaceChildren();
+            (window.groups || []).filter(g => g && !['duration', 'memoTags'].includes(g.id)).forEach(g => {
+                const label = document.createElement('label'); label.className = 'tt-settings-check';
+                const input = document.createElement('input'); input.type = 'checkbox'; input.dataset.importGroup = g.id;
+                input.checked = c.importGroups?.[g.id] !== false;
+                label.append(input, document.createTextNode(` ${g.title || g.id}`)); importGroupsEl.appendChild(label);
+            });
+        }
         check('ttOptCardDuplicate', c.duplicate !== false);
         check('ttOptCardGroupTaskNo', c.groupByTaskNo);
+        check('ttOptEditLock', c.editLock !== false);
         check('ttOptCopyAddress', c.copyAddress);
         check('ttOptCopyNote', c.copyNote);
         check('ttOptCopyContent', c.copyContent);
@@ -665,8 +682,10 @@
             fontScale: val('ttFontScale', 'normal'),
             fontFamily: val('ttFontFamily', 'classic'),
             importSkipDup: on('ttOptImportSkipDup'),
+            importGroups: Object.fromEntries([...document.querySelectorAll('#ttImportGroups input[data-import-group]')].map(el => [el.dataset.importGroup, el.checked])),
             duplicate: on('ttOptCardDuplicate'),
             groupByTaskNo: on('ttOptCardGroupTaskNo'),
+            editLock: on('ttOptEditLock'),
             copyAddress: on('ttOptCopyAddress'),
             copyNote: on('ttOptCopyNote'),
             copyContent: on('ttOptCopyContent'),

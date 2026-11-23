@@ -48,7 +48,7 @@
     window.parseWorkImportText = text => {
         const entries = [];
         let cur = null;
-        const start = () => { cur = { name: '', address: '', taskNo: '', tli: '', phone: '', content: '', time: '', classification: [], extra: [], nameLabels: [] }; entries.push(cur); };
+        const start = () => { cur = { name: '', address: '', taskNo: '', tli: '', phone: '', content: '', time: '', classification: [], extra: [], nameLabels: [], rawLines: [] }; entries.push(cur); };
         String(text || '').replace(/\r/g, '').split('\n').forEach(raw => {
             // 메신저에서 복사하면 섞여 오는 보이지 않는 문자는 지우고, 특수 공백·다른 모양의 콜론은 보통 것으로 바꾼다
             const line = raw
@@ -62,13 +62,14 @@
             // 글머리표(- • · * ▶ ■ ○ 등)는 떼고 본다
             const body = line.replace(/^[-•·*▶▷►■□◆◇○●※]+\s*/, '');
             const m = body.match(/^([^:：]{1,15}?)\s*[:：]\s*(.*)$/) || body.match(NO_COLON_LABEL);
-            if (!m) { if (cur) cur.extra.push(line); return; }
+            if (!m) { if (cur) { cur.rawLines.push(line); cur.extra.push(line); } return; }
             const key = keyOf(m[1]);
             const value = isEmptyValue(m[2]) ? '' : m[2].trim();
             // [n] 없이 이어진 글: 같은 이름표(예: "이름")가 다시 나오면 새 건.
             // "상호"와 "이름"처럼 다른 이름표는 한 건 안에서 합친다(○○상회 홍길동).
             const label = normLabel(m[1]);
             if (!cur || (key === 'name' && cur.nameLabels.includes(label))) start();
+            cur.rawLines.push(line);
             if (key === 'name') cur.nameLabels.push(label);
             if (key === 'classification') { if (value) cur.classification.push(value); }
             else if (key === 'taskNo') { if (!cur.taskNo) cur.taskNo = value; } // 가입번호·타스크 번호 중 먼저 나온 값
@@ -85,8 +86,51 @@
         if (/설변/.test(text)) return /댁내/.test(text) ? '설변(댁내)' : '설변';
         if (/신규/.test(text)) return '신규';
         if (/변경/.test(text)) return '변경';
+        if (/^(?:a\/?s|as건)$/i.test(text)) return 'AS';
         if (!text && e.tli) return 'AS';
         return '';
+    };
+
+    window.getImportedGroupSelections = e => {
+        const groups = window.groups || [];
+        const settings = opt().importGroups || {};
+        const enabled = id => settings[id] !== false;
+        const category = window.classifyWorkImport(e);
+        const canonical = v => String(v || '').replace(/[\s/]/g, '').toLowerCase();
+        const selections = {};
+        const classificationText = (e.classification || []).join(' ');
+        for (const group of groups) {
+            if (!group || !enabled(group.id) || ['equipments', 'duration', 'memoTags'].includes(group.id)) continue;
+            const tags = (group.tags || []).filter(t => t && t.name);
+            const matched = tags.filter(t => {
+                const name = canonical(t.name);
+                return name && ((category && canonical(category) === name) ||
+                    (classificationText && canonical(classificationText) === name));
+            }).map(t => t.name);
+            if (matched.length) selections[group.id] = group.selectionMode === 'single' ? matched.slice(0, 1) : matched;
+        }
+        const equipment = {};
+        if (enabled('equipments') && category !== 'AS') {
+            const counts = { '인': 0, '티': 0, '전': 0, 'CCTV': 0 };
+            const lines = e.rawLines || [];
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const found = new Set();
+                for (const m of line.matchAll(/\d{6,}\s*[（(]\s*(인|티비|티|전화|전)\s*[)）]/gi)) {
+                    found.add(m[1] === '티비' ? '티' : m[1] === '전화' ? '전' : m[1]);
+                }
+                if (/^(?:상품명|서비스명|타스크(?:명|구분))\s*[:：].*cctv/i.test(line)) found.add('CCTV');
+                if (/^(?:상품명|서비스명|타스크(?:명|구분))\s*[:：]?\s*$/.test(line) && /cctv/i.test(lines[i + 1] || '')) found.add('CCTV');
+                found.forEach(name => counts[name]++);
+            }
+            const tags = groups.find(g => g?.id === 'equipments')?.tags || [];
+            for (const tag of tags) {
+                const name = String(tag?.name || '');
+                const key = /^cctv$/i.test(name) ? 'CCTV' : name;
+                if (counts[key]) equipment[name] = counts[key];
+            }
+        }
+        return { selections, equipment, category };
     };
 
     // ─── 작업일지로 바꾸기 ───
@@ -96,25 +140,30 @@
         const noteParts = [e.phone ? `연락처 ${e.phone}` : '', ...(e.classification || []).map(v => `구분: ${v}`), ...e.extra].filter(Boolean);
         const time = /^\d{1,2}:\d{2}/.test(e.time) ? e.time.replace(/^(\d):/, '0$1:').slice(0, 5) : fallbackTime;
         const sameDayDuty = (window.logs || []).some(l => l && l.cat === 'work' && l.y === y && l.m === m && l.d === d && l.isDuty);
+        const auto = window.getImportedGroupSelections(e);
+        const customGroups = {};
+        for (const [id, names] of Object.entries(auto.selections)) {
+            if (!['taskTypes', 'coworkers', 'statuses'].includes(id)) customGroups[id] = names;
+        }
         return {
             id, y, m, d, cat: 'work',
             workTime: time || '',
-            taskNo: (e.taskNo || '').replace(/\s+/g, ''),
+            taskNo: ((e.taskNo || '').match(/\d{12}/)?.[0] || (e.taskNo || '').replace(/\s+/g, '')),
             customerName: e.name,
             address: e.address,
-            taskType: window.classifyWorkImport(e),
+            taskType: (auto.selections.taskTypes || []).join(', '),
             content: contentParts.join('\n'),
             note: noteParts.join('\n'),
             otCount: 0,
-            status: null,
+            status: auto.selections.statuses?.[0] || null,
             personalCheck: null,
-            coworkers: [],
-            equips: {},
+            coworkers: auto.selections.coworkers || [],
+            equips: auto.equipment,
             imgs: [],
             time: window.getCurrentTimeString?.() || '',
             isDuty: sameDayDuty,
             startTime: null, endTime: null, totalMin: null,
-            customGroups: {},
+            customGroups,
             tagQuantities: {},
             excludedGroups: [],
             importedFrom: 'text'
@@ -127,7 +176,8 @@
         return (window.logs || []).find(l => {
             if (!l || l.cat !== 'work' || l.y !== y || l.m !== m || l.d !== d) return false;
             const text = norm(`${l.content || ''} ${l.note || ''}`);
-            if (e.taskNo && norm(l.taskNo) === norm(e.taskNo)) return true;
+            const taskNo = (e.taskNo || '').match(/\d{12}/)?.[0] || norm(e.taskNo);
+            if (taskNo && norm(l.taskNo) === taskNo) return true;
             if (e.tli && text.includes(norm(e.tli))) return true;
             return !!e.name && !!e.address && norm(l.customerName) === norm(e.name) && norm(l.address) === norm(e.address);
         });
@@ -156,7 +206,7 @@
                         <button type="button" class="w95-btn" data-act="clear">지우기</button>
                     </div>
                     <textarea id="tiText" class="w95-in" spellcheck="false" placeholder="[업무보조] 11/17 · 2건&#10;&#10;[1]&#10;이름: 홍길동&#10;주소: 경남 통영시 ...&#10;가입번호(타스크): 5300...&#10;타스크 번호: (없음)&#10;TLI 번호: TLI-261113-003857&#10;&#10;여러 글을 이어 붙여도 됩니다."></textarea>
-                    <div class="ti-list-head"><b id="tiCount">인식된 작업 0건</b><label><input type="checkbox" id="tiAll" checked> 전체 선택</label></div>
+                    <div class="ti-list-head"><b id="tiCount">인식된 작업 0건</b><label><input type="checkbox" id="tiAll" checked> 전체 선택</label><button type="button" class="w95-btn" data-act="add">추가</button></div>
                     <div id="tiList" class="ti-list"></div>
                 </div>
                 <div class="modal-footer ti-footer">
@@ -179,6 +229,7 @@
             if (act === 'close') closeModal();
             else if (act === 'clear') { text.value = ''; refresh(); text.focus(); }
             else if (act === 'save') saveAll();
+            else if (act === 'add') addMissing();
             else if (act === 'clip') {
                 try {
                     const clip = await navigator.clipboard.readText();
@@ -213,7 +264,9 @@
             return `<label class="ti-item${dup ? ' is-dup' : ''}"><input type="checkbox" data-idx="${i}" ${dup && skipDup ? '' : 'checked'}>
                 <span class="ti-item-body"><b><em>${i + 1}</em>${esc(e.name || '(이름 없음)')}${dup ? '<i class="ti-dup">이미 있음</i>' : ''}</b>${lines}</span></label>`;
         }).join('') : '<div class="ti-empty">붙여넣은 글에서 작업을 찾지 못했습니다.<br>"이름:", "주소:" 같은 줄이 있는지 확인해 주세요.</div>';
-        modal.querySelector('#tiAll').checked = true;
+        const boxes = [...modal.querySelectorAll('#tiList input[type="checkbox"]')];
+        modal.querySelector('#tiAll').checked = boxes.length > 0 && boxes.every(box => box.checked);
+        modal.querySelector('#tiAll').indeterminate = boxes.some(box => box.checked) && boxes.some(box => !box.checked);
         updateSaveLabel();
     }
 
@@ -244,6 +297,53 @@
         if (pop && getComputedStyle(pop).display !== 'none') window.renderCal?.(date.y, date.m - 1);
         else window.openPop?.(date.m);
         toast(`${date.m}/${date.d}에 ${picks.length}건 넣었습니다`);
+    }
+
+    function addMissing() {
+        const date = selectedDate();
+        if (!date) return alert('넣을 날짜를 고르세요.');
+        const picks = [...document.querySelectorAll('#tiList input[type="checkbox"]:checked')].map(c => parsed[Number(c.dataset.idx)]).filter(Boolean);
+        if (!picks.length) return alert('추가할 작업을 선택하세요.');
+        const time = document.getElementById('tiTime').value || '';
+        const norm = v => String(v || '').replace(/\s+/g, '');
+        let added = 0, updated = 0, skipped = 0, nextId = Date.now();
+        for (const entry of picks) {
+            const matches = (window.logs || []).filter(l => {
+                if (!l || l.cat !== 'work' || l.y !== date.y || l.m !== date.m || l.d !== date.d) return false;
+                const incomingTask = (entry.taskNo || '').match(/\d{12}/)?.[0] || norm(entry.taskNo);
+                const sameTask = incomingTask && norm(l.taskNo) === incomingTask;
+                const sameTli = entry.tli && norm(`${l.content || ''} ${l.note || ''}`).includes(norm(entry.tli));
+                const samePerson = entry.name && entry.address && norm(l.customerName) === norm(entry.name) && norm(l.address) === norm(entry.address);
+                return sameTask || sameTli || samePerson;
+            });
+            if (matches.length > 1) { skipped++; continue; }
+            if (!matches.length) {
+                while ((window.logs || []).some(l => String(l.id) === String(nextId))) nextId++;
+                window.saveToLocalStore('logs', toLog(entry, date.y, date.m, date.d, time, String(nextId++)));
+                added++; continue;
+            }
+            const old = matches[0];
+            const incoming = toLog(entry, date.y, date.m, date.d, time, old.id);
+            const oldTli = String(`${old.content || ''} ${old.note || ''}`).match(/TLI\s*[-–]?\s*\d+(?:\s*[-–]\s*\d+)+/i)?.[0];
+            if ((incoming.taskNo && old.taskNo && norm(incoming.taskNo) !== norm(old.taskNo)) ||
+                (entry.tli && oldTli && norm(entry.tli).toLowerCase() !== norm(oldTli).toLowerCase())) { skipped++; continue; }
+            const merged = { ...old, customGroups: { ...(old.customGroups || {}) }, equips: { ...(old.equips || {}) } };
+            for (const key of ['taskNo', 'customerName', 'address', 'workTime']) if (!merged[key] && incoming[key]) merged[key] = incoming[key];
+            for (const key of ['content', 'note']) {
+                const existing = String(merged[key] || '').split(/\n|<br\s*\/?\s*>/i).filter(Boolean);
+                const additions = String(incoming[key] || '').split('\n').filter(line => line && !existing.includes(line));
+                if (additions.length) merged[key] = [merged[key], ...additions].filter(Boolean).join('\n');
+            }
+            const union = (a, b) => [...new Set([...(a || []), ...(b || [])])];
+            merged.taskType = union(String(old.taskType || '').split(', ').filter(Boolean), String(incoming.taskType || '').split(', ').filter(Boolean)).join(', ');
+            merged.coworkers = union(old.coworkers, incoming.coworkers);
+            if (!merged.status) merged.status = incoming.status;
+            for (const [id, names] of Object.entries(incoming.customGroups)) merged.customGroups[id] = union(Array.isArray(merged.customGroups[id]) ? merged.customGroups[id] : (merged.customGroups[id] ? [merged.customGroups[id]] : []), names);
+            for (const [name, qty] of Object.entries(incoming.equips)) merged.equips[name] = Math.max(Number(merged.equips[name] || 0), qty);
+            if (JSON.stringify(merged) !== JSON.stringify(old)) { window.saveToLocalStore('logs', merged); updated++; }
+        }
+        refresh();
+        toast(`새 작업 ${added}건 · 보충 ${updated}건${skipped ? ` · 확인 필요 ${skipped}건` : ''}`);
     }
 
     function closeModal() {

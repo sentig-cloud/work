@@ -763,8 +763,8 @@ window.clearSentDirty = function (sent) {
     else window.setDirtyMap(current);
 };
 
-// 같은 기기의 여러 탭이 동시에 서버로 보내지 않도록 브라우저 잠금을 쓴다(지원 안 하면 그냥 실행).
-// 잠금이 어떤 이유로든 오래 안 풀리면(브라우저 이상) 저장이 멈추지 않도록 일정 시간 뒤엔 잠금 없이 진행한다.
+// 같은 기기의 여러 탭이 동시에 서버로 보내지 않도록 브라우저 잠금을 쓴다.
+// 잠금 대기 시간이 지나면 변경 표시를 유지하고 다음 동기화에서 다시 시도한다.
 function withSyncLock(task) {
     if (!(navigator.locks && navigator.locks.request && typeof AbortController === "function")) return task();
     const controller = new AbortController();
@@ -774,7 +774,7 @@ function withSyncLock(task) {
         return task();
     }).catch((e) => {
         clearTimeout(timer);
-        if (e && e.name === "AbortError") return task();
+        if (e && e.name === "AbortError") throw new Error("다른 탭의 동기화가 끝나기를 기다리는 중입니다. 잠시 후 다시 시도합니다.");
         throw e;
     });
 }

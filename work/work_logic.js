@@ -254,7 +254,7 @@ window.copyWorkDraft = async () => {
 window.isWorkEditLocked = false;
 
 window.setWorkEditLocked = (locked) => {
-    window.isWorkEditLocked = !!locked;
+    window.isWorkEditLocked = !!locked && window.getCardToolsSettings?.().editLock !== false;
     const modal = document.getElementById("workModal");
     if (modal) {
         modal.classList.toggle("work-edit-locked", window.isWorkEditLocked);
@@ -275,9 +275,11 @@ window.setWorkEditLocked = (locked) => {
     // 매번 수정 버튼부터 누르게 하면 타이밍을 놓치기 쉬움.
     const basicGroupEl = editableRoot.querySelector('.drag-item[data-id="1"]');
     const durationGroupEl = editableRoot.querySelector('.drag-item[data-group-ref="duration"]');
+    const photoGroupEl = editableRoot.querySelector('.drag-item[data-id="7"]');
     const isLockExempt = (element) =>
         (basicGroupEl && basicGroupEl.contains(element)) ||
-        (durationGroupEl && durationGroupEl.contains(element));
+        (durationGroupEl && durationGroupEl.contains(element)) ||
+        (photoGroupEl && photoGroupEl.contains(element));
 
     editableRoot.querySelectorAll("input, textarea, select, button").forEach((element) => {
         if (element.id === "workCopyBtn" || isLockExempt(element)) {

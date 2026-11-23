@@ -597,7 +597,7 @@ window.setWorkEditLocked = (locked) => {
     // 그룹 메뉴는 수정 모드(locked=false)일 때만 표시
     const menuArea = document.getElementById('workGroupMenuArea');
     if (menuArea) {
-        if (!locked) {
+        if (!window.isWorkEditLocked) {
             menuArea.style.display = 'flex';
             window.renderGroupMenu();
         } else {
